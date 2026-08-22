@@ -29,11 +29,13 @@ namespace ElectricalSim
         private Text modeText;
         private Text taskText;
         private Text taskDescriptionText;
+        private Image taskSchematicImage;
         private Text statusText;
         private Text instrumentText;
         private TrainingCameraController trainingCamera;
         private Transform wireRoot;
         private Material wireMaterial;
+        private OriginalVisualRegistry originalVisuals;
 
         public SimulationMode Mode { get; private set; } = SimulationMode.View;
         public CircuitGraph Graph => graph;
@@ -46,18 +48,22 @@ namespace ElectricalSim
             Text modeLabel,
             Text taskLabel,
             Text taskDescription,
+            Image taskSchematic,
             Text statusLabel,
             Text instrumentLabel,
-            Material lineMaterial)
+            Material lineMaterial,
+            OriginalVisualRegistry visualRegistry)
         {
             trainingCamera = cameraController;
             wireRoot = wireContainer;
             modeText = modeLabel;
             taskText = taskLabel;
             taskDescriptionText = taskDescription;
+            taskSchematicImage = taskSchematic;
             statusText = statusLabel;
             instrumentText = instrumentLabel;
             wireMaterial = lineMaterial;
+            originalVisuals = visualRegistry;
             tasks = CircuitTaskCatalog.CreateAll();
 
             foreach (var view in deviceViews)
@@ -388,6 +394,17 @@ namespace ElectricalSim
         {
             taskText.text = $"{taskIndex + 1:00}/{tasks.Count:00}  {CurrentTask.Name}";
             taskDescriptionText.text = CurrentTask.Description;
+            if (taskSchematicImage != null)
+            {
+                var sprite = originalVisuals != null ? originalVisuals.ResolveSchematic(CurrentTask.Id) : null;
+                taskSchematicImage.sprite = sprite;
+                taskSchematicImage.enabled = sprite != null;
+                if (sprite != null && sprite.rect.height > 0f)
+                {
+                    var fitter = taskSchematicImage.GetComponent<AspectRatioFitter>();
+                    if (fitter != null) fitter.aspectRatio = sprite.rect.width / sprite.rect.height;
+                }
+            }
             SetStatus("已选择任务：" + CurrentTask.Name, false);
         }
 

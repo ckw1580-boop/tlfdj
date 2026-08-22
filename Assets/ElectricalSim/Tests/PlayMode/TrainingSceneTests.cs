@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -47,6 +48,33 @@ namespace ElectricalSim.Tests
             var result = CircuitTaskEvaluator.EvaluateTopology(controller.Graph, controller.CurrentTask);
             Assert.That(result.Passed, Is.True, result.Summary());
             Assert.That(controller.Graph.Wires.Count, Is.GreaterThan(10));
+        }
+
+        [UnityTest]
+        public IEnumerator OriginalModelConnectionPointsUseTerminalTransforms()
+        {
+            AssertPortMatchesTerminal("QF", "L1", "1");
+            AssertPortMatchesTerminal("QF", "T3", "6");
+            AssertPortMatchesTerminal("KM1", "L1", "1L1");
+            AssertPortMatchesTerminal("KM1", "T2", "4T2");
+            AssertPortMatchesTerminal("KM1", "A1", "A1");
+            AssertPortMatchesTerminal("KM1", "13", "13NO");
+            AssertPortMatchesTerminal("FR", "95", "95NC");
+            AssertPortMatchesTerminal("SB1", "COM", "COM1");
+            AssertPortMatchesTerminal("SB1", "NO", "NO1");
+            AssertPortMatchesTerminal("M1", "U", "U1");
+            yield return null;
+        }
+
+        private static void AssertPortMatchesTerminal(string deviceId, string portName, string terminalName)
+        {
+            var device = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == deviceId);
+            var port = device.Ports.Single(view => view.PortName == portName);
+            var terminal = device.GetComponentsInChildren<Transform>(true)
+                .First(transform => transform.name == terminalName);
+            Assert.That(Vector3.Distance(port.transform.position, terminal.position), Is.LessThan(0.0005f),
+                $"{deviceId}.{portName} must be located on original terminal {terminalName}");
         }
     }
 }

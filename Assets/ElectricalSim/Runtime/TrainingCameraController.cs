@@ -10,7 +10,7 @@ namespace ElectricalSim
         public float LookSensitivity = 2.2f;
         public float ZoomSpeed = 3f;
         public Vector3 DefaultPosition = new Vector3(0f, 1.7f, -5.2f);
-        public Vector3 DefaultEuler = new Vector3(5f, 0f, 0f);
+        public Vector3 DefaultEuler = new Vector3(2f, 0f, 0f);
 
         private void Start()
         {
@@ -55,7 +55,7 @@ namespace ElectricalSim
 
         public void SetWiringView()
         {
-            transform.position = new Vector3(0f, 1.75f, -4.1f);
+            transform.position = new Vector3(0f, 1.72f, -4.7f);
             transform.eulerAngles = new Vector3(1f, 0f, 0f);
         }
 

@@ -151,8 +151,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ac056511694c45f3a5304d9d32411190, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  originalVisuals: {fileID: 0}
-  showMissingAssetNotice: 1
+  originalVisuals: {fileID: 11400000, guid: 15ea193620b6dac4c87a4f7b10533027, type: 2}
+  showMissingAssetNotice: 0
   primitiveMaterial: {fileID: 2100000, guid: 484769669a25aa24d9b72137a8d2f624, type: 2}
   wireMaterial: {fileID: 2100000, guid: 0f473090c2c95e74eba0f7d0b82efd3d, type: 2}
 --- !u!4 &1542620040
