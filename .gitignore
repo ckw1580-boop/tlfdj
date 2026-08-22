@@ -5,6 +5,8 @@
 /[Bb]uild/
 /[Bb]uilds/
 /[Ll]ogs/
+access_*.log
+error_*.log
 /[Uu]ser[Ss]ettings/
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
@@ -44,3 +46,6 @@ crashlytics-build.properties
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# User-provided original asset staging area (imported copies belong under Assets/OriginalContent)
+/OriginalAssetsSource/
