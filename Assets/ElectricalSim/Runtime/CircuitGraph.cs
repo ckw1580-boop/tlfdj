@@ -130,6 +130,27 @@ namespace ElectricalSim
 
         public void ClearWires() => wires.Clear();
 
+        public void ReplaceWires(IEnumerable<WireConnection> replacement)
+        {
+            wires.Clear();
+            if (replacement == null) return;
+            foreach (var wire in replacement) wires.Add(CloneWire(wire));
+        }
+
+        public static WireConnection CloneWire(WireConnection source)
+        {
+            return new WireConnection
+            {
+                Id = source.Id,
+                StartPort = source.StartPort,
+                EndPort = source.EndPort,
+                Color = source.Color,
+                Area = source.Area,
+                LineType = source.LineType,
+                Points = new List<Vector3>(source.Points)
+            };
+        }
+
         public bool AreConnectedByWiring(string portA, string portB)
         {
             var union = BuildUnion(includeDeviceContacts: false);

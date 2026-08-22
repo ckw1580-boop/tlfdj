@@ -1,0 +1,1727 @@
+[
+  {
+    "DeviceId": "QF",
+    "PortName": "L1",
+    "TransformPath": "point/1",
+    "local": [
+      0.0318,
+      0.0459,
+      0.0014
+    ],
+    "world": [
+      0.0318,
+      0.0459,
+      0.0014
+    ]
+  },
+  {
+    "DeviceId": "QF",
+    "PortName": "L2",
+    "TransformPath": "point/3",
+    "local": [
+      0.0063,
+      0.0459,
+      0.00139999948
+    ],
+    "world": [
+      0.0063,
+      0.0459,
+      0.00139999948
+    ]
+  },
+  {
+    "DeviceId": "QF",
+    "PortName": "L3",
+    "TransformPath": "point/5",
+    "local": [
+      -0.0192,
+      0.0459,
+      0.00139999948
+    ],
+    "world": [
+      -0.0192,
+      0.0459,
+      0.00139999948
+    ]
+  },
+  {
+    "DeviceId": "QF",
+    "PortName": "T1",
+    "TransformPath": "point/2",
+    "local": [
+      0.0318,
+      -0.0452999957,
+      0.00139999948
+    ],
+    "world": [
+      0.0318,
+      -0.0452999957,
+      0.00139999948
+    ]
+  },
+  {
+    "DeviceId": "QF",
+    "PortName": "T2",
+    "TransformPath": "point/4",
+    "local": [
+      0.0063,
+      -0.0452999957,
+      0.00139999948
+    ],
+    "world": [
+      0.0063,
+      -0.0452999957,
+      0.00139999948
+    ]
+  },
+  {
+    "DeviceId": "QF",
+    "PortName": "T3",
+    "TransformPath": "point/6",
+    "local": [
+      -0.0192,
+      -0.0453,
+      0.00139999948
+    ],
+    "world": [
+      -0.0192,
+      -0.0453,
+      0.00139999948
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0203,
+      0.0274,
+      0.08065
+    ],
+    "world": [
+      0.0203,
+      0.0274,
+      0.08065
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      0.0067,
+      0.0275,
+      0.08078
+    ],
+    "world": [
+      0.0067,
+      0.0275,
+      0.08078
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ],
+    "world": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ],
+    "world": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ],
+    "world": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ],
+    "world": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "A1",
+    "TransformPath": "point/A1",
+    "local": [
+      0.02,
+      0.0393,
+      0.059
+    ],
+    "world": [
+      0.02,
+      0.0393,
+      0.059
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "A2",
+    "TransformPath": "point/A2",
+    "local": [
+      -0.021,
+      0.04,
+      0.0591
+    ],
+    "world": [
+      -0.021,
+      0.04,
+      0.0591
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "13",
+    "TransformPath": "point/13NO",
+    "local": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ],
+    "world": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ]
+  },
+  {
+    "DeviceId": "KM1",
+    "PortName": "14",
+    "TransformPath": "point/14NO",
+    "local": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ],
+    "world": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0203,
+      0.0274,
+      0.08065
+    ],
+    "world": [
+      0.0203,
+      0.0274,
+      0.08065
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      0.0067,
+      0.0275,
+      0.08078
+    ],
+    "world": [
+      0.0067,
+      0.0275,
+      0.08078
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ],
+    "world": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ],
+    "world": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ],
+    "world": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ],
+    "world": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "A1",
+    "TransformPath": "point/A1",
+    "local": [
+      0.02,
+      0.0393,
+      0.059
+    ],
+    "world": [
+      0.02,
+      0.0393,
+      0.059
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "A2",
+    "TransformPath": "point/A2",
+    "local": [
+      -0.021,
+      0.04,
+      0.0591
+    ],
+    "world": [
+      -0.021,
+      0.04,
+      0.0591
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "13",
+    "TransformPath": "point/13NO",
+    "local": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ],
+    "world": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ]
+  },
+  {
+    "DeviceId": "KM2",
+    "PortName": "14",
+    "TransformPath": "point/14NO",
+    "local": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ],
+    "world": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0203,
+      0.0274,
+      0.08065
+    ],
+    "world": [
+      0.0203,
+      0.0274,
+      0.08065
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      0.0067,
+      0.0275,
+      0.08078
+    ],
+    "world": [
+      0.0067,
+      0.0275,
+      0.08078
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ],
+    "world": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ],
+    "world": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ],
+    "world": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ],
+    "world": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "A1",
+    "TransformPath": "point/A1",
+    "local": [
+      0.02,
+      0.0393,
+      0.059
+    ],
+    "world": [
+      0.02,
+      0.0393,
+      0.059
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "A2",
+    "TransformPath": "point/A2",
+    "local": [
+      -0.021,
+      0.04,
+      0.0591
+    ],
+    "world": [
+      -0.021,
+      0.04,
+      0.0591
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "13",
+    "TransformPath": "point/13NO",
+    "local": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ],
+    "world": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ]
+  },
+  {
+    "DeviceId": "KMF",
+    "PortName": "14",
+    "TransformPath": "point/14NO",
+    "local": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ],
+    "world": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0203,
+      0.0274,
+      0.08065
+    ],
+    "world": [
+      0.0203,
+      0.0274,
+      0.08065
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      0.0067,
+      0.0275,
+      0.08078
+    ],
+    "world": [
+      0.0067,
+      0.0275,
+      0.08078
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ],
+    "world": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ],
+    "world": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ],
+    "world": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ],
+    "world": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "A1",
+    "TransformPath": "point/A1",
+    "local": [
+      0.02,
+      0.0393,
+      0.059
+    ],
+    "world": [
+      0.02,
+      0.0393,
+      0.059
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "A2",
+    "TransformPath": "point/A2",
+    "local": [
+      -0.021,
+      0.04,
+      0.0591
+    ],
+    "world": [
+      -0.021,
+      0.04,
+      0.0591
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "13",
+    "TransformPath": "point/13NO",
+    "local": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ],
+    "world": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ]
+  },
+  {
+    "DeviceId": "KMR",
+    "PortName": "14",
+    "TransformPath": "point/14NO",
+    "local": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ],
+    "world": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0203,
+      0.0274,
+      0.08065
+    ],
+    "world": [
+      0.0203,
+      0.0274,
+      0.08065
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      0.0067,
+      0.0275,
+      0.08078
+    ],
+    "world": [
+      0.0067,
+      0.0275,
+      0.08078
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ],
+    "world": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ],
+    "world": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ],
+    "world": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ],
+    "world": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "A1",
+    "TransformPath": "point/A1",
+    "local": [
+      0.02,
+      0.0393,
+      0.059
+    ],
+    "world": [
+      0.02,
+      0.0393,
+      0.059
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "A2",
+    "TransformPath": "point/A2",
+    "local": [
+      -0.021,
+      0.04,
+      0.0591
+    ],
+    "world": [
+      -0.021,
+      0.04,
+      0.0591
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "13",
+    "TransformPath": "point/13NO",
+    "local": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ],
+    "world": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ]
+  },
+  {
+    "DeviceId": "KMB",
+    "PortName": "14",
+    "TransformPath": "point/14NO",
+    "local": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ],
+    "world": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0203,
+      0.0274,
+      0.08065
+    ],
+    "world": [
+      0.0203,
+      0.0274,
+      0.08065
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      0.0067,
+      0.0275,
+      0.08078
+    ],
+    "world": [
+      0.0067,
+      0.0275,
+      0.08078
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ],
+    "world": [
+      -0.00667,
+      0.0278,
+      0.0809
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ],
+    "world": [
+      0.0201,
+      -0.02892,
+      0.0796
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ],
+    "world": [
+      0.00669,
+      -0.0293,
+      0.08032
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ],
+    "world": [
+      -0.00711,
+      -0.02911,
+      0.07985
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "A1",
+    "TransformPath": "point/A1",
+    "local": [
+      0.02,
+      0.0393,
+      0.059
+    ],
+    "world": [
+      0.02,
+      0.0393,
+      0.059
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "A2",
+    "TransformPath": "point/A2",
+    "local": [
+      -0.021,
+      0.04,
+      0.0591
+    ],
+    "world": [
+      -0.021,
+      0.04,
+      0.0591
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "13",
+    "TransformPath": "point/13NO",
+    "local": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ],
+    "world": [
+      -0.02035,
+      0.02779,
+      0.08086
+    ]
+  },
+  {
+    "DeviceId": "KB",
+    "PortName": "14",
+    "TransformPath": "point/14NO",
+    "local": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ],
+    "world": [
+      -0.02071,
+      -0.02911,
+      0.07987
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "L1",
+    "TransformPath": "point/1L1",
+    "local": [
+      0.0165,
+      0.0337,
+      0.049
+    ],
+    "world": [
+      0.0165,
+      0.0337,
+      0.049
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "L2",
+    "TransformPath": "point/3L2",
+    "local": [
+      -0.0002,
+      0.0338,
+      0.049
+    ],
+    "world": [
+      -0.0002,
+      0.0338,
+      0.049
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "L3",
+    "TransformPath": "point/5L3",
+    "local": [
+      -0.01667,
+      0.03431,
+      0.04991
+    ],
+    "world": [
+      -0.01667,
+      0.03431,
+      0.04991
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "T1",
+    "TransformPath": "point/2T1",
+    "local": [
+      0.01726,
+      -0.03098,
+      0.04952
+    ],
+    "world": [
+      0.01726,
+      -0.03098,
+      0.04952
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "T2",
+    "TransformPath": "point/4T2",
+    "local": [
+      0.00037,
+      -0.03098,
+      0.04952
+    ],
+    "world": [
+      0.00037,
+      -0.03098,
+      0.04952
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "T3",
+    "TransformPath": "point/6T3",
+    "local": [
+      -0.01665,
+      -0.0309800021,
+      0.04952
+    ],
+    "world": [
+      -0.01665,
+      -0.0309800021,
+      0.04952
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "95",
+    "TransformPath": "point/95NC",
+    "local": [
+      -0.01802,
+      -0.01277,
+      0.07533
+    ],
+    "world": [
+      -0.01802,
+      -0.01277,
+      0.07533
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "96",
+    "TransformPath": "point/96NC",
+    "local": [
+      -0.00555,
+      -0.01294,
+      0.07533
+    ],
+    "world": [
+      -0.00555,
+      -0.01294,
+      0.07533
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "97",
+    "TransformPath": "point/97NO",
+    "local": [
+      0.00747,
+      -0.01324,
+      0.07533
+    ],
+    "world": [
+      0.00747,
+      -0.01324,
+      0.07533
+    ]
+  },
+  {
+    "DeviceId": "FR",
+    "PortName": "98",
+    "TransformPath": "point/98NO",
+    "local": [
+      0.02042,
+      -0.01291,
+      0.07533
+    ],
+    "world": [
+      0.02042,
+      -0.01291,
+      0.07533
+    ]
+  },
+  {
+    "DeviceId": "SB0",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0A",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0A",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0A",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0B",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0B",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB0B",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SBR",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SBR",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SBR",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SBB",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      -0.0111,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SBB",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      -0.0098,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SBB",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ],
+    "world": [
+      0.0096,
+      0.0102,
+      -0.0063
+    ]
+  },
+  {
+    "DeviceId": "SB1",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.01046,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      0.01046,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB2",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB2",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB2",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.01046,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      0.01046,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SBF",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SBF",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SBF",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.01046,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      0.01046,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SBE",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SBE",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SBE",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.01046,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      0.01046,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1A",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1A",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1A",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.01046,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      0.01046,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1B",
+    "PortName": "COM",
+    "TransformPath": "point/COM1",
+    "local": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      -0.01127,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1B",
+    "PortName": "NO",
+    "TransformPath": "point/NO1",
+    "local": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      -0.00914,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "SB1B",
+    "PortName": "NC",
+    "TransformPath": "point/NC2",
+    "local": [
+      0.01046,
+      0.01039,
+      -0.008
+    ],
+    "world": [
+      0.01046,
+      0.01039,
+      -0.008
+    ]
+  },
+  {
+    "DeviceId": "M1",
+    "PortName": "U",
+    "TransformPath": "point/U1",
+    "local": [
+      -0.0526,
+      0.1179,
+      -0.0199
+    ],
+    "world": [
+      -0.0526,
+      0.1179,
+      -0.0199
+    ]
+  },
+  {
+    "DeviceId": "M1",
+    "PortName": "V",
+    "TransformPath": "point/V1",
+    "local": [
+      -0.0785,
+      0.1179,
+      -0.0198
+    ],
+    "world": [
+      -0.0785,
+      0.1179,
+      -0.0198
+    ]
+  },
+  {
+    "DeviceId": "M1",
+    "PortName": "W",
+    "TransformPath": "point/W1",
+    "local": [
+      -0.1051,
+      0.1179,
+      -0.0196
+    ],
+    "world": [
+      -0.1051,
+      0.1179,
+      -0.0196
+    ]
+  },
+  {
+    "DeviceId": "M2",
+    "PortName": "U",
+    "TransformPath": "point/U1",
+    "local": [
+      -0.0526,
+      0.1179,
+      -0.0199
+    ],
+    "world": [
+      -0.0526,
+      0.1179,
+      -0.0199
+    ]
+  },
+  {
+    "DeviceId": "M2",
+    "PortName": "V",
+    "TransformPath": "point/V1",
+    "local": [
+      -0.0785,
+      0.1179,
+      -0.0198
+    ],
+    "world": [
+      -0.0785,
+      0.1179,
+      -0.0198
+    ]
+  },
+  {
+    "DeviceId": "M2",
+    "PortName": "W",
+    "TransformPath": "point/W1",
+    "local": [
+      -0.1051,
+      0.1179,
+      -0.0196
+    ],
+    "world": [
+      -0.1051,
+      0.1179,
+      -0.0196
+    ]
+  }
+]

@@ -1,0 +1,1412 @@
+{
+    "wiring":[//接线题目
+        {
+            "id":"1",//大题目编号
+            "des":"PLC供电",//描述
+            "score":4,//该题得分
+            "isFinish":false,//是否完成
+            "tag":"电路系统",
+            "tagIndex":"1",
+            "wiring":[
+                {
+                    "id":"1.1.1",//小题目编号
+                    "des":"PLC_1供电",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"15",//设备1 -> 端子排1
+                            "device1_Prot":"PLC_1_L+",//设备1点位 -> PLC_1_L+
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V+",//设备2点位 -> 24V+
+                            "isFinish":false//是否完成
+                        },
+                      {
+                        "device1": "15", //设备1 -> 端子排1
+                        "device1_Prot": "PLC_1_M", //设备1点位 -> PLC_1_M
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                },
+                {
+                    "id":"1.1.2",//小题目编号
+                    "des":"PLC_1输入公共端接线、PLC_1输出公共端接线",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                      {
+                        "device1": "15", //设备1 -> 端子排1
+                        "device1_Prot": "PLC_1_1M", //设备1点位 -> PLC_1_1M
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      },
+                      {
+                        "device1": "24", //设备1 -> 端子排2
+                        "device1_Prot": "PLC_1_3L+", //设备1点位 -> PLC_1_3L+
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V+", //设备2点位 -> 24V+
+                        "isFinish": false //是否完成
+                      },
+                      {
+                        "device1": "24", //设备1 -> 端子排2
+                        "device1_Prot": "PLC_1_3M-", //设备1点位 -> PLC_1_3M-
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                },
+                {
+                    "id":"1.1.3",//小题目编号
+                    "des":"PLC_2供电",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                      {
+                        "device1": "15", //设备1 -> 端子排1
+                        "device1_Prot": "PLC_2_L+", //设备1点位 -> PLC_2_L+
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V+", //设备2点位 -> 24V+
+                        "isFinish": false //是否完成
+                      },
+                      {
+                        "device1": "15", //设备1 -> 端子排1
+                        "device1_Prot": "PLC_2_M", //设备1点位 -> PLC_2_M
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                },
+                {
+                    "id":"1.1.4",//小题目编号
+                    "des":"PLC_2输入公共端接线、PLC_2输出公共端接线",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                      {
+                        "device1": "15", //设备1 -> 端子排1
+                        "device1_Prot": "PLC_2_1M", //设备1点位 -> PLC_2_1M
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      },
+                      {
+                        "device1": "24", //设备1 -> 端子排2
+                        "device1_Prot": "PLC_2_3L+", //设备1点位 -> PLC_2_3L+
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V+", //设备2点位 -> 24V+
+                        "isFinish": false //是否完成
+                      },
+                      {
+                        "device1": "24", //设备1 -> 端子排2
+                        "device1_Prot": "PLC_2_3M-", //设备1点位 -> PLC_2_3M-
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                }
+            ]            
+        },
+        {
+            "id":"2",//大题目编号
+            "des":"电机正转电路",//描述
+            "score":8,//该题得分
+            "isFinish":false,//是否完成
+            "tag":"电路系统",
+            "tagIndex":"1",
+            "wiring":[
+                {
+                    "id":"2.1.1",//小题目编号
+                    "des":"三相电源连接到指定的KM4端子上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"U1",//设备1点位 -> U1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM4_1L1",//设备2点位 -> KM4_1L1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"V1",//设备1点位 -> V1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM4_3L2",//设备2点位 -> KM4_3L2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"W1",//设备1点位 -> W1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM4_5L3",//设备2点位 -> KM4_5L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"2.1.2",//小题目编号
+                    "des":"指定的KM4连接到热继电器上FR1端子上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM4_2T1",//设备1点位 -> KM4_2T1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR1_1L1",//设备2点位 -> FR1_1L1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM4_4T2",//设备1点位 -> KM4_4T2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR1_3L2",//设备2点位 -> FR1-3L2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM4_6T3",//设备1点位 -> KM4_6T3
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR1_5L3",//设备2点位 -> FR1-5L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"2.1.3",//小题目编号
+                    "des":"热继电器FR1分别连接到电机端子区中上端点电机1上的（U1 V1 W1 ），电机端子区中的下端子点电机1（U1 V1 W1)连接三相鼠笼电机1中的（U1 V1 W1）",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR1_2T1",//设备1点位 -> 2T1
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机1_U1",//设备2点位 -> 三相鼠笼电机1_U1                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_U1",//设备1点位 -> 三相鼠笼电机1_U1
+                            "device2":"49",//设备2 -> 三相鼠笼电机
+                            "device2_Prot":"U1",//设备2点位 -> U1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR1_4T2",//设备1点位 -> 4T2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机1_V1",//设备2点位 -> 三相鼠笼电机1_V1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_V1",//设备1点位 -> 三相鼠笼电机1_V1
+                            "device2":"49",//设备2 -> 三相鼠笼电机
+                            "device2_Prot":"V1",//设备2点位 -> V1                           
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR1_6T3",//设备1点位 -> 6T3
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机1_W1",//设备2点位 -> 三相鼠笼电机1_W1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_W1",//设备1点位 -> 三相鼠笼电机1_W1
+                            "device2":"49",//设备2 -> 三相鼠笼电机1
+                            "device2_Prot":"W1",//设备2点位 -> W1
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"2.1.4",//小题目编号
+                    "des":"电机端子区三相鼠笼电机1下端子连接三相鼠笼电机1上的（U2 V2 W2 ），电机端子区上端子三相鼠笼电机1（U2 V2 W2）用电线连接起来",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_U2",//设备1点位 -> 三相鼠笼电机1_U2
+                            "device2":"49",//设备2 -> 三相鼠笼电机1
+                            "device2_Prot":"U2",//设备2点位 -> U2                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_V2",//设备1点位 -> 三相鼠笼电机1_V2
+                            "device2":"49",//设备2 -> 三相鼠笼电机1
+                            "device2_Prot":"V2",//设备2点位 -> V2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_W2",//设备1点位 -> 三相鼠笼电机1_W2
+                            "device2":"49",//设备2 -> 三相鼠笼电机1
+                            "device2_Prot":"W2",//设备2点位 -> W2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_V2",//设备1点位 -> 三相鼠笼电机1_V2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机1_U2",//设备2点位 -> 三相鼠笼电机1_U2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机1_V2",//设备1点位 -> 三相鼠笼电机1_V2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机1_W2",//设备2点位 -> 三相鼠笼电机1_W2                           
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"2.2.1",//小题目编号
+                    "des":"SB1-COM1连接到SA1-COM1开关上，且SB1-ON1连接到指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> SB1按钮
+                            "device1_Prot":"SB1_COM1",//设备1点位 -> COM1
+                            "device2":"13",//设备2 -> SA1旋钮
+                            "device2_Prot":"SA1_COM1",//设备2点位 -> COM1                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> SB1按钮
+                            "device1_Prot":"SB1_NO1",//设备1点位 -> NO1
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_1_M0.1",//设备2点位 -> PLC_1_M0.1
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"2.2.2",//小题目编号
+                    "des":"指定的PLC端口连接到KA4-13上，且由KA4-14连接到24V-上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA4_13",//设备1点位 -> KA4_13
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.4",//设备2点位 -> PLC_2_Q0.4                            
+                            "isFinish":false//是否完成
+                        },
+                      {
+                        "device1": "24", //设备1 -> 端子排2
+                        "device1_Prot": "KA4_14", //设备1点位 -> KA4_14
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                },
+                {
+                    "id":"2.2.3",//小题目编号
+                    "des":"三相电源U1连接到FR1-95NC,FR1-96NC连接到KA4-5,且KA4-9连接到KM4-A1上，KM4-A2连接到N1端点上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"U1",//设备1点位 -> U1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR1_95NC",//设备2点位 -> FR1_95NC                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR1_96NC",//设备1点位 -> FR1_96NC
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"KA4_5",//设备2点位 -> KA4_5                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA4_9",//设备1点位 -> KA4_9
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM4_A1",//设备2点位 -> KM4_A1                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"KM4_A2",//设备1点位 -> KM4_A2
+                            "device2":"13",//设备2 -> 端子排0
+                            "device2_Prot":"N1",//设备2点位 -> N1
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"2.2.4",//小题目编号
+                    "des":"被指定的PLC端口连接到指示灯HL1-L，且HL1-N连接到24V-上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> HL1指示灯
+                            "device1_Prot":"HL1_L",//设备1点位 -> L
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.0",//设备2点位 -> PLC_1_Q0.0                            
+                            "isFinish":false//是否完成
+                        },
+                      {
+                        "device1": "13", //设备1 -> HL1指示灯
+                        "device1_Prot": "HL1_N", //设备1点位 -> N
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                }
+            ]            
+        },
+        {
+            "id":"3",//大题目编号
+            "des":"双速电机电路",//描述
+            "score":17,//该题得分
+            "isFinish":false,//是否完成
+            "tag":"电路系统",
+            "tagIndex":"1",
+            "wiring":[
+                {
+                    "id":"3.1.1",//小题目编号
+                    "des":"三相电源连接到指定的热继电器FR2端子上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"U2",//设备1点位 -> U2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR2_1L1",//设备2点位 -> FR2_1L1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"V2",//设备1点位 -> V2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR2_3L2",//设备2点位 -> FR2_3L2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"W2",//设备1点位 -> W2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR2_5L3",//设备2点位 -> FR2_5L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.1.2",//小题目编号
+                    "des":"热继电器FR2连接到KM2（1L1  3L2  5L3）端子上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR2_2T1",//设备1点位 -> FR2_2T1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_1L1",//设备2点位 -> KM2_1L1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR2_4T2",//设备1点位 -> FR2-4T2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_3L2",//设备2点位 -> KM2_3L2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR2_6T3",//设备1点位 -> FR2-6T3
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_5L3",//设备2点位 -> KM2_5L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.1.3",//小题目编号
+                    "des":"KM2(2T1  4T2  6T3)分别连接电机端子区中上端子双速电机（U1 V1 W1），电机端子区下端子双速电机（U1 V1 W1）连接双速电机（U1 V1 W1）。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_2T1",//设备1点位 -> KM2_2T1
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"双速电机_U1",//设备2点位 -> 双速电机_U1                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"双速电机_U1",//设备1点位 -> 双速电机_U1
+                            "device2":"118",//设备2 -> 双速电机
+                            "device2_Prot":"U1",//设备2点位 -> U1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_4T2",//设备1点位 -> KM2_4T2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"双速电机_V1",//设备2点位 -> 双速电机_V1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"双速电机_V1",//设备1点位 -> 双速电机_V1
+                            "device2":"118",//设备2 -> 双速电机
+                            "device2_Prot":"V1",//设备2点位 -> V1                           
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_6T3",//设备1点位 -> KM2_6T3
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"双速电机_W1",//设备2点位 -> 双速电机_W1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"双速电机_W1",//设备1点位 -> 双速电机_W1
+                            "device2":"118",//设备2 -> 双速电机
+                            "device2_Prot":"W1",//设备2点位 -> W1
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.1.4",//小题目编号
+                    "des":"KM2(1L1  3L2  5L3)分别连接KM1（1L1  3L2  5L3）端子上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"25",//设备1 -> 端子排7
+                            "device1_Prot":"KM2_1L1",//设备1点位 -> KM2_1L1
+                            "device2":"25",//设备2 -> 端子排7
+                            "device2_Prot":"KM1_1L1",//设备2点位 -> KM1_1L1                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排7
+                            "device1_Prot":"KM2_3L2",//设备1点位 -> KM2_3L2
+                            "device2":"25",//设备2 -> 端子排7
+                            "device2_Prot":"KM1_3L2",//设备2点位 -> KM1_3L2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排7
+                            "device1_Prot":"KM2_5L3",//设备1点位 -> KM2_5L3
+                            "device2":"25",//设备2 -> 端子排7
+                            "device2_Prot":"KM1_5L3",//设备2点位 -> KM1_5L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.1.5",//小题目编号
+                    "des":"KM1(2T1  4T2  6T3)分别连接电机端子区上端子中的双速电机（U2 V2 W2），电机端子区下端子双速电机（U2 V2 W2）连接双速电机（U2 V2 W2）。",//描述
+                    "score":2,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM1_2T1",//设备1点位 -> KM1_2T1
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"双速电机_U2",//设备2点位 -> 双速电机_U2                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"双速电机_U2",//设备1点位 -> 双速电机_U2
+                            "device2":"118",//设备2 -> 双速电机
+                            "device2_Prot":"U2",//设备2点位 -> U2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM1_4T2",//设备1点位 -> KM1_4T2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"双速电机_V2",//设备2点位 -> 双速电机_V2                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"双速电机_V2",//设备1点位 -> 双速电机_V2
+                            "device2":"118",//设备2 -> 双速电机
+                            "device2_Prot":"V2",//设备2点位 -> V2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM1_6T3",//设备1点位 -> KM1_6T3
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"双速电机_W2",//设备2点位 -> 双速电机_W2                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"双速电机_W2",//设备1点位 -> 双速电机_W2
+                            "device2":"118",//设备2 -> 双速电机
+                            "device2_Prot":"W2",//设备2点位 -> W2
+                            "isFinish":false//是否完成
+                        }                        
+                    ]
+                },
+                {
+                    "id":"3.1.6",//小题目编号
+                    "des":"KM2(2T1  4T2  6T3)分别连接到KM3(2T1  4T2  6T3)端子上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_2T1",//设备1点位 -> KM2_2T1
+                            "device2":"36",//设备2 -> 端子排4
+                            "device2_Prot":"KM3_2T1",//设备2点位 -> KM3_2T1                           
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_4T2",//设备1点位 -> KM2_4T2
+                            "device2":"36",//设备2 -> 端子排4
+                            "device2_Prot":"KM3_4T2",//设备2点位 -> KM3_4T2                           
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_6T3",//设备1点位 -> KM2_6T3
+                            "device2":"36",//设备2 -> 端子排4
+                            "device2_Prot":"KM3_6T3",//设备2点位 -> KM3_6T3                           
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.1.7",//小题目编号
+                    "des":"KM3(1L1  3L2  5L3)用电线连接起来",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"KM3_1L1",//设备1点位 -> KM3_1L1
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM3_3L2",//设备2点位 -> KM3_3L2                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"KM3_3L2",//设备1点位 -> KM3_3L2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM3_5L3",//设备2点位 -> KM3_5L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.1",//小题目编号
+                    "des":"SB3-COM1连接SB2-COM1且SB3-NO1连接到指定的PLC输入端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> SB3按钮
+                            "device1_Prot":"SB3_COM1",//设备1点位 -> COM1
+                            "device2":"13",//设备2 -> SB2按钮
+                            "device2_Prot":"SB2_COM1",//设备2点位 -> COM1                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> SB3按钮
+                            "device1_Prot":"SB3_NO1",//设备1点位 -> NO1
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_1_M0.3",//设备2点位 -> PLC_1_M0.3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.2",//小题目编号
+                    "des":"指定的PLC端口，连接到KA5-13上，由KA5-14连接到24V-上。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA5_13",//设备1点位 -> KA5_13
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.5",//设备2点位 -> PLC_2_Q0.5                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA5_14",//设备1点位 -> KA5_14
+                            "device2": "13|119", //设备2 -> 端子排0
+                            "device2_Prot": "24V-", //设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.3",//小题目编号
+                    "des":"指定的PLC端口，连接到KA2-13上，有KA2-14连接到KA3-14上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA2_13",//设备1点位 -> KA2_13
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.6",//设备2点位 -> PLC_2_Q0.6                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA2_14",//设备1点位 -> KA2_14
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"KA3_14",//设备2点位 -> KA3_14
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.4",//小题目编号
+                    "des":"指定的PLC端口，连接到KA3-13上，有KA3-14连接到KA5-14上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA3_13",//设备1点位 -> KA3_13
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.7",//设备2点位 -> PLC_2_Q0.7                            
+                            "isFinish":false//是否完成
+                        },
+                      {
+                        "device1": "24", //设备1 -> 端子排2
+                        "device1_Prot": "KA3_14", //设备1点位 -> KA3_14
+                        "device2":"24",//设备2 -> 端子排2
+                        "device2_Prot":"KA5_14",//设备2点位 -> KA5_14
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                },
+                {
+                    "id":"3.2.5",//小题目编号
+                    "des":"三相电源U2连接到FR2-95NC,FR2-96NC连接到KA5-5,且KA5-9连接到KM1-61NC上。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"U2",//设备1点位 -> U2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"FR2_95NC",//设备2点位 -> FR2_95NC              
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"FR2_96NC",//设备1点位 -> FR2_96NC
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"KA5_5",//设备2点位 -> KA5_5                  
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA5_9",//设备1点位 -> KA5_9
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM1_61NC",//设备2点位 -> KM1_61NC
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.6",//小题目编号
+                    "des":"KM1-62NC连接KM3-61NC上，且KM3-62NC连接KM2-A1上，且KM2-A2连接到KM3-A2端点上。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM1_62NC",//设备1点位 -> KM1_62NC
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM3_61NC",//设备2点位 -> KM3_61NC                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM3_62NC",//设备1点位 -> KM3_62NC
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_A1",//设备2点位 -> KM2_A1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"KM2_A2",//设备1点位 -> KM2_A2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM3_A2",//设备2点位 -> KM3_A2
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.7",//小题目编号
+                    "des":"KA2-5连接KA3_5，KA2-9连接到KM2-61NC上，KM2-62NC连接KM1-A1上，且KM1-A2连接到KM2-A2端点上。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"15",//设备1 -> 端子排1
+                            "device1_Prot":"KA2_5",//设备2点位 -> KA2_5
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"KA3_5",//设备1点位 -> KA3_5
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA2_9",//设备1点位 -> KA2_9
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_61NC",//设备2点位 -> KM2_61NC
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_62NC",//设备1点位 -> KM2_62NC
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM1_A1",//设备2点位 -> KM1_A1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"KM1_A2",//设备1点位 -> KM1_A2
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_A2",//设备2点位 -> KM2_A2
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.8",//小题目编号
+                    "des":"KA3-5连接到KA5-5,且KA3-9连接到KM2-71NC上，KM2-72NC连接KM3-A1上，且KM3-A2连接到N2端点上。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"15",//设备1 -> 端子排1
+                            "device1_Prot":"KA3_5",//设备1点位 -> KA3_5
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"KA5_5",//设备2点位 -> KA5_5                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"24",//设备1 -> 端子排2
+                            "device1_Prot":"KA3_9",//设备1点位 -> KA3_9
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM2_71NC",//设备2点位 -> KM2_71NC
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"KM2_72NC",//设备1点位 -> KM2_72NC
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"KM3_A1",//设备2点位 -> KM3_A1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"KM3_A2",//设备1点位 -> KM3_A2
+                            "device2":"13",//设备2 -> 端子排0
+                            "device2_Prot":"N2",//设备2点位 -> N2
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"3.2.9",//小题目编号
+                    "des":"被指定的PLC端口连接到指示灯HL3-L，且HL3-N连接到HL2-N上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> HL3指示灯
+                            "device1_Prot":"HL3_L",//设备1点位 -> L
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.2",//设备2点位 -> PLC_1_Q0.2                            
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> HL3指示灯
+                            "device1_Prot":"HL3_N",//设备1点位 -> N
+                            "device2":"13",//设备2 -> HL2指示灯
+                            "device2_Prot":"HL2_N",//设备2点位 -> N
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                }
+            ]            
+        },
+        {
+            "id":"4",//大题目编号
+            "des":"变频器电机电路",//描述
+            "score":9,//该题得分
+            "isFinish":false,//是否完成
+            "tag":"电路系统",
+            "tagIndex":"1",
+            "wiring":[
+                {
+                    "id":"4.1.1",//小题目编号
+                    "des":"三相电源分别连接到变频器上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"U3",//设备1点位 -> U3
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"G120_L1",//设备2点位 -> G120_L1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"V3",//设备1点位 -> V3
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"G120_L2",//设备2点位 -> G120_L2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 端子排0
+                            "device1_Prot":"W3",//设备1点位 -> W3
+                            "device2":"25",//设备2 -> 端子排3
+                            "device2_Prot":"G120_L3",//设备2点位 -> G120_L3
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.1.2",//小题目编号
+                    "des":"变频器连接到电机端子区上端子三相鼠笼电机2（U1 V1 W1 ），电机端子区下端子三相鼠笼电机2（U2 V2 W2）连接三相鼠笼电机2（U1 V1 W1）。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"G120_U2",//设备1点位 -> G120_U2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_U1",//设备2点位 -> 三相鼠笼电机2_U1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机2_U1",//设备1点位 -> 三相鼠笼电机2_U1
+                            "device2":"38",//设备2 -> 三相鼠笼电机2
+                            "device2_Prot":"U1",//设备2点位 -> U1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"G120_V2",//设备1点位 -> G120_V2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_V1",//设备2点位 -> 三相鼠笼电机2_V1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机2_V1",//设备1点位 -> 三相鼠笼电机2_V1
+                            "device2":"38",//设备2 -> 三相鼠笼电机2
+                            "device2_Prot":"V1",//设备2点位 -> V1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"G120_W2",//设备1点位 -> G120_W2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_W1",//设备2点位 -> 三相鼠笼电机2_W1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机2_W1",//设备1点位 -> 三相鼠笼电机2_W1
+                            "device2":"38",//设备2 -> 三相鼠笼电机2
+                            "device2_Prot":"W1",//设备2点位 -> W1
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.1.3",//小题目编号
+                    "des":"电机端子区三相鼠笼电机2下端子连接三相鼠笼电机2上的（U2 V2 W2 ），电机端子区上端子三相鼠笼电机2（U2 V2 W2）用电线连接起来",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"38",//设备1 -> 三相鼠笼电机2
+                            "device1_Prot":"U2",//设备1点位 -> U2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_U2",//设备2点位 -> 三相鼠笼电机2_U2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"38",//设备1 -> 三相鼠笼电机2
+                            "device1_Prot":"V2",//设备1点位 -> V2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_V2",//设备2点位 -> 三相鼠笼电机2_V2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"38",//设备1 -> 三相鼠笼电机2
+                            "device1_Prot":"W2",//设备1点位 -> W2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_W2",//设备2点位 -> 三相鼠笼电机2_W2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机2_U2",//设备1点位 -> 三相鼠笼电机2_U2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_V2",//设备2点位 -> 三相鼠笼电机2_V2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"120",//设备1 -> 端子排7
+                            "device1_Prot":"三相鼠笼电机2_V2",//设备1点位 -> 三相鼠笼电机2_V2
+                            "device2":"120",//设备2 -> 端子排7
+                            "device2_Prot":"三相鼠笼电机2_W2",//设备2点位 -> 三相鼠笼电机2_W2
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.2.1",//小题目编号
+                    "des":"SB2-COM1连接开关SB1-COM1,SB2-NO1且连接到指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                      {
+                        "device1": "13", //设备1 -> SB2按钮
+                        "device1_Prot": "SB2_COM1", //设备1点位 -> COM1
+                        "device2": "13", //设备2 -> SB1按钮
+                        "device2_Prot": "SB1_COM1", //设备2点位 -> SB1_COM1
+                        "isFinish": false //是否完成
+                      },
+                        {
+                            "device1":"13",//设备1 -> SB2按钮
+                            "device1_Prot":"SB2_NO1",//设备1点位 -> NO1
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_1_M0.2",//设备2点位 -> PLC_1_M0.2
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.2.2",//小题目编号
+                    "des":"变频器输入端子G120-DI0线路连接连到指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"G120_DI0",//设备1点位 -> G120_DI0
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.4",//设备2点位 -> PLC_1_Q0.4
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.2.3",//小题目编号
+                    "des":"变频器输入端子G120-DI4线路连接连到指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"G120_DI4",//设备1点位 -> G120_DI4
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.5",//设备2点位 -> PLC_1_Q0.5
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.2.4",//小题目编号
+                    "des":"变频器输入端子G120-DI5线路连接连到指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"25",//设备1 -> 端子排3
+                            "device1_Prot":"G120_DI5",//设备1点位 -> G120_DI5
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.6",//设备2点位 -> PLC_1_Q0.6
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"4.2.5",//小题目编号
+                    "des":"G120-DI_COM1连接到G120-DI_COM2、G120-DI_COM2连接到24V-",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"36",//设备1 -> 端子排4
+                            "device1_Prot":"G120_DI1_COM1",//设备1点位 -> G120_DI1_COM1
+                            "device2":"36",//设备2 -> 端子排4
+                            "device2_Prot":"G120_DI1_COM2",//设备2点位 -> G120_DI1_COM2
+                            "isFinish":false//是否完成
+                        },
+                      {
+                        "device1": "36", //设备1 -> 端子排4
+                        "device1_Prot": "G120_DI1_COM2", //设备1点位 -> G120_DI1_COM2
+                        "device2": "13|119", //设备2 -> 端子排0
+                        "device2_Prot": "24V-", //设备2点位 -> 24V-
+                        "isFinish": false //是否完成
+                      }
+                    ]
+                },
+                {
+                    "id":"4.2.6",//小题目编号
+                    "des":"被指定的PLC端口连接到指示灯HL2-L，且HL2-N连接到HL1-N上。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 ->HL2指示灯
+                            "device1_Prot":"HL2_L",//设备1点位 -> L
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.1",//设备2点位 -> PLC_1_Q0.1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> HL2指示灯
+                            "device1_Prot":"HL2_N",//设备1点位 -> N
+                            "device2":"13",//设备2 -> HL1指示灯
+                            "device2_Prot":"HL1_N",//设备2点位 -> N
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                }
+            ]            
+        },
+        {
+            "id":"5",//大题目编号
+            "des":"液位传感器、电磁阀、开关、指示灯电路",//描述
+            "score":12,//该题得分
+            "isFinish":false,//是否完成
+            "tag":"电路系统",
+            "tagIndex":"1",
+            "wiring":[
+                {
+                    "id":"5.1.1",//小题目编号
+                    "des":"混料罐下限位液位传感器接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 下限位
+                            "device1_Prot":"下限位_VCC",//设备1点位 -> VCC
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V+",//设备2点位 -> 24V+
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 下限位
+                            "device1_Prot":"下限位_SIGNAL",//设备1点位 -> SIGNAL
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_2_M0.0",//设备2点位 -> PLC_2_M0.0
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 下限位
+                            "device1_Prot":"下限位_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.1.2",//小题目编号
+                    "des":"混料罐中限位液位传感器接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 中限位
+                            "device1_Prot":"中限位_VCC",//设备1点位 -> VCC
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V+",//设备2点位 -> 24V+
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 中限位
+                            "device1_Prot":"中限位_SIGNAL",//设备1点位 -> SIGNAL
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_2_M0.1",//设备2点位 -> PLC_2_M0.1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 中限位
+                            "device1_Prot":"中限位_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.1.3",//小题目编号
+                    "des":"混料罐上限位液位传感器接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 上限位
+                            "device1_Prot":"上限位_VCC",//设备1点位 -> VCC
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V+",//设备2点位 -> 24V+
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 上限位
+                            "device1_Prot":"上限位_SIGNAL",//设备1点位 -> SIGNAL
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_2_M0.2",//设备2点位 -> PLC_2_M0.2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 上限位
+                            "device1_Prot":"上限位_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.1.4",//小题目编号
+                    "des":"混料罐上上限位液位传感器接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 上上限位
+                            "device1_Prot":"上上限位_VCC",//设备1点位 -> VCC
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V+",//设备2点位 -> 24V+
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 上上限位
+                            "device1_Prot":"上上限位_SIGNAL",//设备1点位 -> SIGNAL
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_2_M0.3",//设备2点位 -> PLC_2_M0.3
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 上上限位
+                            "device1_Prot":"上上限位_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.2.1",//小题目编号
+                    "des":"电磁阀1接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 电磁阀1
+                            "device1_Prot":"电磁阀1_VCC",//设备1点位 -> VCC
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.1",//设备2点位 -> PLC_2_Q0.1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 电磁阀1
+                            "device1_Prot":"电磁阀1_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.2.2",//小题目编号
+                    "des":"电磁阀2接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 电磁阀2
+                            "device1_Prot":"电磁阀2_VCC",//设备1点位 -> VCC
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.2",//设备2点位 -> PLC_2_Q0.2
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 电磁阀2
+                            "device1_Prot":"电磁阀2_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.2.3",//小题目编号
+                    "des":"电磁阀3接线，连接指定的PLC端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"121",//设备1 -> 电磁阀3
+                            "device1_Prot":"电磁阀3_VCC",//设备1点位 -> VCC
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.3",//设备2点位 -> PLC_2_Q0.3
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"121",//设备1 -> 电磁阀3
+                            "device1_Prot":"电磁阀3_GND",//设备1点位 -> GND
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V-",//设备2点位 -> 24V-
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.3.1",//小题目编号
+                    "des":"SB4-COM1连接SB3-COM1,SB4-NO1且连接到指定的PLC输入端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> SB4按钮
+                            "device1_Prot":"SB4_COM1",//设备1点位 -> COM1
+                            "device2":"13",//设备2 -> SB3按钮
+                            "device2_Prot":"SB3_COM1",//设备2点位 -> COM1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> SB4按钮
+                            "device1_Prot":"SB4_NO1",//设备1点位 -> NO1
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_1_M0.4",//设备2点位 -> PLC_1_M0.4
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.3.2",//小题目编号
+                    "des":"SB5-COM1连接SB4-COM1且SB5-NO1连接到指定的PLC输入端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> SB5按钮
+                            "device1_Prot":"SB5_COM1",//设备1点位 -> COM1
+                            "device2":"13",//设备2 -> SB4按钮
+                            "device2_Prot":"SB4_COM1",//设备2点位 -> COM1
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> SB5按钮
+                            "device1_Prot":"SB5_NO1",//设备1点位 -> NO1
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_1_M0.5",//设备2点位 -> PLC_1_M0.5
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.4.1",//小题目编号
+                    "des":"SA1-COM1连接24V+且SA1-NO1连接到指定的PLC输入端口",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> 旋钮SA1
+                            "device1_Prot":"SA1_COM1",//设备1点位 -> COM1
+                            "device2":"13|119",//设备2 -> 端子排0
+                            "device2_Prot":"24V+",//设备2点位 -> 24V+
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> 旋钮SA1
+                            "device1_Prot":"SA1_NO1",//设备1点位 -> NO1
+                            "device2":"15",//设备2 -> 端子排1
+                            "device2_Prot":"PLC_1_M0.0",//设备2点位 -> PLC_1_M0.0
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.5.1",//小题目编号
+                    "des":"被指定的PLC端口连接到指示灯HL4-L，且HL4-N连接到HL3-N上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> HL4指示灯
+                            "device1_Prot":"HL4_L",//设备1点位 -> L
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_1_Q0.3",//设备2点位 -> PLC_1_Q0.3
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> HL4指示灯
+                            "device1_Prot":"HL4_N",//设备1点位 -> N
+                            "device2":"13",//设备1 -> HL3指示灯
+                            "device2_Prot":"HL3_N",//设备1点位 -> N
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"5.5.2",//小题目编号
+                    "des":"被指定的PLC端口连接到指示灯HL5-L，且HL5-N连接到HL4-N上",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"13",//设备1 -> HL5指示灯
+                            "device1_Prot":"HL5_L",//设备1点位 -> L
+                            "device2":"24",//设备2 -> 端子排2
+                            "device2_Prot":"PLC_2_Q0.0",//设备2点位 -> PLC_2_Q0.0
+                            "isFinish":false//是否完成
+                        },
+                        {
+                            "device1":"13",//设备1 -> HL5指示灯
+                            "device1_Prot":"HL5_N",//设备1点位 -> N
+                            "device2":"13",//设备1 -> HL4指示灯
+                            "device2_Prot":"HL4_N",//设备1点位 -> N
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                }
+            ]            
+        }
+    ]
+}

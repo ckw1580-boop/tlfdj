@@ -53,6 +53,31 @@ namespace ElectricalSim.Editor
             "App/Src/UI/NewUI/UITopBar.prefab"
         };
 
+        private static readonly Dictionary<string, string> RuntimeUiPrefabs = new Dictionary<string, string>
+        {
+            { "TopNavigation", "App/Src/UI/NewUI/UITopBar.prefab" },
+            { "ExperimentToolbar", "App/Src/UI/UIExperimentTop.prefab" },
+            { "Task", "App/Src/UI/UIExperimentTask.prefab" },
+            { "LineMap", "App/Src/UI/UIExperimentLineMap.prefab" },
+            { "LineForm", "App/Src/UI/NewUI/UIExperimentLineForm.prefab" },
+            { "LineParam", "App/Src/UI/NewUI/UIExperimentLineParam.prefab" },
+            { "ElementLibrary", "App/Src/UI/UIExperimentElementLib.prefab" },
+            { "ElementProperties", "App/Src/UI/UIExperimentElementMsg.prefab" },
+            { "Fault", "App/Src/UI/UIPaiGu.prefab" },
+            { "FaultSet", "App/Src/UI/UIExperimentFaultSet.prefab" },
+            { "Multimeter", "App/Src/UI/UIMultimeterForm.prefab" },
+            { "Oscilloscope", "App/Src/UI/UIExperimentShiBoQi.prefab" },
+            { "ExamList", "App/Src/UI/UIExamList.prefab" },
+            { "ExamConfig", "App/Src/UI/NewUI/UIExamConf.prefab" },
+            { "ExamResult", "App/Src/UI/NewUI/UIExamResult.prefab" },
+            { "Save", "App/Src/UI/NewUI/UISaveTip.prefab" },
+            { "Submit", "App/Src/UI/NewUI/UISubmitTip.prefab" },
+            { "Recorder", "App/Src/UI/Recorder.prefab" },
+            { "RecordControl", "App/Src/UI/RecordCotrol.prefab" },
+            { "Audio", "App/Src/UI/UIExperimentAudioSet.prefab" },
+            { "Help", "App/Src/UI/UIPDFViewer.prefab" }
+        };
+
         [MenuItem("Electrical Sim/Import Original Assets")]
         public static void Import()
         {
@@ -74,17 +99,10 @@ namespace ElectricalSim.Editor
         {
             var sourceRoot = ResolveSourceAssetsRoot();
             var selectedCount = 0;
-            if (!Directory.Exists(DestinationDirectory))
-            {
-                var guidIndex = BuildGuidIndex(sourceRoot);
-                var selected = ResolveDependencyClosure(sourceRoot, guidIndex, BuildSeedPaths(sourceRoot));
-                selectedCount = selected.Count;
-                CopySelectedAssets(sourceRoot, selected);
-            }
-            else
-            {
-                Debug.Log("Resuming original asset import from the existing dependency copy.");
-            }
+            var guidIndex = BuildGuidIndex(sourceRoot);
+            var selected = ResolveDependencyClosure(sourceRoot, guidIndex, BuildSeedPaths(sourceRoot));
+            selectedCount = CopySelectedAssets(sourceRoot, selected);
+            CopyOfflineData(sourceRoot);
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             Directory.CreateDirectory(GeneratedVisualDirectory);
@@ -96,8 +114,10 @@ namespace ElectricalSim.Editor
             }
             registry.Entries.Clear();
             registry.Schematics.Clear();
+            registry.UiPrefabs.Clear();
             PopulateDeviceRegistry(registry);
             PopulateSchematics(registry);
+            PopulateUiRegistry(registry);
             EditorUtility.SetDirty(registry);
             AssetDatabase.SaveAssets();
 
@@ -139,9 +159,13 @@ namespace ElectricalSim.Editor
         private static IEnumerable<string> BuildSeedPaths(string sourceRoot)
         {
             var seeds = new List<string> { "App/Src/Scene/Experiment.unity" };
-            foreach (var name in DevicePrefabNames)
-                seeds.Add("App/Src/Element/Prefab/" + name + ".prefab");
-            seeds.AddRange(UiPrefabPaths);
+            foreach (var folder in new[] { "App/Src/Element/Prefab", "App/Src/UI", "App/Src/Lines", "App/Src/Points", "App/Src/Tool" })
+            {
+                var absolute = Full(sourceRoot, folder);
+                if (!Directory.Exists(absolute)) continue;
+                seeds.AddRange(Directory.GetFiles(absolute, "*.prefab", SearchOption.AllDirectories)
+                    .Select(path => Relative(sourceRoot, path)));
+            }
             foreach (var schematic in TaskSchematics.Values)
             {
                 seeds.Add("App/Src/UI/LineDrawing/" + schematic + ".png");
@@ -196,16 +220,43 @@ namespace ElectricalSim.Editor
                    extension == ".asmdef" || extension == ".unitypackage";
         }
 
-        private static void CopySelectedAssets(string sourceRoot, IEnumerable<string> selected)
+        private static int CopySelectedAssets(string sourceRoot, IEnumerable<string> selected)
         {
+            var copied = 0;
             foreach (var relative in selected.OrderBy(item => item, StringComparer.OrdinalIgnoreCase))
             {
                 var source = Full(sourceRoot, relative);
                 if (!File.Exists(source)) continue;
                 var destination = Full(Path.GetFullPath(DestinationDirectory), relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination));
-                File.Copy(source, destination, false);
-                if (File.Exists(source + ".meta")) File.Copy(source + ".meta", destination + ".meta", false);
+                if (!File.Exists(destination))
+                {
+                    File.Copy(source, destination, false);
+                    copied++;
+                }
+                if (File.Exists(source + ".meta") && !File.Exists(destination + ".meta"))
+                    File.Copy(source + ".meta", destination + ".meta", false);
+            }
+            return copied;
+        }
+
+        private static void CopyOfflineData(string sourceRoot)
+        {
+            var source = Full(sourceRoot, "StreamingAssets");
+            if (!Directory.Exists(source)) return;
+            var destination = Path.GetFullPath("Assets/StreamingAssets/OfflineData");
+            foreach (var relative in new[] { "assess", "Examine", "project", "Instructions" })
+            {
+                var folder = Path.Combine(source, relative);
+                if (!Directory.Exists(folder)) continue;
+                foreach (var file in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
+                {
+                    var extension = Path.GetExtension(file).ToLowerInvariant();
+                    if (extension != ".json" && extension != ".cc3d" && extension != ".pdf") continue;
+                    var target = Path.Combine(destination, relative, file.Substring(folder.Length).TrimStart(Path.DirectorySeparatorChar));
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    File.Copy(file, target, true);
+                }
             }
         }
 
@@ -272,6 +323,30 @@ namespace ElectricalSim.Editor
                              AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().FirstOrDefault();
                 if (sprite != null) registry.Schematics.Add(new OriginalSchematicEntry { TaskId = pair.Key, Sprite = sprite });
             }
+        }
+
+        private static void PopulateUiRegistry(OriginalVisualRegistry registry)
+        {
+            foreach (var pair in RuntimeUiPrefabs)
+            {
+                var path = DestinationDirectory + "/" + pair.Value;
+                var source = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                if (source == null) continue;
+                var clean = CreateCleanUiPrefab(source, pair.Key);
+                registry.UiPrefabs.Add(new OriginalUiEntry { Id = pair.Key, Prefab = clean });
+            }
+        }
+
+        private static GameObject CreateCleanUiPrefab(GameObject source, string id)
+        {
+            var destination = GeneratedVisualDirectory + "/UI_" + id + ".prefab";
+            var instance = UnityEngine.Object.Instantiate(source);
+            instance.name = source.name;
+            foreach (var transform in instance.GetComponentsInChildren<Transform>(true))
+                GameObjectUtility.RemoveMonoBehavioursWithMissingScript(transform.gameObject);
+            var prefab = PrefabUtility.SaveAsPrefabAsset(instance, destination);
+            UnityEngine.Object.DestroyImmediate(instance);
+            return prefab;
         }
 
         private static GameObject BuildEnvironmentPrefab()

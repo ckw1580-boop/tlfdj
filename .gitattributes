@@ -16,3 +16,5 @@
 *.otf filter=lfs diff=lfs merge=lfs -text
 *.exr filter=lfs diff=lfs merge=lfs -text
 *.hdr filter=lfs diff=lfs merge=lfs -text
+Assets/OriginalContent/GeneratedVisuals/OriginalLabEnvironment.prefab filter=lfs diff=lfs merge=lfs -text
+Assets/OriginalContent/App/Src/Scene/Experiment.unity filter=lfs diff=lfs merge=lfs -text

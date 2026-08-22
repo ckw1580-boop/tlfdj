@@ -26,7 +26,14 @@ namespace ElectricalSim
         Motor,
         Indicator,
         BrakeUnit,
-        Terminal
+        Terminal,
+        Transformer,
+        Rectifier,
+        SelectorSwitch,
+        Sensor,
+        VariableFrequencyDrive,
+        Plc,
+        PlcIo
     }
 
     public enum ContactKind

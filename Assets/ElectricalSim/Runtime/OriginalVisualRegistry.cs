@@ -19,6 +19,13 @@ namespace ElectricalSim
         public Sprite Sprite;
     }
 
+    [Serializable]
+    public sealed class OriginalUiEntry
+    {
+        public string Id = string.Empty;
+        public GameObject Prefab;
+    }
+
     [CreateAssetMenu(menuName = "Electrical Sim/Original Visual Registry", fileName = "OriginalVisualRegistry")]
     public sealed class OriginalVisualRegistry : ScriptableObject
     {
@@ -26,6 +33,7 @@ namespace ElectricalSim
         public GameObject CabinetPrefab;
         public List<OriginalVisualEntry> Entries = new List<OriginalVisualEntry>();
         public List<OriginalSchematicEntry> Schematics = new List<OriginalSchematicEntry>();
+        public List<OriginalUiEntry> UiPrefabs = new List<OriginalUiEntry>();
 
         public GameObject Resolve(string deviceId, string typeId)
         {
@@ -42,6 +50,13 @@ namespace ElectricalSim
         {
             foreach (var entry in Schematics)
                 if (entry.TaskId == taskId && entry.Sprite != null) return entry.Sprite;
+            return null;
+        }
+
+        public GameObject ResolveUi(string id)
+        {
+            foreach (var entry in UiPrefabs)
+                if (entry.Id == id && entry.Prefab != null) return entry.Prefab;
             return null;
         }
     }

@@ -25,6 +25,11 @@ namespace ElectricalSim
         private Cc3dDocument loadedDocument;
         private SimulationSnapshot lastSnapshot;
         private InstrumentKind instrumentKind = InstrumentKind.Multimeter;
+        private readonly Stack<List<WireConnection>> undoWires = new Stack<List<WireConnection>>();
+        private readonly Stack<List<WireConnection>> redoWires = new Stack<List<WireConnection>>();
+        private Color currentWireColor = Color.red;
+        private float currentWireArea = 0.01f;
+        private string currentLineType = "JumperLine";
 
         private Text modeText;
         private Text taskText;
@@ -40,6 +45,7 @@ namespace ElectricalSim
         public SimulationMode Mode { get; private set; } = SimulationMode.View;
         public CircuitGraph Graph => graph;
         public CircuitTaskSpec CurrentTask => tasks[taskIndex];
+        public event Action<SimulationMode> ModeChanged;
 
         public void Initialize(
             IEnumerable<ElectricalDeviceView> deviceViews,
@@ -93,10 +99,13 @@ namespace ElectricalSim
         {
             Mode = mode;
             ClearSelection();
+            var showPorts = mode == SimulationMode.Wiring || mode == SimulationMode.Fault;
+            foreach (var port in portViews.Values) port.SetVisible(showPorts);
             modeText.text = $"当前模式：{ModeName(mode)}";
             if (mode == SimulationMode.Wiring) trainingCamera.SetWiringView();
             else if (mode == SimulationMode.Fault) trainingCamera.SetFaultView();
             SetStatus($"已进入{ModeName(mode)}模式。", false);
+            ModeChanged?.Invoke(mode);
         }
 
         public void PreviousTask()
@@ -113,6 +122,7 @@ namespace ElectricalSim
 
         public void LoadReferenceWiring()
         {
+            PushWireHistory();
             graph.ClearWires();
             foreach (var pair in CurrentTask.RequiredConnections)
                 graph.AddWire(pair.A, pair.B, ColorForPort(pair.A), "JumperLine");
@@ -122,6 +132,7 @@ namespace ElectricalSim
 
         public void ResetTraining()
         {
+            PushWireHistory();
             graph.ClearWires();
             foreach (var device in devices.Values)
             {
@@ -189,6 +200,43 @@ namespace ElectricalSim
             SetMode(SimulationMode.Fault);
         }
 
+        public void SetWireStyle(Color color, float area, string lineType)
+        {
+            currentWireColor = color;
+            currentWireArea = Mathf.Clamp(area, 0.001f, 0.2f);
+            currentLineType = string.IsNullOrWhiteSpace(lineType) ? "JumperLine" : lineType;
+            SetStatus($"接线参数：{currentLineType}，截面积 {currentWireArea:0.###}，颜色 #{ColorUtility.ToHtmlStringRGB(currentWireColor)}", false);
+        }
+
+        public bool AddBendPointToLastWire(Vector3 worldPosition)
+        {
+            if (graph.Wires.Count == 0) return false;
+            PushWireHistory();
+            graph.Wires[graph.Wires.Count - 1].Points.Add(worldPosition);
+            RefreshWireViews();
+            return true;
+        }
+
+        public void UndoWiring()
+        {
+            if (undoWires.Count == 0) return;
+            redoWires.Push(SnapshotWires());
+            graph.ReplaceWires(undoWires.Pop());
+            RefreshWireViews();
+            SetStatus("已撤销接线操作。", false);
+        }
+
+        public void RedoWiring()
+        {
+            if (redoWires.Count == 0) return;
+            undoWires.Push(SnapshotWires());
+            graph.ReplaceWires(redoWires.Pop());
+            RefreshWireViews();
+            SetStatus("已恢复接线操作。", false);
+        }
+
+        public void ShowStatus(string message, bool error = false) => SetStatus(message, error);
+
         private IEnumerator EvaluateCurrentTask()
         {
             var result = CircuitTaskEvaluator.EvaluateTopology(graph, CurrentTask);
@@ -237,8 +285,11 @@ namespace ElectricalSim
             if (Input.GetKeyDown(KeyCode.Alpha4)) SetMode(SimulationMode.Simulate);
             if (Input.GetKeyDown(KeyCode.Alpha5)) SetMode(SimulationMode.Fault);
             if (Input.GetKeyDown(KeyCode.Escape)) SetMode(SimulationMode.View);
+            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.Z)) UndoWiring();
+            if (Input.GetKey(KeyCode.LeftControl) && Input.GetKeyDown(KeyCode.Y)) RedoWiring();
             if (Input.GetKeyDown(KeyCode.Delete) && graph.Wires.Count > 0)
             {
+                PushWireHistory();
                 graph.RemoveWire(graph.Wires[graph.Wires.Count - 1].Id);
                 RefreshWireViews();
                 SetStatus("已删除最后一条线路。", false);
@@ -298,7 +349,9 @@ namespace ElectricalSim
                 return;
             }
 
-            graph.AddWire(selectedPort.QualifiedPort, port.QualifiedPort, ColorForPort(selectedPort.QualifiedPort));
+            PushWireHistory();
+            var color = currentWireColor == Color.red ? ColorForPort(selectedPort.QualifiedPort) : currentWireColor;
+            graph.AddWire(selectedPort.QualifiedPort, port.QualifiedPort, color, currentLineType, currentWireArea);
             selectedPort.SetHighlighted(false);
             selectedPort = null;
             RefreshWireViews();
@@ -373,6 +426,20 @@ namespace ElectricalSim
                 var view = gameObject.AddComponent<ElectricalWireView>();
                 view.Initialize(wire, ResolvePortPosition, wireMaterial);
                 wireViews.Add(view);
+            }
+        }
+
+        private List<WireConnection> SnapshotWires() => graph.Wires.Select(CircuitGraph.CloneWire).ToList();
+
+        private void PushWireHistory()
+        {
+            undoWires.Push(SnapshotWires());
+            redoWires.Clear();
+            while (undoWires.Count > 64)
+            {
+                var keep = undoWires.Reverse().Take(64).Reverse().ToArray();
+                undoWires.Clear();
+                foreach (var item in keep) undoWires.Push(item);
             }
         }
 

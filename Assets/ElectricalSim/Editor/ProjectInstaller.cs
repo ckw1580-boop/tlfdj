@@ -26,14 +26,7 @@ namespace ElectricalSim.Editor
             EditorSceneManager.SaveScene(scene, ScenePath);
 
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
-            PlayerSettings.productName = "电气控制系统仿真软件 · 核心离线版";
-            PlayerSettings.companyName = "Offline Electrical Training";
-            PlayerSettings.defaultScreenWidth = 1920;
-            PlayerSettings.defaultScreenHeight = 1080;
-            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
-            PlayerSettings.resizableWindow = true;
-            PlayerSettings.runInBackground = true;
-            PlayerSettings.colorSpace = ColorSpace.Gamma;
+            ConfigurePlayerSettings();
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("ElectricalTraining scene installed at " + ScenePath);
@@ -44,6 +37,8 @@ namespace ElectricalSim.Editor
         {
             if (!File.Exists(ScenePath)) Install();
             else EnsureSceneResources();
+            ConfigurePlayerSettings();
+            OriginalReferenceGenerator.Generate();
             var outputDirectory = Path.GetFullPath("Build/Windows");
             Directory.CreateDirectory(outputDirectory);
             var options = new BuildPlayerOptions
@@ -68,6 +63,18 @@ namespace ElectricalSim.Editor
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene);
             AssetDatabase.SaveAssets();
+        }
+
+        private static void ConfigurePlayerSettings()
+        {
+            PlayerSettings.productName = "电气控制系统仿真软件";
+            PlayerSettings.companyName = "同立方";
+            PlayerSettings.defaultScreenWidth = 1920;
+            PlayerSettings.defaultScreenHeight = 1080;
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.resizableWindow = true;
+            PlayerSettings.runInBackground = true;
+            PlayerSettings.colorSpace = ColorSpace.Gamma;
         }
 
         private static void AssignGeneratedMaterials(TrainingSceneBootstrap bootstrap)

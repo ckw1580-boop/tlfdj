@@ -9,8 +9,8 @@ namespace ElectricalSim
         public float VerticalSpeed = 1.8f;
         public float LookSensitivity = 2.2f;
         public float ZoomSpeed = 3f;
-        public Vector3 DefaultPosition = new Vector3(0f, 1.7f, -5.2f);
-        public Vector3 DefaultEuler = new Vector3(2f, 0f, 0f);
+        public Vector3 DefaultPosition = new Vector3(-0.35f, 1.58f, 0.45f);
+        public Vector3 DefaultEuler = new Vector3(10f, 180f, 0f);
 
         private void Start()
         {
@@ -55,14 +55,14 @@ namespace ElectricalSim
 
         public void SetWiringView()
         {
-            transform.position = new Vector3(0f, 1.72f, -4.7f);
-            transform.eulerAngles = new Vector3(1f, 0f, 0f);
+            transform.position = new Vector3(0.1f, 1.53f, -0.05f);
+            transform.eulerAngles = new Vector3(8f, 180f, 0f);
         }
 
         public void SetFaultView()
         {
-            transform.position = new Vector3(1.2f, 1.75f, -4.7f);
-            transform.eulerAngles = new Vector3(3f, -12f, 0f);
+            transform.position = new Vector3(1.15f, 1.78f, 0.75f);
+            transform.eulerAngles = new Vector3(4f, 168f, 0f);
         }
 
         private static bool IsPointerOverUi()

@@ -17,6 +17,11 @@ namespace ElectricalSim
         private readonly List<ElectricalDeviceView> deviceViews = new List<ElectricalDeviceView>();
         private Font uiFont;
         private SimulationController controller;
+        private Transform originalEnvironment;
+        private Dictionary<string, Transform> originalTerminals;
+        private Transform[] originalEnvironmentTransforms;
+        private OfflineExamController examController;
+        private LocalCaptureRecorder captureRecorder;
 
         private readonly Color darkBlue = new Color(0.015f, 0.075f, 0.16f, 0.96f);
         private readonly Color cyan = new Color(0.05f, 0.72f, 0.95f, 1f);
@@ -32,19 +37,37 @@ namespace ElectricalSim
             Build();
         }
 
+        private void Update()
+        {
+            if (controller == null || examController == null) return;
+            if (Input.GetKeyDown(KeyCode.F5)) BeginExam("A");
+            else if (Input.GetKeyDown(KeyCode.F6)) BeginExam("B");
+            else if (Input.GetKeyDown(KeyCode.F7)) BeginExam("C");
+            else if (Input.GetKeyDown(KeyCode.F8)) BeginExam("D");
+        }
+
         private void Build()
         {
+            Debug.Log("[OfflineBootstrap] Build started.");
             Application.targetFrameRate = 60;
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "Arial" }, 18);
+            Debug.Log("[OfflineBootstrap] Font ready.");
             CreateEnvironment();
+            Debug.Log("[OfflineBootstrap] Environment ready.");
             var cameraController = CreateCamera();
             var wireRoot = new GameObject("ElectricalWires").transform;
             CreateDevices();
+            Debug.Log("[OfflineBootstrap] Devices ready.");
             var ui = CreateHud();
+            Debug.Log("[OfflineBootstrap] HUD ready.");
 
             controller = gameObject.AddComponent<SimulationController>();
+            examController = gameObject.AddComponent<OfflineExamController>();
+            captureRecorder = gameObject.AddComponent<LocalCaptureRecorder>();
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, originalVisuals);
             BindUi(ui);
+            BindOriginalUi(ui);
+            Debug.Log("[OfflineBootstrap] Build complete.");
         }
 
         private void CreateEnvironment()
@@ -53,8 +76,20 @@ namespace ElectricalSim
             RenderSettings.ambientLight = new Color(0.55f, 0.58f, 0.62f);
             RenderSettings.ambientIntensity = 1.25f;
             RenderSettings.fog = false;
-            CreateMainLight();
-            CreatePlaceholderEnvironment();
+            if (originalVisuals != null && originalVisuals.EnvironmentPrefab != null)
+            {
+                var environment = Instantiate(originalVisuals.EnvironmentPrefab, Vector3.zero, Quaternion.identity);
+                environment.name = "OriginalLabEnvironment";
+                originalEnvironment = environment.transform;
+                CacheOriginalEnvironmentTransforms();
+                CreateOriginalRoomShell();
+                if (environment.GetComponentInChildren<Light>(true) == null) CreateMainLight();
+            }
+            else
+            {
+                CreateMainLight();
+                CreatePlaceholderEnvironment();
+            }
         }
 
         private void CreateMainLight()
@@ -72,6 +107,16 @@ namespace ElectricalSim
             fill.intensity = 0.65f;
             fill.color = new Color(0.72f, 0.84f, 1f);
             fillObject.transform.eulerAngles = new Vector3(20f, 145f, 0f);
+        }
+
+        private void CreateOriginalRoomShell()
+        {
+            // The original scene creates its Floor root from a removed runtime script. Rebuild the
+            // same open-front training room from the measured Experiment renderer bounds.
+            CreateCube("Original Floor", new Vector3(-0.067f, -0.055f, -2.62f), new Vector3(5.62f, 0.11f, 5.35f), new Color(0.08f, 0.58f, 0.49f));
+            CreateCube("Original Back Wall", new Vector3(-0.067f, 1.55f, -5.31f), new Vector3(5.62f, 3.2f, 0.10f), new Color(0.82f, 0.84f, 0.84f));
+            CreateCube("Original Left Wall", new Vector3(-2.90f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f));
+            CreateCube("Original Right Wall", new Vector3(2.77f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f));
         }
 
         private void CreatePlaceholderEnvironment()
@@ -101,7 +146,7 @@ namespace ElectricalSim
             var cameraObject = new GameObject("Training Camera");
             cameraObject.tag = "MainCamera";
             var camera = cameraObject.AddComponent<Camera>();
-            camera.fieldOfView = 52f;
+            camera.fieldOfView = 60f;
             camera.nearClipPlane = 0.04f;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color(0.07f, 0.11f, 0.16f);
@@ -169,6 +214,7 @@ namespace ElectricalSim
                 var collider = root.AddComponent<BoxCollider>();
                 collider.size = new Vector3(0.65f, 0.55f, 0.72f);
             }
+            if (originalEnvironment != null) HideDuplicateVisual(root);
             var view = root.AddComponent<ElectricalDeviceView>();
             view.Initialize(runtime, label);
             CreatePorts(view, root.transform, runtime.Ports, new Vector3(0.62f, 0.5f, 0.1f));
@@ -196,12 +242,18 @@ namespace ElectricalSim
                 collider.size = size;
             }
 
+            if (originalEnvironment != null) HideDuplicateVisual(root);
             var view = root.AddComponent<ElectricalDeviceView>();
             view.Initialize(runtime, label);
             CreatePorts(view, root.transform, runtime.Ports, size);
             if (original == null)
                 CreateWorldLabel(label, position + new Vector3(0f, size.y * 0.7f, -0.15f), 0.034f, Color.white);
             deviceViews.Add(view);
+        }
+
+        private static void HideDuplicateVisual(GameObject root)
+        {
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true)) renderer.enabled = false;
         }
 
         private void CreatePorts(ElectricalDeviceView view, Transform parent, IReadOnlyCollection<string> ports, Vector3 bounds)
@@ -215,7 +267,8 @@ namespace ElectricalSim
                 var x = columns == 1 ? 0f : Mathf.Lerp(-bounds.x * 0.42f, bounds.x * 0.42f, column / (float)(columns - 1));
                 var y = row == 0 ? bounds.y * 0.48f : -bounds.y * 0.48f;
                 var fallback = new Vector3(x, y, -bounds.z * 0.68f - 0.025f);
-                var terminal = FindTerminal(parent, view.Runtime.Kind, list[index]);
+                var terminal = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index]) ??
+                               FindTerminal(parent, view.Runtime.Kind, list[index]);
                 var localPosition = terminal != null ? parent.InverseTransformPoint(terminal.position) : fallback;
                 var worldMarkerSize = terminal != null ? 0.026f : 0.032f;
                 var parentScale = Mathf.Max(Mathf.Abs(parent.lossyScale.x), Mathf.Abs(parent.lossyScale.y), Mathf.Abs(parent.lossyScale.z));
@@ -225,6 +278,37 @@ namespace ElectricalSim
                 port.Initialize(view.Runtime.DeviceId, list[index], new Color(0.12f, 0.86f, 0.36f));
                 view.AddPort(port);
             }
+        }
+
+        private Transform FindOriginalEnvironmentTerminal(string deviceId, ElectricalDeviceKind kind, string port)
+        {
+            if (originalEnvironment == null) return null;
+            if (originalTerminals == null) CacheOriginalEnvironmentTransforms();
+            foreach (var alias in TerminalAliases(kind, port))
+            {
+                var prefixes = deviceId == "FR" ? new[] { "FR1", "FR" } :
+                    new[] { deviceId };
+                foreach (var prefix in prefixes)
+                {
+                    var expected = string.IsNullOrEmpty(prefix) ? alias : prefix + "_" + alias;
+                    originalTerminals.TryGetValue(expected, out var exact);
+                    if (exact != null) return exact;
+                }
+                var scoped = originalEnvironmentTransforms.FirstOrDefault(item => item.name.StartsWith(deviceId + "_", StringComparison.OrdinalIgnoreCase) &&
+                                                        item.name.EndsWith(alias, StringComparison.OrdinalIgnoreCase));
+                if (scoped != null) return scoped;
+            }
+            return null;
+        }
+
+        private void CacheOriginalEnvironmentTransforms()
+        {
+            originalEnvironmentTransforms = originalEnvironment != null
+                ? originalEnvironment.GetComponentsInChildren<Transform>(true)
+                : Array.Empty<Transform>();
+            originalTerminals = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in originalEnvironmentTransforms)
+                if (!originalTerminals.ContainsKey(item.name)) originalTerminals.Add(item.name, item);
         }
 
         private static void FitOriginalVisual(GameObject root, Vector3 targetCenter, Vector3 targetSize)
@@ -338,7 +422,7 @@ namespace ElectricalSim
             var mode = Label("Mode", top.transform, "当前模式：视角", 22, TextAnchor.MiddleCenter, cyan);
             SetRect(mode.rectTransform, new Vector2(0.34f, 0f), new Vector2(0.48f, 1f), Vector2.zero, Vector2.zero);
 
-            var right = Panel("RightPanel", canvas.transform, new Vector2(1f, 0f), new Vector2(1f, 1f), new Vector2(-390f, 24f), new Vector2(-18f, -110f), panelBlue);
+            var right = Panel("RightPanel", canvas.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-305f, 18f), new Vector2(-8f, 498f), panelBlue);
             var task = Label("TaskTitle", right.transform, "任务", 22, TextAnchor.UpperLeft, Color.white);
             SetRect(task.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -88f), new Vector2(-18f, -18f));
             var description = Label("TaskDescription", right.transform, "", 18, TextAnchor.UpperLeft, new Color(0.76f, 0.9f, 0.96f));
@@ -358,11 +442,17 @@ namespace ElectricalSim
             var instrument = Label("InstrumentReadout", right.transform, "万用表：请选择两个端子", 17, TextAnchor.UpperLeft, new Color(1f, 0.9f, 0.28f));
             SetRect(instrument.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.42f), new Vector2(18f, 156f), new Vector2(-18f, -8f));
 
-            var statusPanel = Panel("StatusPanel", canvas.transform, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(18f, 20f), new Vector2(-426f, 92f), new Color(0.02f, 0.1f, 0.14f, 0.92f));
+            var statusPanel = Panel("StatusPanel", canvas.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-305f, 18f), new Vector2(-8f, 180f), new Color(0.12f, 0.28f, 0.29f, 0.94f));
             var status = Label("Status", statusPanel.transform, "系统就绪", 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.2f));
             SetRect(status.rectTransform, Vector2.zero, Vector2.one, new Vector2(20f, 5f), new Vector2(-20f, -5f));
 
             var references = new HudReferences { Canvas = canvas, Top = top, Right = right, Mode = mode, Task = task, Description = description, Schematic = schematic, Status = status, Instrument = instrument };
+            if (originalVisuals != null && originalVisuals.ResolveUi("TopNavigation") != null)
+            {
+                top.gameObject.SetActive(false);
+                description.gameObject.SetActive(false);
+                instrument.gameObject.SetActive(false);
+            }
             if (showMissingAssetNotice && originalVisuals == null)
             {
                 var notice = Label("AssetNotice", canvas.transform, "功能验证场景 · 原始 Assets 子集尚未导入", 18, TextAnchor.MiddleCenter, new Color(1f, 0.78f, 0.18f));
@@ -406,6 +496,124 @@ namespace ElectricalSim
                 var col = i % 2;
                 SetRect(button.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(18f + col * 176f, 62f + row * 60f), new Vector2(184f + col * 176f, 112f + row * 60f));
             }
+        }
+
+        private void BindOriginalUi(HudReferences ui)
+        {
+            if (originalVisuals == null) return;
+            var navigation = InstantiateUi("TopNavigation", ui.Canvas.transform);
+            var toolbar = InstantiateUi("ExperimentToolbar", ui.Canvas.transform);
+            if (navigation != null)
+            {
+                BindNamedButton(navigation, "homeBtn", ToggleTaskPanel);
+                BindNamedButton(navigation, "scheduleBtn", ToggleTaskPanel);
+                BindNamedButton(navigation, "saveBtn", controller.SaveCc3d);
+                BindNamedButton(navigation, "submitBtn", controller.SubmitTask);
+                BindNamedButton(navigation, "resetBtn", controller.ResetTraining);
+                SetNamedButtonActive(navigation, "saveBtn", true);
+                SetNamedButtonActive(navigation, "submitBtn", true);
+                SetNamedButtonActive(navigation, "downloadBtn", false);
+                SetNamedButtonActive(navigation, "mineBtn", false);
+                SetNamedButtonText(navigation, "scheduleBtn", "任务查询");
+                SetNamedButtonText(navigation, "saveBtn", "保存");
+                SetNamedButtonText(navigation, "submitBtn", "提交");
+                SetNamedButtonText(navigation, "resetBtn", "重置");
+                foreach (var id in new[] { "EditorBtn_A", "EditorBtn_B", "EditorBtn_C", "EditorBtn_D" })
+                {
+                    var examButton = FindNamed(navigation, id);
+                    if (examButton != null) examButton.gameObject.SetActive(false);
+                }
+            }
+            if (toolbar != null)
+            {
+                BindNamedButton(toolbar, "btn_viewChange", () => controller.SetMode(SimulationMode.View));
+                BindNamedButton(toolbar, "btn_paigu", () => controller.SetMode(SimulationMode.Fault));
+                BindNamedButton(toolbar, "btn_drag", () => controller.SetMode(SimulationMode.Drag));
+                BindNamedButton(toolbar, "btn_line", () => controller.SetMode(SimulationMode.Wiring));
+                BindNamedButton(toolbar, "btn_sim", () => controller.SetMode(SimulationMode.Simulate));
+                BindNamedButton(toolbar, "btn_resume", controller.OpenCc3d);
+                BindNamedButton(toolbar, "btn_snapshot", captureRecorder.CaptureScreenshot);
+                BindNamedButton(toolbar, "btn_submit", controller.SubmitTask);
+                BindNamedButton(toolbar, "btn_localSave", controller.SaveCc3d);
+                BindNamedButton(toolbar, "btn_saveAnswer", controller.SaveCc3d);
+                BindNamedButton(toolbar, "btn_record", captureRecorder.ToggleRecording);
+                BindNamedButton(toolbar, "btn_audio", () => AudioListener.pause = !AudioListener.pause);
+            }
+
+            var lineForm = InstantiateUi("LineForm", ui.Canvas.transform);
+            var lineParam = InstantiateUi("LineParam", ui.Canvas.transform);
+            if (lineForm != null) lineForm.SetActive(false);
+            if (lineParam != null) lineParam.SetActive(false);
+            controller.ModeChanged += mode =>
+            {
+                if (lineForm != null) lineForm.SetActive(mode == SimulationMode.Wiring);
+                if (lineParam != null) lineParam.SetActive(mode == SimulationMode.Wiring);
+            };
+
+            var ticker = ui.Canvas.gameObject.AddComponent<OfflineUiTicker>();
+            ticker.Initialize(navigation, toolbar, examController);
+
+            void ToggleTaskPanel() => ui.Right.gameObject.SetActive(!ui.Right.gameObject.activeSelf);
+        }
+
+        private void BeginExam(string package)
+        {
+            if (!examController.Begin(package))
+            {
+                controller.ShowStatus("未找到本地考试包 " + package, true);
+                return;
+            }
+            examController.LoadFaultWiring(controller.Graph);
+            controller.SetMode(SimulationMode.Fault);
+            controller.ShowStatus($"已进入本地 {package} 套考试，时长 {examController.ActivePackage.Duration.TotalHours:0.#} 小时。", false);
+        }
+
+        private GameObject InstantiateUi(string id, Transform parent)
+        {
+            var prefab = originalVisuals.ResolveUi(id);
+            if (prefab == null) return null;
+            var instance = Instantiate(prefab, parent, false);
+            instance.name = "OriginalUI_" + id;
+            instance.SetActive(true);
+            var rect = instance.GetComponent<RectTransform>();
+            if (rect != null)
+            {
+                rect.localScale = Vector3.one;
+                if (rect.rect.width < 10f || rect.rect.height < 10f)
+                {
+                    rect.anchorMin = Vector2.zero;
+                    rect.anchorMax = Vector2.one;
+                    rect.offsetMin = Vector2.zero;
+                    rect.offsetMax = Vector2.zero;
+                }
+            }
+            return instance;
+        }
+
+        private static void BindNamedButton(GameObject root, string name, UnityEngine.Events.UnityAction action)
+        {
+            var button = FindNamed(root, name);
+            if (button == null) return;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(action);
+        }
+
+        private static Button FindNamed(GameObject root, string name)
+            => root.GetComponentsInChildren<Button>(true).FirstOrDefault(item => item.name == name);
+
+        private static void SetNamedButtonActive(GameObject root, string name, bool active)
+        {
+            var button = FindNamed(root, name);
+            if (button != null) button.gameObject.SetActive(active);
+        }
+
+        private static void SetNamedButtonText(GameObject root, string name, string value)
+        {
+            var button = FindNamed(root, name);
+            if (button == null) return;
+            var labels = button.GetComponentsInChildren<Text>(true);
+            foreach (var label in labels)
+                if (!string.IsNullOrWhiteSpace(label.text)) label.text = value;
         }
 
         private GameObject CreateCube(string name, Vector3 position, Vector3 scale, Color color)

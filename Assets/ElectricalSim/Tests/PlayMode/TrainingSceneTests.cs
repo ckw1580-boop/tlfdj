@@ -71,8 +71,16 @@ namespace ElectricalSim.Tests
             var device = Object.FindObjectsOfType<ElectricalDeviceView>()
                 .Single(view => view.Runtime.DeviceId == deviceId);
             var port = device.Ports.Single(view => view.PortName == portName);
-            var terminal = device.GetComponentsInChildren<Transform>(true)
-                .First(transform => transform.name == terminalName);
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var environmentNames = deviceId == "FR"
+                ? new[] { "FR1_" + terminalName, "FR_" + terminalName }
+                : new[] { deviceId + "_" + terminalName };
+            var terminal = environment == null ? null : environment.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(transform => environmentNames.Any(name =>
+                    string.Equals(transform.name, name, System.StringComparison.OrdinalIgnoreCase)));
+            if (terminal == null)
+                terminal = device.GetComponentsInChildren<Transform>(true)
+                    .First(transform => string.Equals(transform.name, terminalName, System.StringComparison.OrdinalIgnoreCase));
             Assert.That(Vector3.Distance(port.transform.position, terminal.position), Is.LessThan(0.0005f),
                 $"{deviceId}.{portName} must be located on original terminal {terminalName}");
         }

@@ -25,7 +25,18 @@ namespace ElectricalSim
 
         public void SetHighlighted(bool highlighted)
         {
-            if (cachedRenderer != null) cachedRenderer.material.color = highlighted ? Color.yellow : baseColor;
+            if (cachedRenderer != null)
+            {
+                cachedRenderer.enabled = true;
+                cachedRenderer.material.color = highlighted ? Color.yellow : baseColor;
+            }
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (cachedRenderer != null) cachedRenderer.enabled = visible;
+            var collider = GetComponent<Collider>();
+            if (collider != null) collider.enabled = visible;
         }
     }
 

@@ -1,0 +1,189 @@
+{
+    "fault":[
+        {
+            "id":"9",//大题目编号
+            "des":"故障排除",//描述
+            "score":10,//该题得分
+            "isFinish":false,//是否完成
+            "isOrder":false,//是否顺序执行
+            "tag": "故障排除系统",
+            "tagIndex":"3",
+            "faultPortSmallSubject":[//故障点题目
+                {
+                    "id":"9.1.1",//小题目编号
+                    "des":"故障1",//描述
+                    "score":3,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"114",//设备1 -> FR1
+                            "device1_Prot":"96NC",//设备1点位 -> 96NC
+                            "device2":"115",//设备2 -> SB2
+                            "device2_Prot":"SB2_NC2",//设备2点位 -> NC2
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"9.1.2",//小题目编号
+                    "des":"故障2",//描述
+                    "score":3,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"112",//设备1 -> KM2
+                            "device1_Prot":"62NC",//设备1点位 ->62NC
+                            "device2":"111",//设备2 -> KM1
+                            "device2_Prot":"A1",//设备2点位 -> A1
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                },
+                {
+                    "id":"9.1.3",//小题目编号
+                    "des":"故障3",//描述
+                    "score":3,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "device1":"115",//设备1 -> SB3
+                            "device1_Prot":"SB3_COM1",//设备1点位 -> SB3_COM1
+                            "device2":"111",//设备2 -> KM1
+                            "device2_Prot":"61NC",//设备2点位 -> 61NC
+                            "isFinish":false//是否完成
+                        }
+                    ]
+                }
+            ],
+            "faultDebugSmallSubject":[
+                {
+                    "id":"9.1.4",//题目id
+                    "des":"按下SB1，电机正转保持；按下SB2，电机停止运行。按下SB3,电机反转保持；按下SB2，电机停止运行。",//描述
+                    "score":1,//该题得分
+                    "isFinish":false,//是否完成
+                    "conditions":[//题目里的条件
+                        {
+                            "isFinish":false,//是否完成
+                            "condition_Items":[
+                                {
+                                    "device":"108",//SB1
+                                    "isEnble":true,//是否开启
+                                    "values":[//0> 0->按下，1->抬起
+                                        {                                            
+                                            "min":"0",//最小值，没有就填 - 
+                                            "max":"0",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"107",//三相鼠笼电机3
+                                    "isEnble":true,//是否开启
+                                    "values":[//0> 0->停，1->正，2->反转；1> 0->转速；2> 0->低速，1->高速
+                                        {                                            
+                                            "min":"1",//最小值，没有就填 - 
+                                            "max":"1",//最大值，没有就填 +
+                                            "currValue":""
+                                        },
+                                        {                                            
+                                            "min":"1",//最小值，没有就填 - 
+                                            "max":"+",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"109",//SB2
+                                    "isEnble":false,//是否开启
+                                    "values":[//0> 0->按下，1->抬起
+                                        {                                            
+                                            "min":"-",//最小值，没有就填 - 
+                                            "max":"+",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"107",//三相鼠笼电机3
+                                    "isEnble":false,//是否开启
+                                    "values":[//0> 0->停，1->正，2->反转；1> 0->转速；2> 0->低速，1->高速
+                                        {                                            
+                                            "min":"-",//最小值，没有就填 - 
+                                            "max":"+",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"110",//SB3
+                                    "isEnble":true,//是否开启
+                                    "values":[//0> 0->按下，1->抬起
+                                        {                                            
+                                            "min":"0",//最小值，没有就填 - 
+                                            "max":"0",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"107",//三相鼠笼电机3
+                                    "isEnble":true,//是否开启
+                                    "values":[//0> 0->停，1->正，2->反转；1> 0->转速；2> 0->低速，1->高速
+                                        {                                            
+                                            "min":"2",//最小值，没有就填 - 
+                                            "max":"2",//最大值，没有就填 +
+                                            "currValue":""
+                                        },
+                                        {                                            
+                                            "min":"1",//最小值，没有就填 - 
+                                            "max":"+",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"109",//SB2
+                                    "isEnble":false,//是否开启
+                                    "values":[//0> 0->按下，1->抬起
+                                        {                                            
+                                            "min":"-",//最小值，没有就填 - 
+                                            "max":"+",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                },
+                                {
+                                    "device":"107",//三相鼠笼电机3
+                                    "isEnble":false,//是否开启
+                                    "values":[//0> 0->停，1->正，2->反转；1> 0->转速；2> 0->低速，1->高速
+                                        {                                            
+                                            "min":"-",//最小值，没有就填 - 
+                                            "max":"+",//最大值，没有就填 +
+                                            "currValue":""
+                                        }
+                                    ],
+                                    "waitTimer":"-1",//等待时间  只能是个大概的时间 因为通讯是有延时的 单位 秒 单位 秒
+                                    "isFinish":false//是否完成
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
