@@ -41,6 +41,7 @@ namespace ElectricalSim
         private Transform wireRoot;
         private Material wireMaterial;
         private OriginalVisualRegistry originalVisuals;
+        private PortHoverPresenter portHover;
 
         public SimulationMode Mode { get; private set; } = SimulationMode.View;
         public CircuitGraph Graph => graph;
@@ -58,7 +59,8 @@ namespace ElectricalSim
             Text statusLabel,
             Text instrumentLabel,
             Material lineMaterial,
-            OriginalVisualRegistry visualRegistry)
+            OriginalVisualRegistry visualRegistry,
+            PortHoverPresenter hoverPresenter)
         {
             trainingCamera = cameraController;
             trainingCamera.PresetChanged += OnViewPresetChanged;
@@ -71,6 +73,7 @@ namespace ElectricalSim
             instrumentText = instrumentLabel;
             wireMaterial = lineMaterial;
             originalVisuals = visualRegistry;
+            portHover = hoverPresenter;
             tasks = CircuitTaskCatalog.CreateAll();
 
             foreach (var view in deviceViews)
@@ -89,6 +92,7 @@ namespace ElectricalSim
         private void Update()
         {
             HandleHotkeys();
+            UpdatePortHover();
             HandleSceneInput();
             lastSnapshot = graph.Solve(Time.deltaTime);
             foreach (var view in wireViews) view.Refresh();
@@ -101,6 +105,7 @@ namespace ElectricalSim
         {
             Mode = mode;
             ClearSelection();
+            if (portHover != null) portHover.Hide();
             var showPorts = mode == SimulationMode.Wiring || mode == SimulationMode.Fault;
             foreach (var port in portViews.Values) port.SetVisible(showPorts);
             modeText.text = $"当前模式：{ModeName(mode)}";
@@ -207,6 +212,7 @@ namespace ElectricalSim
             currentWireColor = color;
             currentWireArea = Mathf.Clamp(area, 0.001f, 0.2f);
             currentLineType = string.IsNullOrWhiteSpace(lineType) ? "JumperLine" : lineType;
+            if (portHover != null) portHover.Hide();
             ApplyPortAnchors();
             SetStatus($"接线参数：{currentLineType}，截面积 {currentWireArea:0.###}，颜色 #{ColorUtility.ToHtmlStringRGB(currentWireColor)}", false);
         }
@@ -214,9 +220,14 @@ namespace ElectricalSim
         private void OnDestroy()
         {
             if (trainingCamera != null) trainingCamera.PresetChanged -= OnViewPresetChanged;
+            if (portHover != null) portHover.Hide();
         }
 
-        private void OnViewPresetChanged(TrainingViewPreset preset) => ApplyPortAnchors();
+        private void OnViewPresetChanged(TrainingViewPreset preset)
+        {
+            if (portHover != null) portHover.Hide();
+            ApplyPortAnchors();
+        }
 
         private void ApplyPortAnchors()
         {
@@ -227,6 +238,41 @@ namespace ElectricalSim
             foreach (var port in portViews.Values)
                 port.ApplyOriginalAnchor(trainingCamera.CurrentPreset, jumper);
             foreach (var wire in wireViews) wire.Refresh();
+        }
+
+        private void UpdatePortHover()
+        {
+            if (portHover == null) return;
+            if (Mode != SimulationMode.Wiring && Mode != SimulationMode.Fault)
+            {
+                portHover.Hide();
+                return;
+            }
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+            {
+                portHover.Hide();
+                return;
+            }
+
+            var camera = Camera.main;
+            if (camera == null)
+            {
+                portHover.Hide();
+                return;
+            }
+            var ray = camera.ScreenPointToRay(Input.mousePosition);
+            if (!Physics.Raycast(ray, out var hit, 100f))
+            {
+                portHover.Hide();
+                return;
+            }
+            var port = hit.collider.GetComponent<ElectricalPortView>();
+            if (port == null)
+            {
+                portHover.Hide();
+                return;
+            }
+            portHover.Present(port, camera, Input.mousePosition);
         }
 
         public bool AddBendPointToLastWire(Vector3 worldPosition)

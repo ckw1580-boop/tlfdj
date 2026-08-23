@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -57,6 +58,7 @@ namespace ElectricalSim
             var cameraController = CreateCamera();
             var wireRoot = new GameObject("ElectricalWires").transform;
             CreateDevices();
+            CreateOriginalTerminalBoardPorts();
             Debug.Log("[OfflineBootstrap] Devices ready.");
             var ui = CreateHud();
             Debug.Log("[OfflineBootstrap] HUD ready.");
@@ -64,7 +66,7 @@ namespace ElectricalSim
             controller = gameObject.AddComponent<SimulationController>();
             examController = gameObject.AddComponent<OfflineExamController>();
             captureRecorder = gameObject.AddComponent<LocalCaptureRecorder>();
-            controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, originalVisuals);
+            controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, originalVisuals, ui.PortHover);
             BindUi(ui);
             BindOriginalUi(ui);
             Debug.Log("[OfflineBootstrap] Build complete.");
@@ -283,6 +285,70 @@ namespace ElectricalSim
                 port.ConfigureOriginalAnchors(frontElectrical, frontJumper, backElectrical, backElectrical);
                 view.AddPort(port);
             }
+        }
+
+        private void CreateOriginalTerminalBoardPorts()
+        {
+            if (originalEnvironment == null) return;
+            var configurationPath = Path.Combine(Application.streamingAssetsPath, OriginalTerminalBoardMap.RelativeConfigurationPath);
+            OriginalTerminalBoardMap map;
+            try
+            {
+                map = OriginalTerminalBoardMap.Load(configurationPath);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogError("[OfflineBootstrap] Original terminal map could not be loaded: " + exception.Message);
+                return;
+            }
+
+            var board = originalEnvironment.Find(OriginalTerminalBoardMap.BoardTransformPath);
+            var pointRoot = board != null ? board.Find("point") : null;
+            if (pointRoot == null)
+            {
+                Debug.LogError("[OfflineBootstrap] Original DuanZiPai_0/point hierarchy is missing.");
+                return;
+            }
+
+            var runtime = new ElectricalDeviceRuntime(
+                OriginalTerminalBoardMap.DeviceId,
+                ElectricalDeviceKind.Terminal,
+                map.Bindings.Select(item => item.AnchorId));
+            var root = new GameObject("Original Top Terminal Board Ports");
+            root.transform.SetParent(originalEnvironment, false);
+            var view = root.AddComponent<ElectricalDeviceView>();
+            view.Initialize(runtime, "顶部控制面板端子排");
+
+            foreach (var binding in map.Bindings)
+            {
+                var electricalAnchor = pointRoot.Find(binding.AnchorId);
+                var jumperAnchor = pointRoot.Find(binding.JumperAnchorId);
+                if (electricalAnchor == null || jumperAnchor == null)
+                {
+                    Debug.LogWarning($"[OfflineBootstrap] Terminal anchors are incomplete: {binding.AnchorId}/{binding.JumperAnchorId}");
+                    continue;
+                }
+
+                runtime.AddFixedLink(binding.AnchorId, binding.LogicalNode);
+                var localPosition = root.transform.InverseTransformPoint(electricalAnchor.position);
+                var portObject = CreatePrimitive(
+                    PrimitiveType.Sphere,
+                    "Port",
+                    root.transform,
+                    localPosition,
+                    Vector3.one * 0.0075f,
+                    new Color(0.12f, 0.86f, 0.36f));
+                var collider = portObject.GetComponent<SphereCollider>();
+                if (collider != null) collider.radius = 0.85f;
+                var port = portObject.AddComponent<ElectricalPortView>();
+                port.Initialize(OriginalTerminalBoardMap.DeviceId, binding.AnchorId, new Color(0.12f, 0.86f, 0.36f));
+                port.ConfigureHover(binding.DisplayName, binding.AnchorId);
+                port.ConfigureOriginalAnchors(electricalAnchor, jumperAnchor, electricalAnchor, jumperAnchor);
+                view.AddPort(port);
+            }
+
+            deviceViews.Add(view);
+            Debug.Log($"[OfflineBootstrap] Original top terminal board ready: {view.Ports.Count}/{map.Bindings.Count} terminals.");
         }
 
         private Transform FindOriginalEnvironmentTerminal(string deviceId, ElectricalDeviceKind kind, string port, bool jumper)
@@ -547,7 +613,11 @@ namespace ElectricalSim
             var status = Label("Status", statusPanel.transform, "系统就绪", 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.2f));
             SetRect(status.rectTransform, Vector2.zero, Vector2.one, new Vector2(20f, 5f), new Vector2(-20f, -5f));
 
-            var references = new HudReferences { Canvas = canvas, Top = top, Right = right, Mode = mode, Task = task, Description = description, Schematic = schematic, Status = status, Instrument = instrument };
+            var hoverObject = new GameObject("PortHoverPresenter");
+            var portHover = hoverObject.AddComponent<PortHoverPresenter>();
+            portHover.Initialize(canvas, uiFont);
+
+            var references = new HudReferences { Canvas = canvas, Top = top, Right = right, Mode = mode, Task = task, Description = description, Schematic = schematic, Status = status, Instrument = instrument, PortHover = portHover };
             if (originalVisuals != null && originalVisuals.ResolveUi("TopNavigation") != null)
             {
                 top.gameObject.SetActive(false);
@@ -890,6 +960,7 @@ namespace ElectricalSim
             public Image Schematic;
             public Text Status;
             public Text Instrument;
+            public PortHoverPresenter PortHover;
         }
     }
 }

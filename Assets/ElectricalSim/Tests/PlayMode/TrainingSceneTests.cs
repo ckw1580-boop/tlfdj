@@ -122,6 +122,66 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator TopTerminalBoardUsesAllOriginalElectricalAndJumperAnchors()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var board = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == OriginalTerminalBoardMap.DeviceId);
+            Assert.That(board.Ports.Count, Is.EqualTo(76));
+
+            var port = board.Ports.Single(item => item.PortName == "a75");
+            Assert.That(port.HoverLabel, Is.EqualTo("SB8_COM2"));
+            cameraController.SetWiringView();
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            var electrical = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "a75" && HasAncestor(item, "DuanZiPai_0") && HasAncestor(item, "13"));
+            Assert.That(Vector3.Distance(port.transform.position, electrical.position), Is.LessThan(0.0005f));
+            Assert.That(port.UsesJumperAnchor, Is.False);
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            var jumper = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "A75" && HasAncestor(item, "DuanZiPai_0") && HasAncestor(item, "13"));
+            Assert.That(Vector3.Distance(port.transform.position, jumper.position), Is.LessThan(0.0005f));
+            Assert.That(port.UsesJumperAnchor, Is.True);
+            Assert.That(Vector3.Distance(electrical.position, jumper.position), Is.GreaterThan(0.01f));
+        }
+
+        [UnityTest]
+        public IEnumerator PortHoverMatchesOriginalTooltipInWiringAndFaultModes()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var presenter = Object.FindObjectsOfType<PortHoverPresenter>(true).Single();
+            var port = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == OriginalTerminalBoardMap.DeviceId)
+                .Ports.Single(item => item.PortName == "a75");
+
+            controller.SetMode(SimulationMode.Wiring);
+            yield return null;
+            var screenPoint = (Vector2)Camera.main.WorldToScreenPoint(port.CurrentAnchorPosition);
+            presenter.Present(port, Camera.main, screenPoint + new Vector2(-70f, 55f));
+            Assert.That(presenter.IsVisible, Is.True);
+            Assert.That(presenter.CurrentText, Is.EqualTo("SB8_COM2"));
+            var canvas = GameObject.Find("Simulation HUD").GetComponent<RectTransform>();
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(canvas, screenPoint, null, out var expectedEnd);
+            Assert.That(Vector2.Distance(presenter.LeaderEndCanvasPosition, expectedEnd), Is.LessThanOrEqualTo(2f));
+
+            controller.SetMode(SimulationMode.Fault);
+            yield return null;
+            screenPoint = Camera.main.WorldToScreenPoint(port.CurrentAnchorPosition);
+            presenter.Present(port, Camera.main, screenPoint + new Vector2(-70f, 55f));
+            Assert.That(presenter.IsVisible, Is.True);
+            Assert.That(presenter.CurrentText, Is.EqualTo("SB8_COM2"));
+
+            controller.SetMode(SimulationMode.View);
+            Assert.That(presenter.IsVisible, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator WiringPortsStayOnTheOriginalCabinetInsteadOfNearTheCamera()
         {
             var controller = Object.FindObjectOfType<SimulationController>();

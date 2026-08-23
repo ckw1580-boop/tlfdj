@@ -7,6 +7,7 @@ namespace ElectricalSim
     public sealed class ElectricalDeviceRuntime : IElectricalDevice
     {
         private readonly List<string> ports;
+        private readonly List<PortPair> fixedLinks = new List<PortPair>();
         private float timerElapsed;
         private bool lastEvaluatedState;
         private bool manualOverride;
@@ -30,6 +31,13 @@ namespace ElectricalSim
         public float TimerDelaySeconds { get; set; } = 1f;
         public MotorDirection MotorDirection { get; private set; }
         public Action<ElectricalDeviceRuntime> VisualStateChanged;
+
+        public void AddFixedLink(string localPort, string qualifiedTarget)
+        {
+            if (string.IsNullOrWhiteSpace(localPort) || string.IsNullOrWhiteSpace(qualifiedTarget)) return;
+            if (!ports.Contains(localPort)) ports.Add(localPort);
+            fixedLinks.Add(new PortPair(localPort, qualifiedTarget));
+        }
 
         public void SetControl(bool active)
         {
@@ -55,6 +63,7 @@ namespace ElectricalSim
 
         public IEnumerable<PortPair> GetConductiveLinks()
         {
+            foreach (var link in fixedLinks) yield return link;
             switch (Kind)
             {
                 case ElectricalDeviceKind.Breaker:

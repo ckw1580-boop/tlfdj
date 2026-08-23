@@ -12,19 +12,34 @@ namespace ElectricalSim
         private Transform frontJumperAnchor;
         private Transform backElectricalAnchor;
         private Transform backJumperAnchor;
+        private bool isVisible;
 
         public string DeviceId { get; private set; }
         public string PortName { get; private set; }
         public string QualifiedPort => CircuitGraph.Port(DeviceId, PortName);
+        public string HoverLabel { get; private set; }
+        public string PhysicalAnchorId { get; private set; }
+        public bool IsVisible => isVisible;
+        public bool UsesJumperAnchor { get; private set; }
+        public Transform CurrentAnchor { get; private set; }
+        public Vector3 CurrentAnchorPosition => CurrentAnchor != null ? CurrentAnchor.position : transform.position;
 
         public void Initialize(string deviceId, string portName, Color color)
         {
             DeviceId = deviceId;
             PortName = portName;
+            HoverLabel = portName;
+            PhysicalAnchorId = portName;
             gameObject.name = $"Port_{deviceId}_{portName}";
             cachedRenderer = GetComponent<Renderer>();
             baseColor = color;
             if (cachedRenderer != null) cachedRenderer.material.color = color;
+        }
+
+        public void ConfigureHover(string hoverLabel, string physicalAnchorId)
+        {
+            HoverLabel = string.IsNullOrWhiteSpace(hoverLabel) ? PortName : hoverLabel;
+            PhysicalAnchorId = string.IsNullOrWhiteSpace(physicalAnchorId) ? PortName : physicalAnchorId;
         }
 
         public void ConfigureOriginalAnchors(
@@ -46,6 +61,8 @@ namespace ElectricalSim
                 anchor = jumper ? backJumperAnchor : backElectricalAnchor;
             else
                 anchor = jumper ? frontJumperAnchor : frontElectricalAnchor;
+            UsesJumperAnchor = jumper;
+            CurrentAnchor = anchor;
             if (anchor != null) transform.position = anchor.position;
         }
 
@@ -60,6 +77,7 @@ namespace ElectricalSim
 
         public void SetVisible(bool visible)
         {
+            isVisible = visible;
             if (cachedRenderer != null) cachedRenderer.enabled = visible;
             var collider = GetComponent<Collider>();
             if (collider != null) collider.enabled = visible;

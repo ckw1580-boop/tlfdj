@@ -1,0 +1,1230 @@
+{
+    "components": {
+    },
+    "actorComponents":
+	{
+	   "ElementPoints": {
+			  "data": {
+				"root": "point",
+          "points": {
+            "a1": {
+              "name": "U1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a2": {
+              "name": "V1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a3": {
+              "name": "W1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a4": {
+              "name": "N1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a6": {
+              "name": "U2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a7": {
+              "name": "V2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a8": {
+              "name": "W2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a9": {
+              "name": "N2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a11": {
+              "name": "U3",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a12": {
+              "name": "V3",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a13": {
+              "name": "W3",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a14": {
+              "name": "N3",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a17": {
+              "name": "24V+",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a18": {
+              "name": "24V+",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a20": {
+              "name": "24V+",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a21": {
+              "name": "24V+",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a22": {
+              "name": "24V+",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a23": {
+              "name": "24V+",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a24": {
+              "name": "24V-",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a25": {
+              "name": "24V-",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a26": {
+              "name": "24V-",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a27": {
+              "name": "24V-",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a28": {
+              "name": "24V-",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a29": {
+              "name": "24V-",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a33": {
+              "name": "HL1_L",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a34": {
+              "name": "HL1_N",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a35": {
+              "name": "HL2_L",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a36": {
+              "name": "HL2_N",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a37": {
+              "name": "HL3_L",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a38": {
+              "name": "HL3_N",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a39": {
+              "name": "HL4_L",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a77": {
+              "name": "HL4_N",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a78": {
+              "name": "HL5_L",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a79": {
+              "name": "HL5_N",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a80": {
+              "name": "HL6_L",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a81": {
+              "name": "HL6_N",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a82": {
+              "name": "SA1_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a83": {
+              "name": "SA1_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a84": {
+              "name": "SA1_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a85": {
+              "name": "SA1_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a40": {
+              "name": "SB1_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a41": {
+              "name": "SB1_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a42": {
+              "name": "SB1_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a43": {
+              "name": "SB1_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a44": {
+              "name": "SB2_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a45": {
+              "name": "SB2_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a46": {
+              "name": "SB2_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a47": {
+              "name": "SB2_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a48": {
+              "name": "SA2_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a49": {
+              "name": "SA2_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a50": {
+              "name": "SA2_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a51": {
+              "name": "SA2_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a52": {
+              "name": "SB3_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a53": {
+              "name": "SB3_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a54": {
+              "name": "SB3_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a55": {
+              "name": "SB3_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a56": {
+              "name": "SB4_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a57": {
+              "name": "SB4_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a58": {
+              "name": "SB4_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a59": {
+              "name": "SB4_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a60": {
+              "name": "SB5_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a61": {
+              "name": "SB5_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a62": {
+              "name": "SB5_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a63": {
+              "name": "SB5_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a64": {
+              "name": "SB6_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a65": {
+              "name": "SB6_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a66": {
+              "name": "SB6_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a67": {
+              "name": "SB6_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a68": {
+              "name": "SB7_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a69": {
+              "name": "SB7_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a70": {
+              "name": "SB7_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a71": {
+              "name": "SB7_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a72": {
+              "name": "SB8_NO1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a73": {
+              "name": "SB8_COM1",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a74": {
+              "name": "SB8_NC2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            },
+            "a75": {
+              "name": "SB8_COM2",
+              "group": 3,
+              "ports": [
+                {
+                  "type": "WirePort",
+                  "prefabType": "SpherePort",
+                  "matchLineTypes": "Elec",
+                  "scale": [
+                    0.4,
+                    0.4,
+                    0.4
+                  ]
+                }
+              ]
+            }
+          }
+			}
+		}
+	}
+}
