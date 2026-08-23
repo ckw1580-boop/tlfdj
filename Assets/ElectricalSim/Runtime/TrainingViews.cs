@@ -8,6 +8,10 @@ namespace ElectricalSim
     {
         private Renderer cachedRenderer;
         private Color baseColor;
+        private Transform frontElectricalAnchor;
+        private Transform frontJumperAnchor;
+        private Transform backElectricalAnchor;
+        private Transform backJumperAnchor;
 
         public string DeviceId { get; private set; }
         public string PortName { get; private set; }
@@ -21,6 +25,28 @@ namespace ElectricalSim
             cachedRenderer = GetComponent<Renderer>();
             baseColor = color;
             if (cachedRenderer != null) cachedRenderer.material.color = color;
+        }
+
+        public void ConfigureOriginalAnchors(
+            Transform frontElectrical,
+            Transform frontJumper,
+            Transform backElectrical,
+            Transform backJumper)
+        {
+            frontElectricalAnchor = frontElectrical;
+            frontJumperAnchor = frontJumper != null ? frontJumper : frontElectrical;
+            backElectricalAnchor = backElectrical != null ? backElectrical : frontElectricalAnchor;
+            backJumperAnchor = backJumper != null ? backJumper : backElectricalAnchor;
+        }
+
+        public void ApplyOriginalAnchor(TrainingViewPreset preset, bool jumper)
+        {
+            Transform anchor;
+            if (preset == TrainingViewPreset.FaultBack)
+                anchor = jumper ? backJumperAnchor : backElectricalAnchor;
+            else
+                anchor = jumper ? frontJumperAnchor : frontElectricalAnchor;
+            if (anchor != null) transform.position = anchor.position;
         }
 
         public void SetHighlighted(bool highlighted)

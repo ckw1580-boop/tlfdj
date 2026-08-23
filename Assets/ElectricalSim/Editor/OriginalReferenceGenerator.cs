@@ -45,6 +45,36 @@ namespace ElectricalSim.Editor
             }
         }
 
+        public static void ReportEnvironmentTerminals()
+        {
+            var registry = AssetDatabase.LoadAssetAtPath<OriginalVisualRegistry>(RegistryPath);
+            if (registry?.EnvironmentPrefab == null) throw new InvalidOperationException("Original environment is missing.");
+            var path = AssetDatabase.GetAssetPath(registry.EnvironmentPrefab);
+            var root = PrefabUtility.LoadPrefabContents(path);
+            try
+            {
+                var aliases = PortSpecs().SelectMany(spec => spec.Ports.Values.SelectMany(values => values))
+                    .Concat(new[] { "A1", "A2", "COM1", "COM2", "NO1", "NO2", "NC1", "NC2", "U1", "V1", "W1" })
+                    .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                var records = root.GetComponentsInChildren<Transform>(true)
+                    .Where(item => aliases.Any(alias => item.name.EndsWith(alias, StringComparison.OrdinalIgnoreCase)))
+                    .Select(item => new
+                    {
+                        item.name,
+                        path = AnimationUtility.CalculateTransformPath(item, root.transform),
+                        position = new[] { item.position.x, item.position.y, item.position.z },
+                        forward = new[] { item.forward.x, item.forward.y, item.forward.z }
+                    })
+                    .OrderBy(item => item.name, StringComparer.OrdinalIgnoreCase).ThenBy(item => item.position[2])
+                    .ToArray();
+                WriteReport("environment-terminals.json", records);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(root);
+            }
+        }
+
         private static void AddBoundsRecord(ICollection<object> records, Transform root, string name)
         {
             var renderers = root.GetComponentsInChildren<Renderer>(true).Where(item => item.enabled).ToArray();
@@ -174,7 +204,7 @@ namespace ElectricalSim.Editor
 
         private static void WriteReport(string name, object value)
         {
-            var directory = Path.GetFullPath("Build/Reports");
+            var directory = Path.Combine(Directory.GetParent(Application.dataPath).FullName, "Build", "Reports");
             Directory.CreateDirectory(directory);
             File.WriteAllText(Path.Combine(directory, name), JsonConvert.SerializeObject(value, Formatting.Indented));
         }

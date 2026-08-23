@@ -4,6 +4,7 @@ using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
+using UnityEngine.UI;
 
 namespace ElectricalSim.Tests
 {
@@ -53,17 +54,101 @@ namespace ElectricalSim.Tests
         [UnityTest]
         public IEnumerator OriginalModelConnectionPointsUseTerminalTransforms()
         {
-            AssertPortMatchesTerminal("QF", "L1", "1");
-            AssertPortMatchesTerminal("QF", "T3", "6");
+            AssertPortMatchesMappedTerminal("QF", "L1", "L1", "123");
+            AssertPortMatchesMappedTerminal("QF", "T3", "L6", "123");
             AssertPortMatchesTerminal("KM1", "L1", "1L1");
             AssertPortMatchesTerminal("KM1", "T2", "4T2");
             AssertPortMatchesTerminal("KM1", "A1", "A1");
             AssertPortMatchesTerminal("KM1", "13", "13NO");
             AssertPortMatchesTerminal("FR", "95", "95NC");
-            AssertPortMatchesTerminal("SB1", "COM", "COM1");
-            AssertPortMatchesTerminal("SB1", "NO", "NO1");
-            AssertPortMatchesTerminal("M1", "U", "U1");
+            AssertPortMatchesMappedTerminal("SB1", "COM", "COM1", "8");
+            AssertPortMatchesMappedTerminal("SB1", "NO", "NO1", "8");
+            AssertPortMatchesMappedTerminal("M1", "U", "U1", "38");
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator OriginalViewMenuSwitchesBetweenFrontAndBack()
+        {
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var toolbar = GameObject.Find("OriginalUI_ExperimentToolbar");
+            Assert.That(toolbar, Is.Not.Null);
+            var menu = toolbar.GetComponentsInChildren<Transform>(true).Single(item => item.name == "twoChange");
+            var viewButton = toolbar.GetComponentsInChildren<Button>(true).Single(item => item.name == "btn_viewChange");
+
+            viewButton.onClick.Invoke();
+            Assert.That(menu.gameObject.activeSelf, Is.True);
+            ButtonWithText(menu, "排故视角").onClick.Invoke();
+            yield return null;
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.FaultBack));
+            Assert.That(cameraController.transform.position.z, Is.LessThan(-4f));
+            Assert.That(Vector3.Dot(cameraController.transform.forward, Vector3.forward), Is.GreaterThan(0.95f));
+
+            viewButton.onClick.Invoke();
+            ButtonWithText(menu, "接线视角").onClick.Invoke();
+            yield return null;
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.WiringFront));
+            Assert.That(Vector3.Dot(cameraController.transform.forward, Vector3.back), Is.GreaterThan(0.95f));
+        }
+
+        [UnityTest]
+        public IEnumerator FrontLineTypeAndBackViewUseDistinctOriginalAnchors()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var port = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == "KM1").Ports.Single(view => view.PortName == "A1");
+
+            cameraController.SetWiringView();
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            var electrical = environment.GetComponentsInChildren<Transform>(true)
+                .First(item => item.name == "KM1_a1" && HasAncestor(item, "point"));
+            Assert.That(Vector3.Distance(port.transform.position, electrical.position), Is.LessThan(0.0005f));
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            var jumper = environment.GetComponentsInChildren<Transform>(true)
+                .First(item => item.name == "KM1_A1" && HasAncestor(item, "point"));
+            Assert.That(Vector3.Distance(port.transform.position, jumper.position), Is.LessThan(0.0005f));
+            Assert.That(Vector3.Distance(electrical.position, jumper.position), Is.GreaterThan(0.01f));
+
+            cameraController.SetFaultView();
+            yield return null;
+            var back = environment.GetComponentsInChildren<Transform>(true)
+                .First(item => item.name == "A1" && HasAncestor(item, "112") && HasAncestor(item, "point"));
+            Assert.That(Vector3.Distance(port.transform.position, back.position), Is.LessThan(0.0005f));
+        }
+
+        [UnityTest]
+        public IEnumerator WiringPortsStayOnTheOriginalCabinetInsteadOfNearTheCamera()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            cameraController.SetWiringView();
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            controller.SetMode(SimulationMode.Wiring);
+            yield return null;
+
+            foreach (var port in Object.FindObjectsOfType<ElectricalPortView>())
+            {
+                var position = port.transform.position;
+                Assert.That(position.x, Is.InRange(-0.7f, 0.7f), $"{port.QualifiedPort} x={position.x}");
+                Assert.That(position.y, Is.InRange(0.15f, 1.95f), $"{port.QualifiedPort} y={position.y}");
+                Assert.That(position.z, Is.InRange(-2.0f, -1.1f), $"{port.QualifiedPort} z={position.z}");
+            }
+        }
+
+        private static Button ButtonWithText(Transform root, string label)
+            => root.GetComponentsInChildren<Button>(true).Single(button =>
+                button.GetComponentsInChildren<Text>(true).Any(text => text.text == label));
+
+        private static bool HasAncestor(Transform item, string name)
+        {
+            for (var current = item.parent; current != null; current = current.parent)
+                if (current.name == name) return true;
+            return false;
         }
 
         private static void AssertPortMatchesTerminal(string deviceId, string portName, string terminalName)
@@ -83,6 +168,17 @@ namespace ElectricalSim.Tests
                     .First(transform => string.Equals(transform.name, terminalName, System.StringComparison.OrdinalIgnoreCase));
             Assert.That(Vector3.Distance(port.transform.position, terminal.position), Is.LessThan(0.0005f),
                 $"{deviceId}.{portName} must be located on original terminal {terminalName}");
+        }
+
+        private static void AssertPortMatchesMappedTerminal(string deviceId, string portName, string terminalName, string nut)
+        {
+            var port = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == deviceId).Ports.Single(view => view.PortName == portName);
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var terminal = environment.GetComponentsInChildren<Transform>(true).First(item =>
+                string.Equals(item.name, terminalName, System.StringComparison.OrdinalIgnoreCase) &&
+                HasAncestor(item, nut) && HasAncestor(item, "point"));
+            Assert.That(Vector3.Distance(port.transform.position, terminal.position), Is.LessThan(0.0005f));
         }
     }
 }

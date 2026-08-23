@@ -29,7 +29,7 @@ namespace ElectricalSim
         private readonly Stack<List<WireConnection>> redoWires = new Stack<List<WireConnection>>();
         private Color currentWireColor = Color.red;
         private float currentWireArea = 0.01f;
-        private string currentLineType = "JumperLine";
+        private string currentLineType = "ElectricalWire";
 
         private Text modeText;
         private Text taskText;
@@ -61,6 +61,7 @@ namespace ElectricalSim
             OriginalVisualRegistry visualRegistry)
         {
             trainingCamera = cameraController;
+            trainingCamera.PresetChanged += OnViewPresetChanged;
             wireRoot = wireContainer;
             modeText = modeLabel;
             taskText = taskLabel;
@@ -81,6 +82,7 @@ namespace ElectricalSim
 
             UpdateTaskUi();
             SetMode(SimulationMode.View);
+            ApplyPortAnchors();
             SetStatus("系统就绪。请选择任务后进行接线，或点击“标准接线”加载参考拓扑。", false);
         }
 
@@ -205,7 +207,26 @@ namespace ElectricalSim
             currentWireColor = color;
             currentWireArea = Mathf.Clamp(area, 0.001f, 0.2f);
             currentLineType = string.IsNullOrWhiteSpace(lineType) ? "JumperLine" : lineType;
+            ApplyPortAnchors();
             SetStatus($"接线参数：{currentLineType}，截面积 {currentWireArea:0.###}，颜色 #{ColorUtility.ToHtmlStringRGB(currentWireColor)}", false);
+        }
+
+        private void OnDestroy()
+        {
+            if (trainingCamera != null) trainingCamera.PresetChanged -= OnViewPresetChanged;
+        }
+
+        private void OnViewPresetChanged(TrainingViewPreset preset) => ApplyPortAnchors();
+
+        private void ApplyPortAnchors()
+        {
+            if (trainingCamera == null) return;
+            var jumper = currentLineType.IndexOf("jumper", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         currentLineType.IndexOf("rope", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         currentLineType.IndexOf("跳", StringComparison.Ordinal) >= 0;
+            foreach (var port in portViews.Values)
+                port.ApplyOriginalAnchor(trainingCamera.CurrentPreset, jumper);
+            foreach (var wire in wireViews) wire.Refresh();
         }
 
         public bool AddBendPointToLastWire(Vector3 worldPosition)

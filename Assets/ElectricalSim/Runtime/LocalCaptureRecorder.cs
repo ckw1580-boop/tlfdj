@@ -20,6 +20,11 @@ namespace ElectricalSim
 
         private void Awake() => store = new LocalSessionStore();
 
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.F12)) CaptureScreenshot();
+        }
+
         public void CaptureScreenshot()
         {
             var path = Path.Combine(store.CapturesDirectory, $"截图_{DateTime.Now:yyyyMMdd_HHmmss}.png");

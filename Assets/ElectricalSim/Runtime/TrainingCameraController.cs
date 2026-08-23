@@ -1,8 +1,16 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace ElectricalSim
 {
+    public enum TrainingViewPreset
+    {
+        Default,
+        WiringFront,
+        FaultBack
+    }
+
     public sealed class TrainingCameraController : MonoBehaviour
     {
         public float MoveSpeed = 2.5f;
@@ -11,6 +19,9 @@ namespace ElectricalSim
         public float ZoomSpeed = 3f;
         public Vector3 DefaultPosition = new Vector3(-0.35f, 1.58f, 0.45f);
         public Vector3 DefaultEuler = new Vector3(10f, 180f, 0f);
+
+        public TrainingViewPreset CurrentPreset { get; private set; } = TrainingViewPreset.Default;
+        public event Action<TrainingViewPreset> PresetChanged;
 
         private void Start()
         {
@@ -51,18 +62,30 @@ namespace ElectricalSim
         {
             transform.position = DefaultPosition;
             transform.eulerAngles = DefaultEuler;
+            SetPreset(TrainingViewPreset.Default);
         }
 
         public void SetWiringView()
         {
-            transform.position = new Vector3(0.1f, 1.53f, -0.05f);
+            // PLC/terminal-board face, matching the original "接线视角".
+            transform.position = new Vector3(0.10f, 1.53f, -0.05f);
             transform.eulerAngles = new Vector3(8f, 180f, 0f);
+            SetPreset(TrainingViewPreset.WiringFront);
         }
 
         public void SetFaultView()
         {
-            transform.position = new Vector3(1.15f, 1.78f, 0.75f);
-            transform.eulerAngles = new Vector3(4f, 168f, 0f);
+            // Component face is on the room side behind the cabinet.  Looking
+            // towards +Z is essential; the previous preset stayed in front.
+            transform.position = new Vector3(-0.12f, 1.60f, -4.72f);
+            transform.eulerAngles = new Vector3(3f, 0f, 0f);
+            SetPreset(TrainingViewPreset.FaultBack);
+        }
+
+        private void SetPreset(TrainingViewPreset preset)
+        {
+            CurrentPreset = preset;
+            PresetChanged?.Invoke(preset);
         }
 
         private static bool IsPointerOverUi()

@@ -18,7 +18,7 @@ namespace ElectricalSim
         private Font uiFont;
         private SimulationController controller;
         private Transform originalEnvironment;
-        private Dictionary<string, Transform> originalTerminals;
+        private Dictionary<string, List<Transform>> originalTerminals;
         private Transform[] originalEnvironmentTransforms;
         private OfflineExamController examController;
         private LocalCaptureRecorder captureRecorder;
@@ -267,20 +267,25 @@ namespace ElectricalSim
                 var x = columns == 1 ? 0f : Mathf.Lerp(-bounds.x * 0.42f, bounds.x * 0.42f, column / (float)(columns - 1));
                 var y = row == 0 ? bounds.y * 0.48f : -bounds.y * 0.48f;
                 var fallback = new Vector3(x, y, -bounds.z * 0.68f - 0.025f);
-                var terminal = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index]) ??
-                               FindTerminal(parent, view.Runtime.Kind, list[index]);
-                var localPosition = terminal != null ? parent.InverseTransformPoint(terminal.position) : fallback;
-                var worldMarkerSize = terminal != null ? 0.026f : 0.032f;
+                var frontElectrical = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], false) ??
+                                      FindMappedEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], false) ??
+                                      FindTerminal(parent, view.Runtime.Kind, list[index]);
+                var frontJumper = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical;
+                var backElectrical = FindMappedEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical;
+                var localPosition = frontElectrical != null ? parent.InverseTransformPoint(frontElectrical.position) : fallback;
+                // Original terminal highlights are small snap dots, not device-sized bulbs.
+                var worldMarkerSize = frontElectrical != null ? 0.0075f : 0.009f;
                 var parentScale = Mathf.Max(Mathf.Abs(parent.lossyScale.x), Mathf.Abs(parent.lossyScale.y), Mathf.Abs(parent.lossyScale.z));
                 var markerSize = worldMarkerSize / Mathf.Max(0.0001f, parentScale);
                 var portObject = CreatePrimitive(PrimitiveType.Sphere, "Port", parent, localPosition, Vector3.one * markerSize, new Color(0.08f, 1f, 0.32f));
                 var port = portObject.AddComponent<ElectricalPortView>();
                 port.Initialize(view.Runtime.DeviceId, list[index], new Color(0.12f, 0.86f, 0.36f));
+                port.ConfigureOriginalAnchors(frontElectrical, frontJumper, backElectrical, backElectrical);
                 view.AddPort(port);
             }
         }
 
-        private Transform FindOriginalEnvironmentTerminal(string deviceId, ElectricalDeviceKind kind, string port)
+        private Transform FindOriginalEnvironmentTerminal(string deviceId, ElectricalDeviceKind kind, string port, bool jumper)
         {
             if (originalEnvironment == null) return null;
             if (originalTerminals == null) CacheOriginalEnvironmentTransforms();
@@ -290,15 +295,103 @@ namespace ElectricalSim
                     new[] { deviceId };
                 foreach (var prefix in prefixes)
                 {
-                    var expected = string.IsNullOrEmpty(prefix) ? alias : prefix + "_" + alias;
-                    originalTerminals.TryGetValue(expected, out var exact);
-                    if (exact != null) return exact;
+                    var suffix = jumper ? alias.ToUpperInvariant() : alias.ToLowerInvariant();
+                    var expected = string.IsNullOrEmpty(prefix) ? suffix : prefix + "_" + suffix;
+                    if (originalTerminals.TryGetValue(expected, out var exact))
+                    {
+                        var point = exact.FirstOrDefault(IsTerminalPointTransform);
+                        if (point != null) return point;
+                    }
                 }
-                var scoped = originalEnvironmentTransforms.FirstOrDefault(item => item.name.StartsWith(deviceId + "_", StringComparison.OrdinalIgnoreCase) &&
-                                                        item.name.EndsWith(alias, StringComparison.OrdinalIgnoreCase));
+                var scoped = originalEnvironmentTransforms.FirstOrDefault(item => IsTerminalPointTransform(item) &&
+                                                        item.name.StartsWith(deviceId + "_", StringComparison.Ordinal) &&
+                                                        item.name.EndsWith(jumper ? alias.ToUpperInvariant() : alias.ToLowerInvariant(), StringComparison.Ordinal));
                 if (scoped != null) return scoped;
             }
             return null;
+        }
+
+        private Transform FindMappedEnvironmentTerminal(string deviceId, ElectricalDeviceKind kind, string port, bool back)
+        {
+            if (originalEnvironment == null) return null;
+            var nut = back ? BackDeviceNut(deviceId) : FrontDeviceNut(deviceId);
+            if (string.IsNullOrEmpty(nut)) return null;
+            foreach (var alias in TerminalAliases(kind, port))
+            {
+                var match = originalEnvironmentTransforms.FirstOrDefault(item =>
+                    string.Equals(item.name, alias, StringComparison.OrdinalIgnoreCase) &&
+                    IsTerminalPointTransform(item) && HasAncestor(item, nut));
+                if (match != null) return match;
+            }
+            // Some original models (notably PE/chassis terminals) do not carry
+            // a semantic name.  Keep those logical ports on the mapped device
+            // instead of falling back to the near-camera hidden prefab.
+            return originalEnvironmentTransforms.FirstOrDefault(item =>
+                IsTerminalPointTransform(item) && HasAncestor(item, nut));
+        }
+
+        private static string FrontDeviceNut(string deviceId)
+        {
+            switch (deviceId)
+            {
+                case "POWER": return "123";
+                case "QF": return "123";
+                case "KMF": return "29";
+                case "KM1": return "30";
+                case "KMR": return "31";
+                case "KM2": return "32";
+                case "KMB": return "29";
+                case "KB": return "30";
+                case "FR": return "33";
+                case "KT": return "35";
+                case "SB0": return "9";
+                case "SB1": return "8";
+                case "SB2": return "11";
+                case "SBF": return "39";
+                case "SBR": return "40";
+                case "SBB": return "42";
+                case "SBE": return "41";
+                case "SB0A": return "12";
+                case "SB0B": return "10";
+                case "SB1A": return "7";
+                case "SB1B": return "11";
+                case "M1": return "38";
+                case "M2": return "49";
+                case "BRAKE": return "35";
+                default: return null;
+            }
+        }
+
+        private static string BackDeviceNut(string deviceId)
+        {
+            switch (deviceId)
+            {
+                case "QF": return "123";
+                case "POWER": return "123";
+                case "KMF": return "111";
+                case "KM1": return "112";
+                case "KMR": return "113";
+                case "KM2": return "113";
+                case "FR": return "114";
+                case "SB1": return "108";
+                case "SB0": return "109";
+                case "SB2": return "110";
+                case "M1": return "107";
+                case "M2": return "118";
+                default: return null;
+            }
+        }
+
+        private static bool HasAncestor(Transform item, string name)
+        {
+            for (var current = item.parent; current != null; current = current.parent)
+                if (current.name == name) return true;
+            return false;
+        }
+
+        private static bool IsTerminalPointTransform(Transform item)
+        {
+            return item != null && item.parent != null && item.parent.name == "point";
         }
 
         private void CacheOriginalEnvironmentTransforms()
@@ -306,9 +399,16 @@ namespace ElectricalSim
             originalEnvironmentTransforms = originalEnvironment != null
                 ? originalEnvironment.GetComponentsInChildren<Transform>(true)
                 : Array.Empty<Transform>();
-            originalTerminals = new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
+            originalTerminals = new Dictionary<string, List<Transform>>(StringComparer.Ordinal);
             foreach (var item in originalEnvironmentTransforms)
-                if (!originalTerminals.ContainsKey(item.name)) originalTerminals.Add(item.name, item);
+            {
+                if (!originalTerminals.TryGetValue(item.name, out var matches))
+                {
+                    matches = new List<Transform>();
+                    originalTerminals.Add(item.name, matches);
+                }
+                matches.Add(item);
+            }
         }
 
         private static void FitOriginalVisual(GameObject root, Vector3 targetCenter, Vector3 targetSize)
@@ -332,7 +432,8 @@ namespace ElectricalSim
             foreach (var alias in TerminalAliases(kind, port))
             {
                 var match = root.GetComponentsInChildren<Transform>(true)
-                    .FirstOrDefault(item => string.Equals(item.name, alias, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(item => string.Equals(item.name, alias, StringComparison.OrdinalIgnoreCase) &&
+                                            IsTerminalPointTransform(item));
                 if (match != null) return match;
             }
             return null;
@@ -364,12 +465,12 @@ namespace ElectricalSim
             }
             if (kind == ElectricalDeviceKind.Breaker)
             {
-                var breaker = new Dictionary<string, string>
+                var breaker = new Dictionary<string, string[]>
                 {
-                    { "L1", "1" }, { "L2", "3" }, { "L3", "5" },
-                    { "T1", "2" }, { "T2", "4" }, { "T3", "6" }
+                    { "L1", new[] { "L1", "1" } }, { "L2", new[] { "L3", "3" } }, { "L3", new[] { "L5", "5" } },
+                    { "T1", new[] { "L2", "2" } }, { "T2", new[] { "L4", "4" } }, { "T3", new[] { "L6", "6" } }
                 };
-                if (breaker.TryGetValue(port, out var alias)) return new[] { alias };
+                if (breaker.TryGetValue(port, out var aliases)) return aliases;
             }
             if (kind == ElectricalDeviceKind.PushButton)
                 return port == "COM" ? new[] { "COM1", "COM2" } : new[] { port + "1", port + "2", port };
@@ -526,7 +627,7 @@ namespace ElectricalSim
             }
             if (toolbar != null)
             {
-                BindNamedButton(toolbar, "btn_viewChange", () => controller.SetMode(SimulationMode.View));
+                BindOriginalViewMenu(toolbar);
                 BindNamedButton(toolbar, "btn_paigu", () => controller.SetMode(SimulationMode.Fault));
                 BindNamedButton(toolbar, "btn_drag", () => controller.SetMode(SimulationMode.Drag));
                 BindNamedButton(toolbar, "btn_line", () => controller.SetMode(SimulationMode.Wiring));
@@ -542,18 +643,67 @@ namespace ElectricalSim
 
             var lineForm = InstantiateUi("LineForm", ui.Canvas.transform);
             var lineParam = InstantiateUi("LineParam", ui.Canvas.transform);
-            if (lineForm != null) lineForm.SetActive(false);
+            if (lineForm != null)
+            {
+                BindOriginalLineForm(lineForm);
+                lineForm.SetActive(false);
+            }
             if (lineParam != null) lineParam.SetActive(false);
             controller.ModeChanged += mode =>
             {
                 if (lineForm != null) lineForm.SetActive(mode == SimulationMode.Wiring);
-                if (lineParam != null) lineParam.SetActive(mode == SimulationMode.Wiring);
+                // The original property window opens only for a selected wire.
+                if (lineParam != null) lineParam.SetActive(false);
             };
 
             var ticker = ui.Canvas.gameObject.AddComponent<OfflineUiTicker>();
             ticker.Initialize(navigation, toolbar, examController);
 
             void ToggleTaskPanel() => ui.Right.gameObject.SetActive(!ui.Right.gameObject.activeSelf);
+        }
+
+        private void BindOriginalViewMenu(GameObject toolbar)
+        {
+            var cameraController = Camera.main != null ? Camera.main.GetComponent<TrainingCameraController>() : null;
+            if (cameraController == null) return;
+            var menu = toolbar.GetComponentsInChildren<Transform>(true).FirstOrDefault(item => item.name == "twoChange");
+            BindNamedButton(toolbar, "btn_viewChange", () =>
+            {
+                if (menu != null) menu.gameObject.SetActive(!menu.gameObject.activeSelf);
+            });
+            BindButtonByText(menu, "接线视角", cameraController.SetWiringView);
+            BindButtonByText(menu, "排故视角", cameraController.SetFaultView);
+            BindButtonByText(menu, "重置视角", cameraController.ResetView);
+            if (menu != null) menu.gameObject.SetActive(false);
+        }
+
+        private void BindOriginalLineForm(GameObject lineForm)
+        {
+            var lineTypeObject = lineForm.GetComponentsInChildren<Transform>(true).FirstOrDefault(item => item.name == "LineType");
+            var dropdown = lineTypeObject != null ? lineTypeObject.GetComponent<Dropdown>() : null;
+            if (dropdown == null) return;
+            dropdown.ClearOptions();
+            dropdown.AddOptions(new List<string> { "电线", "跳线" });
+            dropdown.onValueChanged.RemoveAllListeners();
+            dropdown.onValueChanged.AddListener(value =>
+                controller.SetWireStyle(Color.red, 0.01f, value == 0 ? "ElectricalWire" : "JumperLine"));
+            dropdown.value = 0;
+            dropdown.RefreshShownValue();
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+        }
+
+        private static void BindButtonByText(Transform root, string label, UnityEngine.Events.UnityAction action)
+        {
+            if (root == null) return;
+            var button = root.GetComponentsInChildren<Button>(true).FirstOrDefault(candidate =>
+                candidate.GetComponentsInChildren<Text>(true).Any(text => text.text == label));
+            if (button == null) return;
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(() =>
+            {
+                action();
+                root.gameObject.SetActive(false);
+            });
         }
 
         private void BeginExam(string package)
