@@ -61,10 +61,109 @@ namespace ElectricalSim.Tests
             AssertPortMatchesTerminal("KM1", "A1", "A1");
             AssertPortMatchesTerminal("KM1", "13", "13NO");
             AssertPortMatchesTerminal("FR", "95", "95NC");
-            AssertPortMatchesMappedTerminal("SB1", "COM", "COM1", "8");
-            AssertPortMatchesMappedTerminal("SB1", "NO", "NO1", "8");
             AssertPortMatchesMappedTerminal("M1", "U", "U1", "38");
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator TopPanelControlsExposeOnlyTerminalBoardConnectionPoints()
+        {
+            var views = Object.FindObjectsOfType<ElectricalDeviceView>();
+            foreach (var view in views.Where(item =>
+                         item.Runtime.Kind == ElectricalDeviceKind.PowerSource ||
+                         item.Runtime.Kind == ElectricalDeviceKind.PushButton ||
+                         item.Runtime.Kind == ElectricalDeviceKind.Indicator ||
+                         item.Runtime.Kind == ElectricalDeviceKind.SelectorSwitch))
+                Assert.That(view.Ports, Is.Empty, view.Runtime.DeviceId + " must be routed through DuanZiPai_0");
+
+            var board = views.Single(view => view.Runtime.DeviceId == OriginalTerminalBoardMap.DeviceId);
+            Assert.That(board.Ports.Count, Is.EqualTo(76));
+            Assert.That(board.Runtime.GetConductiveLinks().Count(), Is.EqualTo(76));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlcAndRelayTerminalBoardsUseOriginalNamedConnectionPoints()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var views = Object.FindObjectsOfType<ElectricalDeviceView>();
+            AssertNamedBoardPort(environment, views, "DuanZiPai_1", "PLC_1_M0.0");
+            AssertNamedBoardPort(environment, views, "DuanZiPai_1", "KA6_8");
+            AssertNamedBoardPort(environment, views, "DuanZiPai_2", "PLC_1_Q0.0");
+            AssertNamedBoardPort(environment, views, "DuanZiPai_2", "KA6_14");
+
+            foreach (var definition in OriginalCabinetTerminalBoardMap.Boards)
+            {
+                var board = environment.GetComponentsInChildren<Transform>(true)
+                    .Single(item => item.name == definition.DeviceId && item.Find("point") != null);
+                var expectedCount = board.Find("point").Cast<Transform>()
+                    .Count(item => OriginalCabinetTerminalBoardMap.IsTerminalName(item.name));
+                var view = views.Single(item => item.Runtime.DeviceId == definition.DeviceId);
+                Assert.That(view.Ports.Count, Is.EqualTo(expectedCount));
+                Assert.That(view.Runtime.GetConductiveLinks().Count(), Is.EqualTo(expectedCount));
+            }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlcAndRelayTerminalHoverShowsOriginalName()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var presenter = Object.FindObjectsOfType<PortHoverPresenter>(true).Single();
+            var port = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == "DuanZiPai_1")
+                .Ports.Single(item => item.PortName == "KA6_8");
+
+            controller.SetMode(SimulationMode.Wiring);
+            yield return null;
+            Assert.That(port.GetComponent<MeshRenderer>(), Is.Not.Null);
+            Assert.That(port.GetComponent<MeshRenderer>().enabled, Is.True);
+            var screenPoint = (Vector2)Camera.main.WorldToScreenPoint(port.CurrentAnchorPosition);
+            presenter.Present(port, Camera.main, screenPoint + new Vector2(-60f, 48f));
+            Assert.That(presenter.IsVisible, Is.True);
+            Assert.That(presenter.CurrentText, Is.EqualTo("KA6_8"));
+        }
+
+        [UnityTest]
+        public IEnumerator CabinetBrandingCoversBothOriginalHeaderLogos()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            Assert.That(environment, Is.Not.Null);
+            var cabinet = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "wanggui");
+            var mesh = cabinet.GetComponent<MeshFilter>().sharedMesh;
+            var front = cabinet.Find("Cabinet WCK Logo Front");
+            var back = cabinet.Find("Cabinet WCK Logo Back");
+
+            Assert.That(front, Is.Not.Null);
+            Assert.That(back, Is.Not.Null);
+            Assert.That(front.localPosition.y, Is.GreaterThan(mesh.bounds.center.y + mesh.bounds.extents.y * 0.8f));
+            Assert.That(back.localPosition.y, Is.EqualTo(front.localPosition.y).Within(0.0001f));
+            Assert.That(front.localPosition.z, Is.GreaterThan(mesh.bounds.max.z));
+            Assert.That(back.localPosition.z, Is.LessThan(mesh.bounds.min.z));
+            Assert.That(front.GetComponentInChildren<MeshRenderer>().enabled, Is.True);
+            Assert.That(back.GetComponentInChildren<MeshRenderer>().enabled, Is.True);
+
+            cameraController.SetWiringView();
+            yield return null;
+            var frontScreen = Camera.main.WorldToScreenPoint(front.position);
+            Debug.Log($"[CabinetBranding] front local={front.localPosition}, world={front.position}, screen={frontScreen}");
+            foreach (var renderer in environment.GetComponentsInChildren<Renderer>(true)
+                         .Where(item => item.enabled && item.bounds.max.y > 2.6f)
+                         .OrderByDescending(item => item.bounds.max.y)
+                         .Take(30))
+            {
+                var screen = Camera.main.WorldToScreenPoint(renderer.bounds.center);
+                Debug.Log($"[CabinetHeaderCandidate] {HierarchyPath(renderer.transform)} bounds={renderer.bounds} screen={screen}");
+            }
+            Assert.That(frontScreen.z, Is.GreaterThan(0f));
+
+            cameraController.SetFaultView();
+            yield return null;
+            var backScreen = Camera.main.WorldToScreenPoint(back.position);
+            Debug.Log($"[CabinetBranding] back local={back.localPosition}, world={back.position}, screen={backScreen}");
+            Assert.That(backScreen.z, Is.GreaterThan(0f));
         }
 
         [UnityTest]
@@ -122,7 +221,7 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator TopTerminalBoardUsesAllOriginalElectricalAndJumperAnchors()
+        public IEnumerator TopTerminalBoardUsesElectricalAnchorsAndHidesDuplicateJumperPoints()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
             var cameraController = Object.FindObjectOfType<TrainingCameraController>();
@@ -133,7 +232,9 @@ namespace ElectricalSim.Tests
 
             var port = board.Ports.Single(item => item.PortName == "a75");
             Assert.That(port.HoverLabel, Is.EqualTo("SB8_COM2"));
+            Assert.That(port.SupportsJumperAnchor, Is.False);
             cameraController.SetWiringView();
+            controller.SetMode(SimulationMode.Wiring);
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
             yield return null;
             var electrical = environment.GetComponentsInChildren<Transform>(true)
@@ -143,11 +244,10 @@ namespace ElectricalSim.Tests
 
             controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
             yield return null;
-            var jumper = environment.GetComponentsInChildren<Transform>(true)
-                .Single(item => item.name == "A75" && HasAncestor(item, "DuanZiPai_0") && HasAncestor(item, "13"));
-            Assert.That(Vector3.Distance(port.transform.position, jumper.position), Is.LessThan(0.0005f));
-            Assert.That(port.UsesJumperAnchor, Is.True);
-            Assert.That(Vector3.Distance(electrical.position, jumper.position), Is.GreaterThan(0.01f));
+            Assert.That(port.CurrentAnchor, Is.Null);
+            Assert.That(port.UsesJumperAnchor, Is.False);
+            Assert.That(port.IsVisible, Is.False);
+            Assert.That(port.GetComponent<Collider>().enabled, Is.False);
         }
 
         [UnityTest]
@@ -209,6 +309,33 @@ namespace ElectricalSim.Tests
             for (var current = item.parent; current != null; current = current.parent)
                 if (current.name == name) return true;
             return false;
+        }
+
+        private static void AssertNamedBoardPort(
+            GameObject environment,
+            ElectricalDeviceView[] views,
+            string boardId,
+            string terminalName)
+        {
+            var board = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == boardId && item.Find("point") != null);
+            var anchor = board.Find("point/" + terminalName);
+            Assert.That(anchor, Is.Not.Null, boardId + "/" + terminalName + " original anchor");
+            var port = views.Single(item => item.Runtime.DeviceId == boardId)
+                .Ports.Single(item => item.PortName == terminalName);
+            Assert.That(port.HoverLabel, Is.EqualTo(terminalName));
+            Assert.That(port.PhysicalAnchorId, Is.EqualTo(terminalName));
+            Assert.That(Vector3.Distance(port.CurrentAnchorPosition, anchor.position), Is.LessThan(0.0005f));
+            Assert.That(port.GetComponent<SphereCollider>(), Is.Not.Null);
+            Assert.That(port.GetComponent<MeshRenderer>(), Is.Not.Null);
+        }
+
+        private static string HierarchyPath(Transform item)
+        {
+            var names = new System.Collections.Generic.List<string>();
+            for (var current = item; current != null; current = current.parent) names.Add(current.name);
+            names.Reverse();
+            return string.Join("/", names);
         }
 
         private static void AssertPortMatchesTerminal(string deviceId, string portName, string terminalName)

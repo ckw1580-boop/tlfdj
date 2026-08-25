@@ -12,6 +12,9 @@ namespace ElectricalSim
         private Transform frontJumperAnchor;
         private Transform backElectricalAnchor;
         private Transform backJumperAnchor;
+        private bool hasOriginalAnchorConfiguration;
+        private bool supportsJumperAnchor = true;
+        private bool requestedVisible;
         private bool isVisible;
 
         public string DeviceId { get; private set; }
@@ -20,6 +23,7 @@ namespace ElectricalSim
         public string HoverLabel { get; private set; }
         public string PhysicalAnchorId { get; private set; }
         public bool IsVisible => isVisible;
+        public bool SupportsJumperAnchor => supportsJumperAnchor;
         public bool UsesJumperAnchor { get; private set; }
         public Transform CurrentAnchor { get; private set; }
         public Vector3 CurrentAnchorPosition => CurrentAnchor != null ? CurrentAnchor.position : transform.position;
@@ -46,12 +50,18 @@ namespace ElectricalSim
             Transform frontElectrical,
             Transform frontJumper,
             Transform backElectrical,
-            Transform backJumper)
+            Transform backJumper,
+            bool supportsJumper = true)
         {
+            hasOriginalAnchorConfiguration = frontElectrical != null || frontJumper != null ||
+                                             backElectrical != null || backJumper != null;
+            supportsJumperAnchor = supportsJumper;
             frontElectricalAnchor = frontElectrical;
-            frontJumperAnchor = frontJumper != null ? frontJumper : frontElectrical;
+            frontJumperAnchor = supportsJumper && frontJumper != null ? frontJumper :
+                                supportsJumper ? frontElectrical : null;
             backElectricalAnchor = backElectrical != null ? backElectrical : frontElectricalAnchor;
-            backJumperAnchor = backJumper != null ? backJumper : backElectricalAnchor;
+            backJumperAnchor = supportsJumper && backJumper != null ? backJumper :
+                               supportsJumper ? backElectricalAnchor : null;
         }
 
         public void ApplyOriginalAnchor(TrainingViewPreset preset, bool jumper)
@@ -61,26 +71,34 @@ namespace ElectricalSim
                 anchor = jumper ? backJumperAnchor : backElectricalAnchor;
             else
                 anchor = jumper ? frontJumperAnchor : frontElectricalAnchor;
-            UsesJumperAnchor = jumper;
+            UsesJumperAnchor = jumper && anchor != null;
             CurrentAnchor = anchor;
             if (anchor != null) transform.position = anchor.position;
+            RefreshVisibility();
         }
 
         public void SetHighlighted(bool highlighted)
         {
             if (cachedRenderer != null)
             {
-                cachedRenderer.enabled = true;
+                cachedRenderer.enabled = isVisible;
                 cachedRenderer.material.color = highlighted ? Color.yellow : baseColor;
             }
         }
 
         public void SetVisible(bool visible)
         {
-            isVisible = visible;
-            if (cachedRenderer != null) cachedRenderer.enabled = visible;
+            requestedVisible = visible;
+            RefreshVisibility();
+        }
+
+        private void RefreshVisibility()
+        {
+            var anchorAvailable = !hasOriginalAnchorConfiguration || CurrentAnchor != null;
+            isVisible = requestedVisible && anchorAvailable;
+            if (cachedRenderer != null) cachedRenderer.enabled = isVisible;
             var collider = GetComponent<Collider>();
-            if (collider != null) collider.enabled = visible;
+            if (collider != null) collider.enabled = isVisible;
         }
     }
 

@@ -155,6 +155,7 @@ MonoBehaviour:
   showMissingAssetNotice: 0
   primitiveMaterial: {fileID: 2100000, guid: 484769669a25aa24d9b72137a8d2f624, type: 2}
   wireMaterial: {fileID: 2100000, guid: 0f473090c2c95e74eba0f7d0b82efd3d, type: 2}
+  cabinetBrandLogo: {fileID: 2800000, guid: 711db58d652768942b7ce267abfb583b, type: 3}
 --- !u!4 &1542620040
 Transform:
   m_ObjectHideFlags: 0

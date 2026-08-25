@@ -13,6 +13,7 @@ namespace ElectricalSim.Editor
         private const string GeneratedDirectory = "Assets/ElectricalSim/Generated";
         private const string PrimitiveMaterialPath = GeneratedDirectory + "/TrainingPrimitive.mat";
         private const string WireMaterialPath = GeneratedDirectory + "/TrainingWire.mat";
+        private const string CabinetBrandLogoPath = "Assets/OriginalContent/Texture2D/loading_logo_forground.png";
 
         [MenuItem("Electrical Sim/Install Training Scene")]
         public static void Install()
@@ -85,6 +86,7 @@ namespace ElectricalSim.Editor
             var serialized = new SerializedObject(bootstrap);
             serialized.FindProperty("primitiveMaterial").objectReferenceValue = primitive;
             serialized.FindProperty("wireMaterial").objectReferenceValue = wire;
+            serialized.FindProperty("cabinetBrandLogo").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Texture2D>(CabinetBrandLogoPath);
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

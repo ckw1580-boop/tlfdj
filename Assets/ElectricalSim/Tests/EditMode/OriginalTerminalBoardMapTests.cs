@@ -17,6 +17,10 @@ namespace ElectricalSim.Tests
             AssertBinding(map, "a33", "HL1_L", OriginalTerminalZone.Indicator);
             AssertBinding(map, "a83", "SA1_COM1", OriginalTerminalZone.SelectorAndButton);
             AssertBinding(map, "a75", "SB8_COM2", OriginalTerminalZone.SelectorAndButton);
+            Assert.That(map.Find("a1").LogicalNode, Is.EqualTo("POWER.L1"));
+            Assert.That(map.Find("a33").LogicalNode, Is.EqualTo("HL1.L"));
+            Assert.That(map.Find("a83").LogicalNode, Is.EqualTo("SA1.COM1"));
+            Assert.That(map.Find("a75").LogicalNode, Is.EqualTo("SB8.COM2"));
         }
 
         [Test]
@@ -31,6 +35,16 @@ namespace ElectricalSim.Tests
                 Assert.That(binding.WireTransformPath, Does.EndWith("/" + binding.AnchorId));
                 Assert.That(binding.JumperTransformPath, Does.EndWith("/" + binding.JumperAnchorId));
             }
+        }
+
+        [TestCase("PLC_1_M0.0", "PLC_1.M0.0")]
+        [TestCase("PLC_2_Q1.1", "PLC_2.Q1.1")]
+        [TestCase("KA6_8", "KA6.8")]
+        [TestCase("KA4_14", "KA4.14")]
+        public void CabinetTerminalNamesMapToLogicalDevicePorts(string terminalName, string logicalNode)
+        {
+            Assert.That(OriginalCabinetTerminalBoardMap.IsTerminalName(terminalName), Is.True);
+            Assert.That(OriginalCabinetTerminalBoardMap.ResolveLogicalNode(terminalName), Is.EqualTo(logicalNode));
         }
 
         private static void AssertBinding(
