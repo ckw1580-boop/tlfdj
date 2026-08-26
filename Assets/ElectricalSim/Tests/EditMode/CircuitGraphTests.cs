@@ -16,6 +16,13 @@ namespace ElectricalSim.Tests
         }
 
         [Test]
+        public void MotorRuntimeKeepsAllSixOriginalWindingTerminals()
+        {
+            var motor = ElectricalDeviceRuntime.CreateMotor("M1");
+            Assert.That(motor.Ports, Is.EquivalentTo(new[] { "U", "V", "W", "U2", "V2", "W2" }));
+        }
+
+        [Test]
         public void StandardReferenceTopologyPassesForEveryTask()
         {
             foreach (var task in CircuitTaskCatalog.CreateAll())

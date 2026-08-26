@@ -14,6 +14,8 @@ namespace ElectricalSim
         private Transform backJumperAnchor;
         private bool hasOriginalAnchorConfiguration;
         private bool supportsJumperAnchor = true;
+        private bool jumperOnly;
+        private bool electricalOnly;
         private bool requestedVisible;
         private bool isVisible;
 
@@ -24,6 +26,8 @@ namespace ElectricalSim
         public string PhysicalAnchorId { get; private set; }
         public bool IsVisible => isVisible;
         public bool SupportsJumperAnchor => supportsJumperAnchor;
+        public bool JumperOnly => jumperOnly;
+        public bool ElectricalOnly => electricalOnly;
         public bool UsesJumperAnchor { get; private set; }
         public Transform CurrentAnchor { get; private set; }
         public Vector3 CurrentAnchorPosition => CurrentAnchor != null ? CurrentAnchor.position : transform.position;
@@ -44,6 +48,20 @@ namespace ElectricalSim
         {
             HoverLabel = string.IsNullOrWhiteSpace(hoverLabel) ? PortName : hoverLabel;
             PhysicalAnchorId = string.IsNullOrWhiteSpace(physicalAnchorId) ? PortName : physicalAnchorId;
+        }
+
+        public void ConfigureJumperOnly(bool value = true)
+        {
+            jumperOnly = value;
+            if (value) electricalOnly = false;
+            RefreshVisibility();
+        }
+
+        public void ConfigureElectricalOnly(bool value = true)
+        {
+            electricalOnly = value;
+            if (value) jumperOnly = false;
+            RefreshVisibility();
         }
 
         public void ConfigureOriginalAnchors(
@@ -95,7 +113,9 @@ namespace ElectricalSim
         private void RefreshVisibility()
         {
             var anchorAvailable = !hasOriginalAnchorConfiguration || CurrentAnchor != null;
-            isVisible = requestedVisible && anchorAvailable;
+            var lineTypeAvailable = (!jumperOnly || UsesJumperAnchor) &&
+                                    (!electricalOnly || !UsesJumperAnchor);
+            isVisible = requestedVisible && anchorAvailable && lineTypeAvailable;
             if (cachedRenderer != null) cachedRenderer.enabled = isVisible;
             var collider = GetComponent<Collider>();
             if (collider != null) collider.enabled = isVisible;

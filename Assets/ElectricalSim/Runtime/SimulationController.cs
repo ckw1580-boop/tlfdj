@@ -209,6 +209,7 @@ namespace ElectricalSim
 
         public void SetWireStyle(Color color, float area, string lineType)
         {
+            ClearSelection();
             currentWireColor = color;
             currentWireArea = Mathf.Clamp(area, 0.001f, 0.2f);
             currentLineType = string.IsNullOrWhiteSpace(lineType) ? "JumperLine" : lineType;

@@ -199,7 +199,8 @@ namespace ElectricalSim.Editor
                     { "COM", new[] { "COM1", "COM2" } }, { "NO", new[] { "NO1", "NO2" } }, { "NC", new[] { "NC1", "NC2" } } });
             foreach (var id in new[] { "M1", "M2" })
                 yield return new DevicePortSpec(id, ElectricalDeviceKind.Motor, new Dictionary<string, string[]> {
-                    { "U", new[] { "U1" } }, { "V", new[] { "V1" } }, { "W", new[] { "W1" } } });
+                    { "U", new[] { "U1" } }, { "V", new[] { "V1" } }, { "W", new[] { "W1" } },
+                    { "U2", new[] { "U2" } }, { "V2", new[] { "V2" } }, { "W2", new[] { "W2" } } });
         }
 
         private static void WriteReport(string name, object value)

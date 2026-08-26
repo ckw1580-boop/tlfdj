@@ -189,6 +189,7 @@ namespace ElectricalSim
 
             CreateDevice(new ElectricalDeviceRuntime("BRAKE", ElectricalDeviceKind.BrakeUnit, new[] { "IN", "OUT" }), "制动单元", new Vector3(-0.2f, 0.6f, -0.17f), new Vector3(0.52f, 0.32f, 0.18f), new Color(0.3f, 0.32f, 0.35f));
             CreateMotor("M1", "三相电机 M1", new Vector3(-0.55f, 0.25f, -0.45f));
+            CreateMotor("M_DOUBLE", "双速电机", new Vector3(0f, 0.25f, -0.45f));
             CreateMotor("M2", "三相电机 M2", new Vector3(0.45f, 0.25f, -0.45f));
         }
 
@@ -265,10 +266,14 @@ namespace ElectricalSim
 
         private void CreatePorts(ElectricalDeviceView view, Transform parent, IReadOnlyCollection<string> ports, Vector3 bounds)
         {
-            // The original top-panel controls are wired exclusively through DuanZiPai_0.
-            // Keep their runtime behaviour, but do not create a second set of clickable
-            // spheres on the lamps, switches, buttons or supply module themselves.
-            if (RoutesThroughTopTerminalBoard(view.Runtime)) return;
+            // The brake unit remains in the circuit model for legacy task/save compatibility,
+            // but its generic IN/OUT points are not physical cabinet connection points.
+            if (view.Runtime.Kind == ElectricalDeviceKind.BrakeUnit) return;
+
+            // Controls and lower-cabinet switching devices are wired exclusively through
+            // their original terminal boards. Keep runtime behaviour, but do not leave a
+            // second set of clickable spheres on the device models themselves.
+            if (RoutesThroughOriginalTerminalBoard(view.Runtime)) return;
 
             var list = ports.ToList();
             var columns = Mathf.Min(6, Mathf.Max(2, Mathf.CeilToInt(list.Count / 2f)));
@@ -293,17 +298,26 @@ namespace ElectricalSim
                 var port = portObject.AddComponent<ElectricalPortView>();
                 port.Initialize(view.Runtime.DeviceId, list[index], new Color(0.12f, 0.86f, 0.36f));
                 port.ConfigureOriginalAnchors(frontElectrical, frontJumper, backElectrical, backElectrical);
+                if (view.Runtime.Kind == ElectricalDeviceKind.Motor)
+                    port.ConfigureJumperOnly();
+                else
+                    port.ConfigureElectricalOnly();
                 view.AddPort(port);
             }
         }
 
-        private bool RoutesThroughTopTerminalBoard(ElectricalDeviceRuntime runtime)
+        private bool RoutesThroughOriginalTerminalBoard(ElectricalDeviceRuntime runtime)
         {
             if (originalEnvironment == null || runtime == null) return false;
-            return runtime.Kind == ElectricalDeviceKind.PowerSource ||
+            if (runtime.Kind == ElectricalDeviceKind.PowerSource ||
                    runtime.Kind == ElectricalDeviceKind.PushButton ||
                    runtime.Kind == ElectricalDeviceKind.Indicator ||
-                   runtime.Kind == ElectricalDeviceKind.SelectorSwitch;
+                   runtime.Kind == ElectricalDeviceKind.SelectorSwitch)
+                return true;
+
+            return runtime.Kind == ElectricalDeviceKind.Contactor ||
+                   runtime.Kind == ElectricalDeviceKind.ThermalRelay ||
+                   runtime.Kind == ElectricalDeviceKind.TimeRelay;
         }
 
         private void CreateOriginalTerminalBoardPorts()
@@ -364,6 +378,7 @@ namespace ElectricalSim
                 // The terminal strip is the sole physical endpoint. Its uppercase A* points
                 // were duplicate jump-wire markers and must not appear in the runtime view.
                 port.ConfigureOriginalAnchors(electricalAnchor, null, electricalAnchor, null, false);
+                port.ConfigureElectricalOnly();
                 view.AddPort(port);
             }
 
@@ -389,7 +404,7 @@ namespace ElectricalSim
                 }
 
                 var anchors = pointRoot.Cast<Transform>()
-                    .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(item.name))
+                    .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(definition, item.name))
                     .GroupBy(item => item.name, StringComparer.Ordinal)
                     .Select(group => group.First())
                     .OrderBy(item => item.GetSiblingIndex())
@@ -403,7 +418,7 @@ namespace ElectricalSim
                 var runtime = new ElectricalDeviceRuntime(
                     definition.DeviceId,
                     ElectricalDeviceKind.Terminal,
-                    anchors.Select(item => item.name));
+                    anchors.Select(item => OriginalCabinetTerminalBoardMap.GetPortName(definition, item.name)));
                 var root = new GameObject(definition.DeviceId + " Original Connection Points");
                 root.transform.SetParent(originalEnvironment, false);
                 var view = root.AddComponent<ElectricalDeviceView>();
@@ -411,29 +426,56 @@ namespace ElectricalSim
 
                 foreach (var anchor in anchors)
                 {
-                    var terminalName = anchor.name;
-                    runtime.AddFixedLink(terminalName, OriginalCabinetTerminalBoardMap.ResolveLogicalNode(terminalName));
+                    var physicalAnchorName = anchor.name;
+                    var terminalName = OriginalCabinetTerminalBoardMap.GetPortName(definition, physicalAnchorName);
+                    var jumperAnchorName = OriginalCabinetTerminalBoardMap.GetJumperAnchorName(definition, physicalAnchorName);
+                    var jumperAnchor = definition.UsesSeparateJumperAnchors ? pointRoot.Find(jumperAnchorName) : anchor;
+                    if (definition.UsesSeparateJumperAnchors && jumperAnchor == null)
+                    {
+                        Debug.LogWarning($"[OfflineBootstrap] Jumper anchor is missing: {definition.DeviceId}/{jumperAnchorName}");
+                        continue;
+                    }
+                    // The upper cabinet strip keeps its original upper electrical points,
+                    // while the lower strip always exposes its lower physical points. Other
+                    // boards may still switch between their original electrical/jumper rows.
+                    var connectionAnchor = definition.AlwaysUsesJumperAnchor ? jumperAnchor : anchor;
 
+                    runtime.AddFixedLink(terminalName, OriginalCabinetTerminalBoardMap.ResolveLogicalNode(definition, terminalName));
+
+                    var markerSize = definition.Kind == OriginalCabinetTerminalBoardKind.Motor
+                        ? 0.0125f
+                        : 0.0075f;
                     var portObject = CreatePrimitive(
                         PrimitiveType.Sphere,
                         "Port",
                         root.transform,
-                        root.transform.InverseTransformPoint(anchor.position),
-                        Vector3.one * 0.0075f,
+                        root.transform.InverseTransformPoint(connectionAnchor.position),
+                        Vector3.one * markerSize,
                         new Color(0.12f, 0.86f, 0.36f));
                     var collider = portObject.GetComponent<SphereCollider>();
                     if (collider != null) collider.radius = 1.6f;
                     var port = portObject.AddComponent<ElectricalPortView>();
                     port.Initialize(definition.DeviceId, terminalName, new Color(0.12f, 0.86f, 0.36f));
-                    port.ConfigureHover(terminalName, terminalName);
+                    port.ConfigureHover(terminalName, connectionAnchor.name);
                     // The original semantic point Transform remains authoritative. The explicit
                     // marker makes the connection location visible even when the ripped point
                     // renderer is inactive or occluded in the Unity 2022 player.
-                    port.ConfigureOriginalAnchors(anchor, anchor, anchor, anchor);
+                    if (definition.AlwaysUsesElectricalAnchor || definition.AlwaysUsesJumperAnchor)
+                        port.ConfigureOriginalAnchors(connectionAnchor, connectionAnchor, connectionAnchor, connectionAnchor);
+                    else
+                        port.ConfigureOriginalAnchors(anchor, jumperAnchor, anchor, jumperAnchor);
+                    // The motor terminal strip (DuanZiPai_7, including C_w2) is
+                    // visible in both line modes: its upper points are electrical
+                    // endpoints and its lower points are jumper endpoints.
+                    // All other cabinet strips belong to electrical-wire mode only.
+                    if (definition.Kind != OriginalCabinetTerminalBoardKind.Motor)
+                        port.ConfigureElectricalOnly();
                     view.AddPort(port);
                 }
 
                 deviceViews.Add(view);
+                if (view.Ports.Count != definition.ExpectedPortCount)
+                    Debug.LogWarning($"[OfflineBootstrap] Original {definition.DeviceId} expected {definition.ExpectedPortCount} terminals, found {view.Ports.Count}.");
                 Debug.Log($"[OfflineBootstrap] Original {definition.DeviceId} ready: {view.Ports.Count} named terminals.");
             }
         }
@@ -509,6 +551,7 @@ namespace ElectricalSim
                 case "SB1A": return "7";
                 case "SB1B": return "11";
                 case "M1": return "38";
+                case "M_DOUBLE": return "118";
                 case "M2": return "49";
                 case "BRAKE": return "35";
                 default: return null;
@@ -530,6 +573,7 @@ namespace ElectricalSim
                 case "SB0": return "109";
                 case "SB2": return "110";
                 case "M1": return "107";
+                case "M_DOUBLE": return "118";
                 case "M2": return "118";
                 default: return null;
             }
@@ -968,7 +1012,8 @@ namespace ElectricalSim
             {
                 var motor = new Dictionary<string, string[]>
                 {
-                    { "U", new[] { "U1" } }, { "V", new[] { "V1" } }, { "W", new[] { "W1" } }
+                    { "U", new[] { "U1" } }, { "V", new[] { "V1" } }, { "W", new[] { "W1" } },
+                    { "U2", new[] { "U2" } }, { "V2", new[] { "V2" } }, { "W2", new[] { "W2" } }
                 };
                 if (motor.TryGetValue(port, out var aliases)) return aliases;
             }

@@ -1,0 +1,1105 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: OriginalPortMap
+  m_EditorClassIdentifier: ElectricalSim.Runtime:ElectricalSim:OriginalPortMap
+  ReferenceResolution: {x: 1920, y: 1080}
+  Ports:
+  - DeviceId: QF
+    DeviceType: Breaker
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1
+    LocalPosition: {x: 0.0318, y: 0.0459, z: 0.0014}
+    ReferenceWorldPosition: {x: 0.0318, y: 0.0459, z: 0.0014}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: QF
+    DeviceType: Breaker
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3
+    LocalPosition: {x: 0.0063, y: 0.0459, z: 0.0013999995}
+    ReferenceWorldPosition: {x: 0.0063, y: 0.0459, z: 0.0013999995}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: QF
+    DeviceType: Breaker
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5
+    LocalPosition: {x: -0.0192, y: 0.0459, z: 0.0013999995}
+    ReferenceWorldPosition: {x: -0.0192, y: 0.0459, z: 0.0013999995}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: QF
+    DeviceType: Breaker
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2
+    LocalPosition: {x: 0.0318, y: -0.045299996, z: 0.0013999995}
+    ReferenceWorldPosition: {x: 0.0318, y: -0.045299996, z: 0.0013999995}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: QF
+    DeviceType: Breaker
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4
+    LocalPosition: {x: 0.0063, y: -0.045299996, z: 0.0013999995}
+    ReferenceWorldPosition: {x: 0.0063, y: -0.045299996, z: 0.0013999995}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: QF
+    DeviceType: Breaker
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6
+    LocalPosition: {x: -0.0192, y: -0.0453, z: 0.0013999995}
+    ReferenceWorldPosition: {x: -0.0192, y: -0.0453, z: 0.0013999995}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceWorldPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceWorldPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceWorldPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceWorldPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceWorldPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceWorldPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: A1
+    DisplayName: A1
+    TransformPath: point/A1
+    LocalPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceWorldPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: A2
+    DisplayName: A2
+    TransformPath: point/A2
+    LocalPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceWorldPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: 13
+    DisplayName: 13
+    TransformPath: point/13NO
+    LocalPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceWorldPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM1
+    DeviceType: Contactor
+    PortName: 14
+    DisplayName: 14
+    TransformPath: point/14NO
+    LocalPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceWorldPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceWorldPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceWorldPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceWorldPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceWorldPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceWorldPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceWorldPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: A1
+    DisplayName: A1
+    TransformPath: point/A1
+    LocalPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceWorldPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: A2
+    DisplayName: A2
+    TransformPath: point/A2
+    LocalPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceWorldPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: 13
+    DisplayName: 13
+    TransformPath: point/13NO
+    LocalPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceWorldPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KM2
+    DeviceType: Contactor
+    PortName: 14
+    DisplayName: 14
+    TransformPath: point/14NO
+    LocalPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceWorldPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceWorldPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceWorldPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceWorldPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceWorldPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceWorldPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceWorldPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: A1
+    DisplayName: A1
+    TransformPath: point/A1
+    LocalPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceWorldPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: A2
+    DisplayName: A2
+    TransformPath: point/A2
+    LocalPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceWorldPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: 13
+    DisplayName: 13
+    TransformPath: point/13NO
+    LocalPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceWorldPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMF
+    DeviceType: Contactor
+    PortName: 14
+    DisplayName: 14
+    TransformPath: point/14NO
+    LocalPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceWorldPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceWorldPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceWorldPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceWorldPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceWorldPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceWorldPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceWorldPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: A1
+    DisplayName: A1
+    TransformPath: point/A1
+    LocalPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceWorldPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: A2
+    DisplayName: A2
+    TransformPath: point/A2
+    LocalPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceWorldPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: 13
+    DisplayName: 13
+    TransformPath: point/13NO
+    LocalPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceWorldPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMR
+    DeviceType: Contactor
+    PortName: 14
+    DisplayName: 14
+    TransformPath: point/14NO
+    LocalPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceWorldPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceWorldPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceWorldPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceWorldPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceWorldPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceWorldPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceWorldPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: A1
+    DisplayName: A1
+    TransformPath: point/A1
+    LocalPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceWorldPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: A2
+    DisplayName: A2
+    TransformPath: point/A2
+    LocalPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceWorldPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: 13
+    DisplayName: 13
+    TransformPath: point/13NO
+    LocalPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceWorldPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KMB
+    DeviceType: Contactor
+    PortName: 14
+    DisplayName: 14
+    TransformPath: point/14NO
+    LocalPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceWorldPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceWorldPosition: {x: 0.0203, y: 0.0274, z: 0.08065}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceWorldPosition: {x: 0.0067, y: 0.0275, z: 0.08078}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceWorldPosition: {x: -0.00667, y: 0.0278, z: 0.0809}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceWorldPosition: {x: 0.0201, y: -0.02892, z: 0.0796}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceWorldPosition: {x: 0.00669, y: -0.0293, z: 0.08032}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceWorldPosition: {x: -0.00711, y: -0.02911, z: 0.07985}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: A1
+    DisplayName: A1
+    TransformPath: point/A1
+    LocalPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceWorldPosition: {x: 0.02, y: 0.0393, z: 0.059}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: A2
+    DisplayName: A2
+    TransformPath: point/A2
+    LocalPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceWorldPosition: {x: -0.021, y: 0.04, z: 0.0591}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: 13
+    DisplayName: 13
+    TransformPath: point/13NO
+    LocalPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceWorldPosition: {x: -0.02035, y: 0.02779, z: 0.08086}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: KB
+    DeviceType: Contactor
+    PortName: 14
+    DisplayName: 14
+    TransformPath: point/14NO
+    LocalPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceWorldPosition: {x: -0.02071, y: -0.02911, z: 0.07987}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: L1
+    DisplayName: L1
+    TransformPath: point/1L1
+    LocalPosition: {x: 0.0165, y: 0.0337, z: 0.049}
+    ReferenceWorldPosition: {x: 0.0165, y: 0.0337, z: 0.049}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: L2
+    DisplayName: L2
+    TransformPath: point/3L2
+    LocalPosition: {x: -0.0002, y: 0.0338, z: 0.049}
+    ReferenceWorldPosition: {x: -0.0002, y: 0.0338, z: 0.049}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: L3
+    DisplayName: L3
+    TransformPath: point/5L3
+    LocalPosition: {x: -0.01667, y: 0.03431, z: 0.04991}
+    ReferenceWorldPosition: {x: -0.01667, y: 0.03431, z: 0.04991}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: T1
+    DisplayName: T1
+    TransformPath: point/2T1
+    LocalPosition: {x: 0.01726, y: -0.03098, z: 0.04952}
+    ReferenceWorldPosition: {x: 0.01726, y: -0.03098, z: 0.04952}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: T2
+    DisplayName: T2
+    TransformPath: point/4T2
+    LocalPosition: {x: 0.00037, y: -0.03098, z: 0.04952}
+    ReferenceWorldPosition: {x: 0.00037, y: -0.03098, z: 0.04952}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: T3
+    DisplayName: T3
+    TransformPath: point/6T3
+    LocalPosition: {x: -0.01665, y: -0.030980002, z: 0.04952}
+    ReferenceWorldPosition: {x: -0.01665, y: -0.030980002, z: 0.04952}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: 95
+    DisplayName: 95
+    TransformPath: point/95NC
+    LocalPosition: {x: -0.01802, y: -0.01277, z: 0.07533}
+    ReferenceWorldPosition: {x: -0.01802, y: -0.01277, z: 0.07533}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: 96
+    DisplayName: 96
+    TransformPath: point/96NC
+    LocalPosition: {x: -0.00555, y: -0.01294, z: 0.07533}
+    ReferenceWorldPosition: {x: -0.00555, y: -0.01294, z: 0.07533}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: 97
+    DisplayName: 97
+    TransformPath: point/97NO
+    LocalPosition: {x: 0.00747, y: -0.01324, z: 0.07533}
+    ReferenceWorldPosition: {x: 0.00747, y: -0.01324, z: 0.07533}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: FR
+    DeviceType: ThermalRelay
+    PortName: 98
+    DisplayName: 98
+    TransformPath: point/98NO
+    LocalPosition: {x: 0.02042, y: -0.01291, z: 0.07533}
+    ReferenceWorldPosition: {x: 0.02042, y: -0.01291, z: 0.07533}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0A
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0A
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0A
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0B
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0B
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB0B
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBR
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBR
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBR
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBB
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: -0.0111, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBB
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: -0.0098, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBB
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceWorldPosition: {x: 0.0096, y: 0.0102, z: -0.0063}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB2
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB2
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB2
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBF
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBF
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBF
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBE
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBE
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SBE
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1A
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1A
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1A
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1B
+    DeviceType: PushButton
+    PortName: COM
+    DisplayName: COM
+    TransformPath: point/COM1
+    LocalPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: -0.01127, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1B
+    DeviceType: PushButton
+    PortName: NO
+    DisplayName: NO
+    TransformPath: point/NO1
+    LocalPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: -0.00914, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: SB1B
+    DeviceType: PushButton
+    PortName: NC
+    DisplayName: NC
+    TransformPath: point/NC2
+    LocalPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceWorldPosition: {x: 0.01046, y: 0.01039, z: -0.008}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M1
+    DeviceType: Motor
+    PortName: U
+    DisplayName: U
+    TransformPath: point/U1
+    LocalPosition: {x: -0.0526, y: 0.1179, z: -0.0199}
+    ReferenceWorldPosition: {x: -0.0526, y: 0.1179, z: -0.0199}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M1
+    DeviceType: Motor
+    PortName: V
+    DisplayName: V
+    TransformPath: point/V1
+    LocalPosition: {x: -0.0785, y: 0.1179, z: -0.0198}
+    ReferenceWorldPosition: {x: -0.0785, y: 0.1179, z: -0.0198}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M1
+    DeviceType: Motor
+    PortName: W
+    DisplayName: W
+    TransformPath: point/W1
+    LocalPosition: {x: -0.1051, y: 0.1179, z: -0.0196}
+    ReferenceWorldPosition: {x: -0.1051, y: 0.1179, z: -0.0196}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M1
+    DeviceType: Motor
+    PortName: U2
+    DisplayName: U2
+    TransformPath: point/U2
+    LocalPosition: {x: -0.0783, y: 0.1179, z: 0.0197}
+    ReferenceWorldPosition: {x: -0.0783, y: 0.1179, z: 0.0197}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M1
+    DeviceType: Motor
+    PortName: V2
+    DisplayName: V2
+    TransformPath: point/V2
+    LocalPosition: {x: -0.1045, y: 0.1179, z: 0.0197}
+    ReferenceWorldPosition: {x: -0.1045, y: 0.1179, z: 0.0197}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M1
+    DeviceType: Motor
+    PortName: W2
+    DisplayName: W2
+    TransformPath: point/W2
+    LocalPosition: {x: -0.0522, y: 0.1179, z: 0.0198}
+    ReferenceWorldPosition: {x: -0.0522, y: 0.1179, z: 0.0198}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M2
+    DeviceType: Motor
+    PortName: U
+    DisplayName: U
+    TransformPath: point/U1
+    LocalPosition: {x: -0.0526, y: 0.1179, z: -0.0199}
+    ReferenceWorldPosition: {x: -0.0526, y: 0.1179, z: -0.0199}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M2
+    DeviceType: Motor
+    PortName: V
+    DisplayName: V
+    TransformPath: point/V1
+    LocalPosition: {x: -0.0785, y: 0.1179, z: -0.0198}
+    ReferenceWorldPosition: {x: -0.0785, y: 0.1179, z: -0.0198}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M2
+    DeviceType: Motor
+    PortName: W
+    DisplayName: W
+    TransformPath: point/W1
+    LocalPosition: {x: -0.1051, y: 0.1179, z: -0.0196}
+    ReferenceWorldPosition: {x: -0.1051, y: 0.1179, z: -0.0196}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M2
+    DeviceType: Motor
+    PortName: U2
+    DisplayName: U2
+    TransformPath: point/U2
+    LocalPosition: {x: -0.0783, y: 0.1179, z: 0.0197}
+    ReferenceWorldPosition: {x: -0.0783, y: 0.1179, z: 0.0197}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M2
+    DeviceType: Motor
+    PortName: V2
+    DisplayName: V2
+    TransformPath: point/V2
+    LocalPosition: {x: -0.1045, y: 0.1179, z: 0.0197}
+    ReferenceWorldPosition: {x: -0.1045, y: 0.1179, z: 0.0197}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7
+  - DeviceId: M2
+    DeviceType: Motor
+    PortName: W2
+    DisplayName: W2
+    TransformPath: point/W2
+    LocalPosition: {x: -0.0522, y: 0.1179, z: 0.0198}
+    ReferenceWorldPosition: {x: -0.0522, y: 0.1179, z: 0.0198}
+    ReferenceScreenPosition: {x: 0, y: 0}
+    ConnectionKinds: 7

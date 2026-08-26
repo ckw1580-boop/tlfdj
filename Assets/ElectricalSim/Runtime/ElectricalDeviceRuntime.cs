@@ -200,7 +200,8 @@ namespace ElectricalSim
                 new[] { "A1", "A2", "15", "16", "18" }) { TimerDelaySeconds = delay };
 
         public static ElectricalDeviceRuntime CreateMotor(string id)
-            => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Motor, new[] { "U", "V", "W", "PE" });
+            => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Motor,
+                new[] { "U", "V", "W", "U2", "V2", "W2" });
 
         public static ElectricalDeviceRuntime CreateIndicator(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Indicator, new[] { "L", "N" });

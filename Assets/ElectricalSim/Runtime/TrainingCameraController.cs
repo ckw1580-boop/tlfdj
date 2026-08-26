@@ -19,6 +19,10 @@ namespace ElectricalSim
         public float ZoomSpeed = 3f;
         public Vector3 DefaultPosition = new Vector3(-0.35f, 1.58f, 0.45f);
         public Vector3 DefaultEuler = new Vector3(10f, 180f, 0f);
+        public Vector3 FaultPosition = new Vector3(-0.01f, 1.08f, -3.30f);
+        public Vector3 FaultFallbackTarget = new Vector3(-0.01f, 1.00f, -1.45f);
+
+        public Vector3 CurrentFaultTarget { get; private set; }
 
         public TrainingViewPreset CurrentPreset { get; private set; } = TrainingViewPreset.Default;
         public event Action<TrainingViewPreset> PresetChanged;
@@ -75,11 +79,28 @@ namespace ElectricalSim
 
         public void SetFaultView()
         {
-            // Component face is on the room side behind the cabinet.  Looking
-            // towards +Z is essential; the previous preset stayed in front.
-            transform.position = new Vector3(-0.12f, 1.60f, -4.72f);
-            transform.eulerAngles = new Vector3(3f, 0f, 0f);
+            // Match the original troubleshooting composition: stand behind the
+            // electrical cabinet and aim at its centre so the preset remains
+            // straight-on even if the imported environment moves slightly.
+            transform.position = FaultPosition;
+            CurrentFaultTarget = ResolveFaultTarget();
+            var direction = CurrentFaultTarget - transform.position;
+            transform.rotation = direction.sqrMagnitude > 0.0001f
+                ? Quaternion.LookRotation(direction, Vector3.up)
+                : Quaternion.Euler(0f, 180f, 0f);
             SetPreset(TrainingViewPreset.FaultBack);
+        }
+
+        private Vector3 ResolveFaultTarget()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            if (environment == null) return FaultFallbackTarget;
+
+            foreach (var renderer in environment.GetComponentsInChildren<Renderer>(true))
+                if (string.Equals(renderer.name, "DQG01", StringComparison.OrdinalIgnoreCase))
+                    return renderer.bounds.center;
+
+            return FaultFallbackTarget;
         }
 
         private void SetPreset(TrainingViewPreset preset)

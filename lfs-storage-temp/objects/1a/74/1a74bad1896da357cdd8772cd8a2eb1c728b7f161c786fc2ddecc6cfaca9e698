@@ -1,0 +1,153 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dfd276c7ec6c42b3bb237398f95732cf, type: 3}
+  m_Name: OriginalVisualRegistry
+  m_EditorClassIdentifier: 
+  EnvironmentPrefab: {fileID: 7867889223744474315, guid: 7e7dd33f40018c44392c21a278bc7eef, type: 3}
+  CabinetPrefab: {fileID: 181439921454208698, guid: 81b57e6f811cc864fa252c8e8f1f8fca, type: 3}
+  Entries:
+  - DeviceId: POWER
+    TypeId: 
+    Prefab: {fileID: 6909051551188076513, guid: fdb4e7b22a1a44e4ebe4c1955ec0d000, type: 3}
+  - DeviceId: QF
+    TypeId: 
+    Prefab: {fileID: 1408264367482910785, guid: b3380729460c0384c8477b862be0b4de, type: 3}
+  - DeviceId: KM1
+    TypeId: 
+    Prefab: {fileID: 9107516019868116624, guid: 181b6762ed756e54fa1e8413827118a5, type: 3}
+  - DeviceId: KM2
+    TypeId: 
+    Prefab: {fileID: 9107516019868116624, guid: 181b6762ed756e54fa1e8413827118a5, type: 3}
+  - DeviceId: KMF
+    TypeId: 
+    Prefab: {fileID: 9107516019868116624, guid: 181b6762ed756e54fa1e8413827118a5, type: 3}
+  - DeviceId: KMR
+    TypeId: 
+    Prefab: {fileID: 9107516019868116624, guid: 181b6762ed756e54fa1e8413827118a5, type: 3}
+  - DeviceId: KMB
+    TypeId: 
+    Prefab: {fileID: 9107516019868116624, guid: 181b6762ed756e54fa1e8413827118a5, type: 3}
+  - DeviceId: KB
+    TypeId: 
+    Prefab: {fileID: 9107516019868116624, guid: 181b6762ed756e54fa1e8413827118a5, type: 3}
+  - DeviceId: FR
+    TypeId: 
+    Prefab: {fileID: 5767019424608215926, guid: 8d772c6d043b46c43b758bfbc34e2c75, type: 3}
+  - DeviceId: KT
+    TypeId: 
+    Prefab: {fileID: 2239357781372566183, guid: 5e249f58377fea54ea3549575cd3ea1e, type: 3}
+  - DeviceId: SB0
+    TypeId: 
+    Prefab: {fileID: 2460010059048719646, guid: 8651a232d8a606a40bb5633817dead28, type: 3}
+  - DeviceId: SB0A
+    TypeId: 
+    Prefab: {fileID: 2460010059048719646, guid: 8651a232d8a606a40bb5633817dead28, type: 3}
+  - DeviceId: SB0B
+    TypeId: 
+    Prefab: {fileID: 2460010059048719646, guid: 8651a232d8a606a40bb5633817dead28, type: 3}
+  - DeviceId: SBR
+    TypeId: 
+    Prefab: {fileID: 2460010059048719646, guid: 8651a232d8a606a40bb5633817dead28, type: 3}
+  - DeviceId: SBB
+    TypeId: 
+    Prefab: {fileID: 2460010059048719646, guid: 8651a232d8a606a40bb5633817dead28, type: 3}
+  - DeviceId: SB1
+    TypeId: 
+    Prefab: {fileID: 5203325851286597462, guid: 4950e825c1e7e8648bc6f53b6fd92aa2, type: 3}
+  - DeviceId: SB2
+    TypeId: 
+    Prefab: {fileID: 5203325851286597462, guid: 4950e825c1e7e8648bc6f53b6fd92aa2, type: 3}
+  - DeviceId: SBF
+    TypeId: 
+    Prefab: {fileID: 5203325851286597462, guid: 4950e825c1e7e8648bc6f53b6fd92aa2, type: 3}
+  - DeviceId: SBE
+    TypeId: 
+    Prefab: {fileID: 5203325851286597462, guid: 4950e825c1e7e8648bc6f53b6fd92aa2, type: 3}
+  - DeviceId: SB1A
+    TypeId: 
+    Prefab: {fileID: 5203325851286597462, guid: 4950e825c1e7e8648bc6f53b6fd92aa2, type: 3}
+  - DeviceId: SB1B
+    TypeId: 
+    Prefab: {fileID: 5203325851286597462, guid: 4950e825c1e7e8648bc6f53b6fd92aa2, type: 3}
+  - DeviceId: M1
+    TypeId: 
+    Prefab: {fileID: 8911947440584559445, guid: 894266636f8e85040bdaee78998f09f9, type: 3}
+  - DeviceId: M2
+    TypeId: 
+    Prefab: {fileID: 8911947440584559445, guid: 894266636f8e85040bdaee78998f09f9, type: 3}
+  - DeviceId: BRAKE
+    TypeId: 
+    Prefab: {fileID: 5458754100897592015, guid: 69eb61b0a15e7c3449fd541977528a0b, type: 3}
+  Schematics:
+  - TaskId: point
+    Sprite: {fileID: 21300000, guid: 9f51f92049fb4ce48b1c384527a16b91, type: 2}
+  - TaskId: single-start
+    Sprite: {fileID: 21300000, guid: e09f5b912c3a20041afbb381a5f948e6, type: 2}
+  - TaskId: self-lock
+    Sprite: {fileID: 21300000, guid: 6867721aa0bc7914b9d241b30402b17c, type: 2}
+  - TaskId: overload
+    Sprite: {fileID: 21300000, guid: ac7cb6a3da2e2074c81b73b06bf9b194, type: 2}
+  - TaskId: forward-reverse
+    Sprite: {fileID: 21300000, guid: 75fe97482e4ae7246bcc6cf8b4695563, type: 2}
+  - TaskId: multi-location
+    Sprite: {fileID: 21300000, guid: 92774ea5520d6364d99b55e754a05fc4, type: 2}
+  - TaskId: timed
+    Sprite: {fileID: 21300000, guid: d03021e6e3feb714bb9fa69d5f4033fe, type: 2}
+  - TaskId: sequence
+    Sprite: {fileID: 21300000, guid: 304c9c900996ab34f96274d1ff583168, type: 2}
+  - TaskId: reverse-brake
+    Sprite: {fileID: 21300000, guid: dbc4681c88762444d939ec24bfc732b3, type: 2}
+  - TaskId: energy-brake
+    Sprite: {fileID: 21300000, guid: f95057023472959459a1110ba4422983, type: 2}
+  UiPrefabs:
+  - Id: TopNavigation
+    Prefab: {fileID: 1408716598552793155, guid: c9e1cf242e91d5b40a3eff12e07586dd, type: 3}
+  - Id: ExperimentToolbar
+    Prefab: {fileID: 7661709501894078725, guid: 904d58d2b33ccf64f9b0df2f80080759, type: 3}
+  - Id: Task
+    Prefab: {fileID: 5304800678391461071, guid: fe65630cc7e28c44192d3d5f37145dad, type: 3}
+  - Id: LineMap
+    Prefab: {fileID: 9120914742273588573, guid: 1a10893ad2af1c24284997d64aacdcef, type: 3}
+  - Id: LineForm
+    Prefab: {fileID: 3586325410467791666, guid: 630076b4a71c80745b940b05b04dbf60, type: 3}
+  - Id: LineParam
+    Prefab: {fileID: 3029529762080837610, guid: 59711b9423323574d833e2c94722686c, type: 3}
+  - Id: ElementLibrary
+    Prefab: {fileID: 5031671328850278317, guid: 9daf1e4c1add82b4797a2fd3864e8ce6, type: 3}
+  - Id: ElementProperties
+    Prefab: {fileID: 5186410246634647353, guid: 1450301ce8f15eb4ba97b1bcc34a7563, type: 3}
+  - Id: Fault
+    Prefab: {fileID: 2233170621678122635, guid: f0a6f0effc9e478488d578d9b4f5310d, type: 3}
+  - Id: FaultSet
+    Prefab: {fileID: 4862568650781713531, guid: ce0dc5a0870e7df4b9bae58bf751b759, type: 3}
+  - Id: Multimeter
+    Prefab: {fileID: 2639295328063994146, guid: 594da7533204d1f47b961cb0d29aa46b, type: 3}
+  - Id: Oscilloscope
+    Prefab: {fileID: 1164599296572970773, guid: ddd50427aa1eb844ab6bc2f9be3b3182, type: 3}
+  - Id: ExamList
+    Prefab: {fileID: 3362143539107184445, guid: 19adfb2f7d7380543bcf1eb19a3b240e, type: 3}
+  - Id: ExamConfig
+    Prefab: {fileID: 303217995651613835, guid: 4785fadf4d9f6cf428389b5095df468f, type: 3}
+  - Id: ExamResult
+    Prefab: {fileID: 6968730943114597183, guid: 715f77e94086ee14384c02ea2e664211, type: 3}
+  - Id: Save
+    Prefab: {fileID: 632755541530573527, guid: 7d2ba709eb4a2464ba6eca283775bd0b, type: 3}
+  - Id: Submit
+    Prefab: {fileID: 5822785383240058326, guid: 736bb96826dce6b48b9f8a925da31066, type: 3}
+  - Id: Recorder
+    Prefab: {fileID: 4866482530871836035, guid: 8c03b762a6c562e40b9584f4a935d5aa, type: 3}
+  - Id: RecordControl
+    Prefab: {fileID: 2715553441004822625, guid: e89aae7aac88e84409457be08b291de7, type: 3}
+  - Id: Audio
+    Prefab: {fileID: 3043567355677507631, guid: e5f04a39fe8ead840959cf2763ecd05f, type: 3}
+  - Id: Help
+    Prefab: {fileID: 7033377756578390717, guid: e2074456e0555d948a23a94c83590c1f, type: 3}

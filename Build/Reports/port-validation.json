@@ -1680,6 +1680,51 @@
     ]
   },
   {
+    "DeviceId": "M1",
+    "PortName": "U2",
+    "TransformPath": "point/U2",
+    "local": [
+      -0.0783,
+      0.1179,
+      0.0197
+    ],
+    "world": [
+      -0.0783,
+      0.1179,
+      0.0197
+    ]
+  },
+  {
+    "DeviceId": "M1",
+    "PortName": "V2",
+    "TransformPath": "point/V2",
+    "local": [
+      -0.1045,
+      0.1179,
+      0.0197
+    ],
+    "world": [
+      -0.1045,
+      0.1179,
+      0.0197
+    ]
+  },
+  {
+    "DeviceId": "M1",
+    "PortName": "W2",
+    "TransformPath": "point/W2",
+    "local": [
+      -0.0522,
+      0.1179,
+      0.0198
+    ],
+    "world": [
+      -0.0522,
+      0.1179,
+      0.0198
+    ]
+  },
+  {
     "DeviceId": "M2",
     "PortName": "U",
     "TransformPath": "point/U1",
@@ -1722,6 +1767,51 @@
       -0.1051,
       0.1179,
       -0.0196
+    ]
+  },
+  {
+    "DeviceId": "M2",
+    "PortName": "U2",
+    "TransformPath": "point/U2",
+    "local": [
+      -0.0783,
+      0.1179,
+      0.0197
+    ],
+    "world": [
+      -0.0783,
+      0.1179,
+      0.0197
+    ]
+  },
+  {
+    "DeviceId": "M2",
+    "PortName": "V2",
+    "TransformPath": "point/V2",
+    "local": [
+      -0.1045,
+      0.1179,
+      0.0197
+    ],
+    "world": [
+      -0.1045,
+      0.1179,
+      0.0197
+    ]
+  },
+  {
+    "DeviceId": "M2",
+    "PortName": "W2",
+    "TransformPath": "point/W2",
+    "local": [
+      -0.0522,
+      0.1179,
+      0.0198
+    ],
+    "world": [
+      -0.0522,
+      0.1179,
+      0.0198
     ]
   }
 ]
