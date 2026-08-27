@@ -29,6 +29,29 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator TerminalBoardAnnotationsAreCompletelyRemoved()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            Assert.That(environment, Is.Not.Null);
+
+            var generatedRoot = environment.transform.Find("Terminal Board Annotations");
+            Assert.That(generatedRoot == null || !generatedRoot.gameObject.activeSelf, Is.True);
+
+            var boardCanvases = environment.GetComponentsInChildren<Canvas>(true)
+                .Where(canvas => canvas.GetComponentsInParent<Transform>(true)
+                    .Any(item => item.name.StartsWith("DuanZiPai_")))
+                .ToArray();
+            Assert.That(boardCanvases.All(canvas => !canvas.gameObject.activeSelf), Is.True);
+
+            var boardTextMeshes = environment.GetComponentsInChildren<TextMesh>(true)
+                .Where(textMesh => textMesh.GetComponentsInParent<Transform>(true)
+                    .Any(item => item.name.StartsWith("DuanZiPai_")))
+                .ToArray();
+            Assert.That(boardTextMeshes.All(textMesh => !textMesh.gameObject.activeSelf), Is.True);
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator EveryModeCanBeSelected()
         {
             var controller = Object.FindObjectOfType<SimulationController>();

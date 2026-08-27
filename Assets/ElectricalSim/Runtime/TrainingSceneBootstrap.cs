@@ -55,6 +55,7 @@ namespace ElectricalSim
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "Arial" }, 18);
             Debug.Log("[OfflineBootstrap] Font ready.");
             CreateEnvironment();
+            RemoveTerminalBoardAnnotations();
             Debug.Log("[OfflineBootstrap] Environment ready.");
             var cameraController = CreateCamera();
             var wireRoot = new GameObject("ElectricalWires").transform;
@@ -73,6 +74,43 @@ namespace ElectricalSim
             BindOriginalUi(ui);
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
             Debug.Log("[OfflineBootstrap] Build complete.");
+        }
+
+        private void RemoveTerminalBoardAnnotations()
+        {
+            if (originalEnvironment == null) return;
+
+            var generatedRoot = originalEnvironment.Find("Terminal Board Annotations");
+            if (generatedRoot != null)
+            {
+                generatedRoot.gameObject.SetActive(false);
+                Destroy(generatedRoot.gameObject);
+            }
+
+            foreach (var canvas in originalEnvironment.GetComponentsInChildren<Canvas>(true))
+            {
+                if (!HasTerminalBoardAncestor(canvas.transform)) continue;
+                canvas.gameObject.SetActive(false);
+                Destroy(canvas.gameObject);
+            }
+
+            foreach (var textMesh in originalEnvironment.GetComponentsInChildren<TextMesh>(true))
+            {
+                if (!HasTerminalBoardAncestor(textMesh.transform)) continue;
+                textMesh.gameObject.SetActive(false);
+                Destroy(textMesh.gameObject);
+            }
+        }
+
+        private static bool HasTerminalBoardAncestor(Transform transform)
+        {
+            for (var current = transform; current != null; current = current.parent)
+            {
+                if (!current.name.StartsWith("DuanZiPai_", StringComparison.Ordinal)) continue;
+                var suffix = current.name.Substring("DuanZiPai_".Length);
+                if (int.TryParse(suffix, out _)) return true;
+            }
+            return false;
         }
 
         private void CreateEnvironment()
