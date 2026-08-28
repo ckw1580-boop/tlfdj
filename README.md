@@ -128,7 +128,7 @@ Build/Windows/ElectricalTraining.exe
 | `DuanZiPai_2` | PLC 输出、中间继电器 | 使用原 PLC/KA 命名锚点 |
 | `DuanZiPai_3` | G120、KM、FR、KT 上端子 | 64 个端口；保持原始上侧的小写锚点 |
 | `DuanZiPai_4` | G120、KM、FR 下端子 | 48 个端口；统一使用端子排下侧的大写锚点 |
-| `DuanZiPai_5` | 变频器下方分区备注端子排 | 84 个原始 `a*` 锚点；按 `a1`–`a39`、`a40`–`a76`、`a77`–`a85` 划分视觉备注区（原模型无 `a19`） |
+| `DuanZiPai_5` | 原模型备注载体（运行时移除旧 Canvas） | 不作为端子排使用；运行时删除其自带的三条旧 Canvas/TMP 备注 |
 | `DuanZiPai_6` | 电源端子区 | 8 个跳线端口；对应原 Prefab 的 `V_1`–`V_4`、`N_1`–`N_4` |
 | `DuanZiPai_7` | 电机端子区 | 18 个端口；电线模式显示上侧小写锚点，跳线模式显示下侧大写锚点 |
 | `DuanZiPai_8` | 场景中传感器、电磁阀端子 | 18 个跳线端口；对应传感器 `a`–`d` 与三个电磁阀端子 |
@@ -140,12 +140,12 @@ Build/Windows/ElectricalTraining.exe
 | `DuanZiPai_0` | `三相电源端子区`、`指示灯（HL）端子区`、`旋钮（SA）、按钮SB端子区` |
 | `DuanZiPai_1` | `PLC_1DI端子区`、`PLC_2DI端子区`、`中间继电器（KA）1、2、3、5、6、7、8端子区` |
 | `DuanZiPai_2` | `PLC_1端子区`、`PLC_2端子区`、`中间继电器（KA）4、9、10、11、12、13、14端子区` |
-| `DuanZiPai_5` | `G120变频器端子区`、`交流接触器（KM）端子区`、`FR端子区KT端子区` |
+| `DuanZiPai_4` | `G120变频器端子区`、`交流接触器（KM）端子区`、`FR端子区KT端子区` |
 | `DuanZiPai_6` | `电源端子区` |
 | `DuanZiPai_7` | `电机端子区` |
 | `DuanZiPai_8` | `场景中传感器、电磁阀端子` |
 
-备注使用独立的 `TextMesh` 渲染，不依赖 World Space Canvas 或 UI Text。字体与柜体表面平行，并沿用“三相电源端子区”的方向和尺寸。`DuanZiPai_1`、`DuanZiPai_6`、`DuanZiPai_7`、`DuanZiPai_8` 的备注位于端子组中心下方 0.45 个字高；`DuanZiPai_2` 与变频器下方 `DuanZiPai_5` 的三条备注位于端子组中心上方 1.55 个字高，其中 `DuanZiPai_5` 继续使用原模型内三块文字布局的横向位置。所有黄色备注仅在柜体正面可见，从柜体背面观察时自动隐藏，避免排故视角外的反向穿透显示。
+备注使用独立的 `TextMesh` 渲染，不依赖 World Space Canvas 或 UI Text。字体与柜体表面平行，并沿用“三相电源端子区”的方向和尺寸。`DuanZiPai_1`、`DuanZiPai_6`、`DuanZiPai_7`、`DuanZiPai_8` 的备注位于端子组中心下方 0.45 个字高；`DuanZiPai_2` 的三条备注位于端子组中心上方 1.55 个字高，`DuanZiPai_4` 的三条备注现在位于端子组中心下方 0.95 个字高。运行时会移除 `DuanZiPai_5` 原模型内的三条旧 Canvas/TMP 备注，避免旧位置重复显示。所有黄色备注仅在柜体正面可见，从柜体背面观察时自动隐藏，避免排故视角外的反向穿透显示。
 
 下柜四组物理接触器端子与运行时器件的对应关系为：
 

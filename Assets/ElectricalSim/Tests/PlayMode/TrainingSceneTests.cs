@@ -251,7 +251,7 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator InverterLowerTerminalBoardAnnotationsUseOriginalNumberedGroups()
+        public IEnumerator InverterLowerTerminalBoardAnnotationsUseOriginalLowerBoardGroups()
         {
             var environment = GameObject.Find("OriginalLabEnvironment");
             Assert.That(environment, Is.Not.Null);
@@ -260,27 +260,34 @@ namespace ElectricalSim.Tests
             var orientationReference = generatedRoot.Find("Terminal Annotation - Three Phase Power");
             Assert.That(orientationReference, Is.Not.Null);
             var board = environment.GetComponentsInChildren<Transform>(true)
-                .Single(item => item.name == "DuanZiPai_5" && item.Find("point") != null);
+                .Single(item => item.name == "DuanZiPai_4" && item.Find("point") != null);
             var pointRoot = board.Find("point");
             var camera = Camera.main;
             Assert.That(camera, Is.Not.Null);
+            var oldAnnotationBoard = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "DuanZiPai_5");
+            Assert.That(oldAnnotationBoard.GetComponentsInChildren<Canvas>(true), Is.Empty,
+                "The old DuanZiPai_5 Canvas annotations must be removed");
+            Assert.That(oldAnnotationBoard.GetComponentsInChildren<Component>(true)
+                    .Where(item => item.GetType().Name == "TMP_Text"), Is.Empty,
+                "The old DuanZiPai_5 TMP annotations must be removed");
 
             var expectedAnnotations = new[]
             {
                 new
                 {
                     ObjectName = "Terminal Annotation - G120 Inverter Below Inverter",
-                    Text = "G120变频器端子区", First = 1, Last = 39, Count = 38
+                    Text = "G120变频器端子区", Prefix = "G120_"
                 },
                 new
                 {
                     ObjectName = "Terminal Annotation - Contactors KM Below Inverter",
-                    Text = "交流接触器（KM）端子区", First = 40, Last = 76, Count = 37
+                    Text = "交流接触器（KM）端子区", Prefix = "KM"
                 },
                 new
                 {
                     ObjectName = "Terminal Annotation - FR and KT Below Inverter",
-                    Text = "FR端子区KT端子区", First = 77, Last = 85, Count = 9
+                    Text = "FR端子区KT端子区", Prefix = "FR"
                 }
             };
             foreach (var expected in expectedAnnotations)
@@ -300,15 +307,13 @@ namespace ElectricalSim.Tests
                     Is.LessThan(0.0001f), label.text);
 
                 var anchors = pointRoot.Cast<Transform>()
-                    .Where(item => item.name.Length > 1 && item.name[0] == 'a' &&
-                                   int.TryParse(item.name.Substring(1), out var number) &&
-                                   number >= expected.First && number <= expected.Last)
+                    .Where(item => item.name.StartsWith(expected.Prefix, System.StringComparison.Ordinal))
                     .ToArray();
-                Assert.That(anchors.Length, Is.EqualTo(expected.Count), label.text);
+                Assert.That(anchors, Is.Not.Empty, label.text);
                 var center = anchors.Aggregate(Vector3.zero, (sum, anchor) => sum + anchor.position) / anchors.Length;
                 var verticalOffset = Vector3.Dot(label.transform.position - center, label.transform.up);
                 Assert.That(verticalOffset,
-                    Is.EqualTo(renderer.bounds.size.y * 1.55f).Within(0.0005f), label.text);
+                    Is.EqualTo(renderer.bounds.size.y * -0.95f).Within(0.0005f), label.text);
                 var horizontalOffset = Vector3.Dot(label.transform.position - center, label.transform.right);
                 Assert.That(horizontalOffset, Is.EqualTo(0f).Within(0.0005f),
                     label.text + " must be centered over its lower terminal group");

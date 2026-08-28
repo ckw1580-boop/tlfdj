@@ -108,10 +108,25 @@ namespace ElectricalSim
                 Destroy(textMesh.gameObject);
             }
 
+            RemoveOriginalBoardAnnotations("DuanZiPai_5");
+
             CreateTopTerminalBoardAnnotations(viewingCamera, annotationLayouts);
             CreatePlcRelayTerminalBoardAnnotations(viewingCamera);
             CreateInverterLowerTerminalBoardAnnotations(viewingCamera);
             CreateAuxiliaryTerminalBoardAnnotations(viewingCamera);
+        }
+
+        private void RemoveOriginalBoardAnnotations(string boardName)
+        {
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, boardName, StringComparison.Ordinal));
+            if (board == null) return;
+
+            foreach (var canvas in board.GetComponentsInChildren<Canvas>(true))
+            {
+                canvas.gameObject.SetActive(false);
+                Destroy(canvas.gameObject);
+            }
         }
 
         private TerminalAnnotationLayout[] CaptureTopTerminalAnnotationLayouts()
@@ -309,37 +324,29 @@ namespace ElectricalSim
 
             var root = originalEnvironment.Find("Terminal Board Annotations");
             var board = originalEnvironmentTransforms.FirstOrDefault(item =>
-                string.Equals(item.name, "DuanZiPai_5", StringComparison.Ordinal) && item.Find("point") != null);
+                string.Equals(item.name, "DuanZiPai_4", StringComparison.Ordinal) && item.Find("point") != null);
             var pointRoot = board != null ? board.Find("point") : null;
             if (root == null || pointRoot == null) return;
 
-            var numberedAnchors = pointRoot.Cast<Transform>()
-                .Where(item => TryGetNumberedTerminalAnchor(item, out _))
+            var boardDefinition = OriginalCabinetTerminalBoardMap.Boards.FirstOrDefault(item =>
+                string.Equals(item.DeviceId, "DuanZiPai_4", StringComparison.Ordinal));
+            if (boardDefinition == null) return;
+
+            var lowerAnchors = pointRoot.Cast<Transform>()
+                .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(boardDefinition, item.name))
                 .ToArray();
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
-                numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 1, 39)).ToArray(),
-                "G120变频器端子区", "G120 Inverter Below Inverter", 1.55f);
+                lowerAnchors.Where(item => item.name.StartsWith("G120_", StringComparison.Ordinal)).ToArray(),
+                "G120变频器端子区", "G120 Inverter Below Inverter", -0.95f);
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
-                numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 40, 76)).ToArray(),
-                "交流接触器（KM）端子区", "Contactors KM Below Inverter", 1.55f);
+                lowerAnchors.Where(item => item.name.StartsWith("KM", StringComparison.Ordinal)).ToArray(),
+                "交流接触器（KM）端子区", "Contactors KM Below Inverter", -0.95f);
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
-                numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 77, 85)).ToArray(),
-                "FR端子区KT端子区", "FR and KT Below Inverter", 1.55f);
-        }
-
-        private static bool IsNumberedTerminalInRange(Transform anchor, int first, int last)
-        {
-            return TryGetNumberedTerminalAnchor(anchor, out var number) && number >= first && number <= last;
-        }
-
-        private static bool TryGetNumberedTerminalAnchor(Transform anchor, out int number)
-        {
-            number = 0;
-            return anchor != null && anchor.name.Length > 1 && anchor.name[0] == 'a' &&
-                   int.TryParse(anchor.name.Substring(1), out number);
+                lowerAnchors.Where(item => item.name.StartsWith("FR", StringComparison.Ordinal)).ToArray(),
+                "FR端子区KT端子区", "FR and KT Below Inverter", -0.95f);
         }
 
         private void CreateWholeTerminalBoardAnnotation(
