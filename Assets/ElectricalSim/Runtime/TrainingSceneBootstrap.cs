@@ -112,6 +112,7 @@ namespace ElectricalSim
 
             CreateTopTerminalBoardAnnotations(viewingCamera, annotationLayouts);
             CreatePlcRelayTerminalBoardAnnotations(viewingCamera);
+            CreateInverterUpperTerminalBoardAnnotations(viewingCamera);
             CreateInverterLowerTerminalBoardAnnotations(viewingCamera);
             CreateAuxiliaryTerminalBoardAnnotations(viewingCamera);
         }
@@ -317,19 +318,35 @@ namespace ElectricalSim
                 root, viewingCamera, "DuanZiPai_8", "场景中传感器、电磁阀端子", "Scene Sensors and Valves");
         }
 
+        private void CreateInverterUpperTerminalBoardAnnotations(Transform viewingCamera)
+        {
+            CreateInverterTerminalBoardAnnotations(
+                viewingCamera, "DuanZiPai_3", "Upper", -0.95f);
+        }
+
         private void CreateInverterLowerTerminalBoardAnnotations(Transform viewingCamera)
+        {
+            CreateInverterTerminalBoardAnnotations(
+                viewingCamera, "DuanZiPai_4", "Below Inverter", -0.95f);
+        }
+
+        private void CreateInverterTerminalBoardAnnotations(
+            Transform viewingCamera,
+            string boardName,
+            string objectNameSuffix,
+            float verticalOffsetInGlyphHeights)
         {
             if (viewingCamera == null) return;
             if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
 
             var root = originalEnvironment.Find("Terminal Board Annotations");
             var board = originalEnvironmentTransforms.FirstOrDefault(item =>
-                string.Equals(item.name, "DuanZiPai_4", StringComparison.Ordinal) && item.Find("point") != null);
+                string.Equals(item.name, boardName, StringComparison.Ordinal) && item.Find("point") != null);
             var pointRoot = board != null ? board.Find("point") : null;
             if (root == null || pointRoot == null) return;
 
             var boardDefinition = OriginalCabinetTerminalBoardMap.Boards.FirstOrDefault(item =>
-                string.Equals(item.DeviceId, "DuanZiPai_4", StringComparison.Ordinal));
+                string.Equals(item.DeviceId, boardName, StringComparison.Ordinal));
             if (boardDefinition == null) return;
 
             var lowerAnchors = pointRoot.Cast<Transform>()
@@ -338,15 +355,16 @@ namespace ElectricalSim
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 lowerAnchors.Where(item => item.name.StartsWith("G120_", StringComparison.Ordinal)).ToArray(),
-                "G120变频器端子区", "G120 Inverter Below Inverter", -0.95f);
+                "G120变频器端子区", "G120 Inverter " + objectNameSuffix, verticalOffsetInGlyphHeights);
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 lowerAnchors.Where(item => item.name.StartsWith("KM", StringComparison.Ordinal)).ToArray(),
-                "交流接触器（KM）端子区", "Contactors KM Below Inverter", -0.95f);
+                "交流接触器（KM）端子区", "Contactors KM " + objectNameSuffix, verticalOffsetInGlyphHeights);
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 lowerAnchors.Where(item => item.name.StartsWith("FR", StringComparison.Ordinal)).ToArray(),
-                "FR端子区KT端子区", "FR and KT Below Inverter", -0.95f);
+                objectNameSuffix == "Below Inverter" ? "FR端子区KT端子区" : "FR端子区",
+                "FR " + objectNameSuffix, verticalOffsetInGlyphHeights);
         }
 
         private void CreateWholeTerminalBoardAnnotation(

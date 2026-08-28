@@ -286,7 +286,7 @@ namespace ElectricalSim.Tests
                 },
                 new
                 {
-                    ObjectName = "Terminal Annotation - FR and KT Below Inverter",
+                    ObjectName = "Terminal Annotation - FR Below Inverter",
                     Text = "FR端子区KT端子区", Prefix = "FR"
                 }
             };
@@ -320,6 +320,19 @@ namespace ElectricalSim.Tests
                 Assert.That(Vector3.Dot(-label.transform.forward,
                     (camera.transform.position - label.transform.position).normalized),
                     Is.GreaterThan(0f), label.text);
+            }
+
+            var upperAnnotations = new[]
+            {
+                new { ObjectName = "Terminal Annotation - G120 Inverter Upper", Text = "G120变频器端子区" },
+                new { ObjectName = "Terminal Annotation - Contactors KM Upper", Text = "交流接触器（KM）端子区" },
+                new { ObjectName = "Terminal Annotation - FR Upper", Text = "FR端子区" }
+            };
+            foreach (var expectedUpper in upperAnnotations)
+            {
+                var label = generatedRoot.Find(expectedUpper.ObjectName)?.GetComponent<TextMesh>();
+                Assert.That(label, Is.Not.Null, expectedUpper.ObjectName);
+                Assert.That(label.text, Is.EqualTo(expectedUpper.Text));
             }
             yield return null;
         }
