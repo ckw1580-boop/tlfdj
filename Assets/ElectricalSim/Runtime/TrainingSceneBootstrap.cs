@@ -86,6 +86,7 @@ namespace ElectricalSim
             // the annotations as independent TextMesh objects instead of reviving
             // the unsupported World Space Canvas/TMP hierarchy.
             var annotationLayouts = CaptureTopTerminalAnnotationLayouts();
+            var inverterTerminalLayouts = CaptureCabinetTerminalAnnotationLayouts("DuanZiPai_5");
 
             var generatedRoot = originalEnvironment.Find("Terminal Board Annotations");
             if (generatedRoot != null)
@@ -110,11 +111,29 @@ namespace ElectricalSim
 
             CreateTopTerminalBoardAnnotations(viewingCamera, annotationLayouts);
             CreatePlcRelayTerminalBoardAnnotations(viewingCamera);
+            CreateInverterLowerTerminalBoardAnnotations(viewingCamera, inverterTerminalLayouts);
+            CreateAuxiliaryTerminalBoardAnnotations(viewingCamera);
         }
 
         private TerminalAnnotationLayout[] CaptureTopTerminalAnnotationLayouts()
         {
             var board = originalEnvironment.Find(OriginalTerminalBoardMap.BoardTransformPath);
+            var canvas = board != null ? board.GetComponentInChildren<Canvas>(true) : null;
+            if (canvas == null) return Array.Empty<TerminalAnnotationLayout>();
+
+            return canvas.transform.Cast<Transform>()
+                .OfType<RectTransform>()
+                .OrderBy(item => item.anchoredPosition.x)
+                .Take(3)
+                .Select(item => new TerminalAnnotationLayout(item.position))
+                .ToArray();
+        }
+
+        private TerminalAnnotationLayout[] CaptureCabinetTerminalAnnotationLayouts(string boardName)
+        {
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, boardName, StringComparison.Ordinal) && item.Find("point") != null);
             var canvas = board != null ? board.GetComponentInChildren<Canvas>(true) : null;
             if (canvas == null) return Array.Empty<TerminalAnnotationLayout>();
 
@@ -239,24 +258,131 @@ namespace ElectricalSim
             if (viewingCamera == null) return;
             if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
 
-            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
-                string.Equals(item.name, "DuanZiPai_1", StringComparison.Ordinal) && item.Find("point") != null);
-            var pointRoot = board != null ? board.Find("point") : null;
             var root = originalEnvironment.Find("Terminal Board Annotations");
-            if (pointRoot == null || root == null) return;
+            if (root == null) return;
+
+            CreatePlcRelayTerminalBoardAnnotations(
+                root, viewingCamera, "DuanZiPai_1",
+                "PLC_1DI端子区", "PLC_2DI端子区",
+                "中间继电器（KA）1、2、3、5、6、7、8端子区",
+                "PLC 1 DI", "PLC 2 DI", "Intermediate Relays KA1-3 and KA5-8", -0.45f);
+            CreatePlcRelayTerminalBoardAnnotations(
+                root, viewingCamera, "DuanZiPai_2",
+                "PLC_1端子区", "PLC_2端子区",
+                "中间继电器（KA）4、9、10、11、12、13、14端子区",
+                "PLC 1 Output", "PLC 2 Output", "Intermediate Relays KA4 and KA9-14", 1.55f);
+        }
+
+        private void CreatePlcRelayTerminalBoardAnnotations(
+            Transform root,
+            Transform viewingCamera,
+            string boardName,
+            string plc1Content,
+            string plc2Content,
+            string relayContent,
+            string plc1ObjectName,
+            string plc2ObjectName,
+            string relayObjectName,
+            float verticalOffsetInGlyphHeights)
+        {
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, boardName, StringComparison.Ordinal) && item.Find("point") != null);
+            var pointRoot = board != null ? board.Find("point") : null;
+            if (pointRoot == null) return;
 
             var anchors = pointRoot.Cast<Transform>()
                 .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(item.name))
                 .ToArray();
             CreateCabinetTerminalBoardAnnotation(root, viewingCamera,
                 anchors.Where(item => item.name.StartsWith("PLC_1_", StringComparison.Ordinal)).ToArray(),
-                "PLC_1DI端子区", "PLC 1 DI");
+                plc1Content, plc1ObjectName, verticalOffsetInGlyphHeights);
             CreateCabinetTerminalBoardAnnotation(root, viewingCamera,
                 anchors.Where(item => item.name.StartsWith("PLC_2_", StringComparison.Ordinal)).ToArray(),
-                "PLC_2DI端子区", "PLC 2 DI");
+                plc2Content, plc2ObjectName, verticalOffsetInGlyphHeights);
             CreateCabinetTerminalBoardAnnotation(root, viewingCamera,
                 anchors.Where(item => item.name.StartsWith("KA", StringComparison.Ordinal)).ToArray(),
-                "中间继电器（KA）1、2、3、4、5、6、7、8端子区", "Intermediate Relays KA1-8");
+                relayContent, relayObjectName, verticalOffsetInGlyphHeights);
+        }
+
+        private void CreateAuxiliaryTerminalBoardAnnotations(Transform viewingCamera)
+        {
+            if (viewingCamera == null) return;
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+
+            var root = originalEnvironment.Find("Terminal Board Annotations");
+            if (root == null) return;
+            CreateWholeTerminalBoardAnnotation(
+                root, viewingCamera, "DuanZiPai_6", "电源端子区", "Power Terminals");
+            CreateWholeTerminalBoardAnnotation(
+                root, viewingCamera, "DuanZiPai_7", "电机端子区", "Motor Terminals");
+            CreateWholeTerminalBoardAnnotation(
+                root, viewingCamera, "DuanZiPai_8", "场景中传感器、电磁阀端子", "Scene Sensors and Valves");
+        }
+
+        private void CreateInverterLowerTerminalBoardAnnotations(
+            Transform viewingCamera,
+            IReadOnlyList<TerminalAnnotationLayout> layouts)
+        {
+            if (viewingCamera == null) return;
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+
+            var root = originalEnvironment.Find("Terminal Board Annotations");
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, "DuanZiPai_5", StringComparison.Ordinal) && item.Find("point") != null);
+            var pointRoot = board != null ? board.Find("point") : null;
+            if (root == null || pointRoot == null) return;
+
+            var numberedAnchors = pointRoot.Cast<Transform>()
+                .Where(item => TryGetNumberedTerminalAnchor(item, out _))
+                .ToArray();
+            CreateCabinetTerminalBoardAnnotation(
+                root, viewingCamera,
+                numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 1, 39)).ToArray(),
+                "G120变频器端子区", "G120 Inverter Below Inverter", 1.55f,
+                layouts.Count == 3 ? layouts[0] : (TerminalAnnotationLayout?)null);
+            CreateCabinetTerminalBoardAnnotation(
+                root, viewingCamera,
+                numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 40, 76)).ToArray(),
+                "交流接触器（KM）端子区", "Contactors KM Below Inverter", 1.55f,
+                layouts.Count == 3 ? layouts[1] : (TerminalAnnotationLayout?)null);
+            CreateCabinetTerminalBoardAnnotation(
+                root, viewingCamera,
+                numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 77, 85)).ToArray(),
+                "FR端子区KT端子区", "FR and KT Below Inverter", 1.55f,
+                layouts.Count == 3 ? layouts[2] : (TerminalAnnotationLayout?)null);
+        }
+
+        private static bool IsNumberedTerminalInRange(Transform anchor, int first, int last)
+        {
+            return TryGetNumberedTerminalAnchor(anchor, out var number) && number >= first && number <= last;
+        }
+
+        private static bool TryGetNumberedTerminalAnchor(Transform anchor, out int number)
+        {
+            number = 0;
+            return anchor != null && anchor.name.Length > 1 && anchor.name[0] == 'a' &&
+                   int.TryParse(anchor.name.Substring(1), out number);
+        }
+
+        private void CreateWholeTerminalBoardAnnotation(
+            Transform root,
+            Transform viewingCamera,
+            string boardName,
+            string content,
+            string objectName)
+        {
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, boardName, StringComparison.Ordinal) && item.Find("point") != null);
+            var pointRoot = board != null ? board.Find("point") : null;
+            var boardDefinition = OriginalCabinetTerminalBoardMap.Boards.FirstOrDefault(item =>
+                string.Equals(item.DeviceId, boardName, StringComparison.Ordinal));
+            if (pointRoot == null || boardDefinition == null) return;
+
+            var anchors = pointRoot.Cast<Transform>()
+                .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(boardDefinition, item.name))
+                .ToArray();
+            CreateCabinetTerminalBoardAnnotation(
+                root, viewingCamera, anchors, content, objectName, -0.45f);
         }
 
         private void CreateCabinetTerminalBoardAnnotation(
@@ -264,22 +390,29 @@ namespace ElectricalSim
             Transform viewingCamera,
             IReadOnlyCollection<Transform> anchors,
             string content,
-            string objectName)
+            string objectName,
+            float verticalOffsetInGlyphHeights,
+            TerminalAnnotationLayout? layout = null)
         {
             if (anchors.Count == 0) return;
 
             var center = Vector3.zero;
             foreach (var anchor in anchors) center += anchor.position;
             center /= anchors.Count;
-            var pointRoot = anchors.First().parent;
-            var front = pointRoot.forward.normalized;
-            if (Vector3.Dot(front, viewingCamera.position - center) < 0f) front = -front;
+            var orientationReference = root.Find("Terminal Annotation - Three Phase Power");
+            if (orientationReference == null) return;
+            var front = -orientationReference.forward;
 
             var labelObject = new GameObject("Terminal Annotation - " + objectName);
             labelObject.transform.SetParent(root, true);
-            labelObject.transform.SetPositionAndRotation(
-                center + front * 0.0025f,
-                Quaternion.LookRotation(-front, pointRoot.up));
+            var labelPosition = center + front * 0.0025f;
+            if (layout.HasValue)
+            {
+                labelPosition = layout.Value.Position;
+                labelPosition.y = center.y;
+                labelPosition += front * 0.0025f;
+            }
+            labelObject.transform.SetPositionAndRotation(labelPosition, orientationReference.rotation);
 
             var textMesh = labelObject.AddComponent<TextMesh>();
             textMesh.text = content;
@@ -290,20 +423,12 @@ namespace ElectricalSim
             textMesh.anchor = TextAnchor.MiddleCenter;
             textMesh.alignment = TextAlignment.Center;
             textMesh.color = new Color(1f, 0.9f, 0f, 1f);
-            labelObject.transform.localScale = new Vector3(0.42f, 1f, 1f);
+            labelObject.transform.localScale = orientationReference.localScale;
 
             var renderer = labelObject.GetComponent<MeshRenderer>();
             if (renderer == null) return;
-            var labelRight = labelObject.transform.right;
-            var projectedPositions = anchors.Select(item => Vector3.Dot(item.position, labelRight)).ToArray();
-            var availableWidth = projectedPositions.Max() - projectedPositions.Min();
-            if (renderer.bounds.size.x > availableWidth && availableWidth > 0.001f)
-            {
-                var scale = labelObject.transform.localScale;
-                scale.x *= availableWidth * 0.96f / renderer.bounds.size.x;
-                labelObject.transform.localScale = scale;
-            }
-            labelObject.transform.position -= labelObject.transform.up * renderer.bounds.size.y * 0.25f;
+            labelObject.transform.position += labelObject.transform.up * renderer.bounds.size.y *
+                                              verticalOffsetInGlyphHeights;
 
             renderer.sharedMaterial = uiFont.material;
             renderer.sortingOrder = 100;

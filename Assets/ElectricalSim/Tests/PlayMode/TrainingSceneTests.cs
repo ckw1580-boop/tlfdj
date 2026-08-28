@@ -137,27 +137,34 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator PlcInputAndRelayTerminalBoardAnnotationsAreVisibleFromTheFront()
+        public IEnumerator PlcAndRelayTerminalBoardAnnotationsAreVisibleFromTheFront()
         {
             var environment = GameObject.Find("OriginalLabEnvironment");
             Assert.That(environment, Is.Not.Null);
             var generatedRoot = environment.transform.Find("Terminal Board Annotations");
             Assert.That(generatedRoot, Is.Not.Null);
 
+            var expectedRaisedLabels = new[]
+            {
+                "PLC_1端子区",
+                "PLC_2端子区",
+                "中间继电器（KA）4、9、10、11、12、13、14端子区"
+            };
             var expectedLabels = new[]
             {
                 "PLC_1DI端子区",
                 "PLC_2DI端子区",
-                "中间继电器（KA）1、2、3、4、5、6、7、8端子区"
-            };
+                "中间继电器（KA）1、2、3、5、6、7、8端子区",
+            }.Concat(expectedRaisedLabels).ToArray();
             var labels = generatedRoot.GetComponentsInChildren<TextMesh>(true)
                 .Where(item => expectedLabels.Contains(item.text))
                 .ToArray();
             Assert.That(labels.Select(item => item.text), Is.EquivalentTo(expectedLabels));
-
-            var board = environment.GetComponentsInChildren<Transform>(true)
-                .Single(item => item.name == "DuanZiPai_1" && item.Find("point") != null);
-            var surfaceNormal = board.Find("point").forward.normalized;
+            var orientationReference = generatedRoot.GetComponentsInChildren<TextMesh>(true)
+                .Single(item => item.text == "三相电源端子区");
+            var board2 = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "DuanZiPai_2" && item.Find("point") != null);
+            var board2PointRoot = board2.Find("point");
 
             var camera = Camera.main;
             Assert.That(camera, Is.Not.Null);
@@ -167,8 +174,141 @@ namespace ElectricalSim.Tests
                 Assert.That(renderer, Is.Not.Null, label.text);
                 Assert.That(renderer.enabled, Is.True, label.text);
                 Assert.That(label.GetComponent("FrontFaceOnlyTextVisibility"), Is.Not.Null, label.text);
-                Assert.That(Mathf.Abs(Vector3.Dot(label.transform.forward, surfaceNormal)),
-                    Is.GreaterThan(0.999f), label.text + " must remain parallel to the cabinet surface");
+                Assert.That(Quaternion.Angle(label.transform.rotation, orientationReference.transform.rotation),
+                    Is.LessThan(0.01f), label.text + " must exactly match the three-phase label direction");
+                Assert.That(Vector3.Distance(label.transform.localScale, orientationReference.transform.localScale),
+                    Is.LessThan(0.0001f), label.text + " must exactly match the three-phase label size");
+                Assert.That(Vector3.Dot(-label.transform.forward,
+                    (camera.transform.position - label.transform.position).normalized),
+                    Is.GreaterThan(0f), label.text);
+                if (!expectedRaisedLabels.Contains(label.text)) continue;
+
+                var prefix = label.text == "PLC_1端子区" ? "PLC_1_" :
+                    label.text == "PLC_2端子区" ? "PLC_2_" : "KA";
+                var anchors = board2PointRoot.Cast<Transform>()
+                    .Where(item => item.name.StartsWith(prefix, System.StringComparison.Ordinal) &&
+                                   OriginalCabinetTerminalBoardMap.IsTerminalName(item.name))
+                    .ToArray();
+                Assert.That(anchors, Is.Not.Empty, label.text);
+                var center = anchors.Aggregate(Vector3.zero, (sum, anchor) => sum + anchor.position) / anchors.Length;
+                var verticalOffset = Vector3.Dot(label.transform.position - center, label.transform.up);
+                Assert.That(verticalOffset,
+                    Is.EqualTo(renderer.bounds.size.y * 1.55f).Within(0.0005f),
+                    label.text + " must be raised two glyph heights from its previous position");
+            }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator AuxiliaryTerminalBoardAnnotationsUseWholeOriginalBoards()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            Assert.That(environment, Is.Not.Null);
+            var generatedRoot = environment.transform.Find("Terminal Board Annotations");
+            Assert.That(generatedRoot, Is.Not.Null);
+            var orientationReference = generatedRoot.GetComponentsInChildren<TextMesh>(true)
+                .Single(item => item.text == "三相电源端子区");
+            var camera = Camera.main;
+            Assert.That(camera, Is.Not.Null);
+
+            var expectedAnnotations = new[]
+            {
+                new { BoardName = "DuanZiPai_6", Text = "电源端子区" },
+                new { BoardName = "DuanZiPai_7", Text = "电机端子区" },
+                new { BoardName = "DuanZiPai_8", Text = "场景中传感器、电磁阀端子" }
+            };
+            foreach (var expected in expectedAnnotations)
+            {
+                var label = generatedRoot.GetComponentsInChildren<TextMesh>(true)
+                    .Single(item => item.text == expected.Text);
+                var renderer = label.GetComponent<MeshRenderer>();
+                Assert.That(renderer, Is.Not.Null, label.text);
+                Assert.That(renderer.enabled, Is.True, label.text);
+                Assert.That(label.GetComponent("FrontFaceOnlyTextVisibility"), Is.Not.Null, label.text);
+                Assert.That(Quaternion.Angle(label.transform.rotation, orientationReference.transform.rotation),
+                    Is.LessThan(0.01f), label.text);
+                Assert.That(Vector3.Distance(label.transform.localScale, orientationReference.transform.localScale),
+                    Is.LessThan(0.0001f), label.text);
+
+                var board = environment.GetComponentsInChildren<Transform>(true)
+                    .Single(item => item.name == expected.BoardName && item.Find("point") != null);
+                var pointRoot = board.Find("point");
+                var boardDefinition = OriginalCabinetTerminalBoardMap.Boards
+                    .Single(item => item.DeviceId == expected.BoardName);
+                var anchors = pointRoot.Cast<Transform>()
+                    .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(boardDefinition, item.name))
+                    .ToArray();
+                Assert.That(anchors, Is.Not.Empty, label.text);
+                var center = anchors.Aggregate(Vector3.zero, (sum, anchor) => sum + anchor.position) / anchors.Length;
+                var verticalOffset = Vector3.Dot(label.transform.position - center, label.transform.up);
+                Assert.That(verticalOffset,
+                    Is.EqualTo(renderer.bounds.size.y * -0.45f).Within(0.0005f), label.text);
+                Assert.That(Vector3.Dot(-label.transform.forward,
+                    (camera.transform.position - label.transform.position).normalized),
+                    Is.GreaterThan(0f), label.text);
+            }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator InverterLowerTerminalBoardAnnotationsUseOriginalNumberedGroups()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            Assert.That(environment, Is.Not.Null);
+            var generatedRoot = environment.transform.Find("Terminal Board Annotations");
+            Assert.That(generatedRoot, Is.Not.Null);
+            var orientationReference = generatedRoot.Find("Terminal Annotation - Three Phase Power");
+            Assert.That(orientationReference, Is.Not.Null);
+            var board = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "DuanZiPai_5" && item.Find("point") != null);
+            var pointRoot = board.Find("point");
+            var camera = Camera.main;
+            Assert.That(camera, Is.Not.Null);
+
+            var expectedAnnotations = new[]
+            {
+                new
+                {
+                    ObjectName = "Terminal Annotation - G120 Inverter Below Inverter",
+                    Text = "G120变频器端子区", First = 1, Last = 39, Count = 38
+                },
+                new
+                {
+                    ObjectName = "Terminal Annotation - Contactors KM Below Inverter",
+                    Text = "交流接触器（KM）端子区", First = 40, Last = 76, Count = 37
+                },
+                new
+                {
+                    ObjectName = "Terminal Annotation - FR and KT Below Inverter",
+                    Text = "FR端子区KT端子区", First = 77, Last = 85, Count = 9
+                }
+            };
+            foreach (var expected in expectedAnnotations)
+            {
+                var labelTransform = generatedRoot.Find(expected.ObjectName);
+                Assert.That(labelTransform, Is.Not.Null, expected.Text);
+                var label = labelTransform.GetComponent<TextMesh>();
+                Assert.That(label, Is.Not.Null, expected.Text);
+                Assert.That(label.text, Is.EqualTo(expected.Text));
+                var renderer = label.GetComponent<MeshRenderer>();
+                Assert.That(renderer, Is.Not.Null, label.text);
+                Assert.That(renderer.enabled, Is.True, label.text);
+                Assert.That(label.GetComponent("FrontFaceOnlyTextVisibility"), Is.Not.Null, label.text);
+                Assert.That(Quaternion.Angle(label.transform.rotation, orientationReference.rotation),
+                    Is.LessThan(0.01f), label.text);
+                Assert.That(Vector3.Distance(label.transform.localScale, orientationReference.localScale),
+                    Is.LessThan(0.0001f), label.text);
+
+                var anchors = pointRoot.Cast<Transform>()
+                    .Where(item => item.name.Length > 1 && item.name[0] == 'a' &&
+                                   int.TryParse(item.name.Substring(1), out var number) &&
+                                   number >= expected.First && number <= expected.Last)
+                    .ToArray();
+                Assert.That(anchors.Length, Is.EqualTo(expected.Count), label.text);
+                var center = anchors.Aggregate(Vector3.zero, (sum, anchor) => sum + anchor.position) / anchors.Length;
+                var verticalOffset = Vector3.Dot(label.transform.position - center, label.transform.up);
+                Assert.That(verticalOffset,
+                    Is.EqualTo(renderer.bounds.size.y * 1.55f).Within(0.0005f), label.text);
                 Assert.That(Vector3.Dot(-label.transform.forward,
                     (camera.transform.position - label.transform.position).normalized),
                     Is.GreaterThan(0f), label.text);
