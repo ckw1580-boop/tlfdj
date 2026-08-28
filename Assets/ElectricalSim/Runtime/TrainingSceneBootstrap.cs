@@ -55,9 +55,10 @@ namespace ElectricalSim
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "Arial" }, 18);
             Debug.Log("[OfflineBootstrap] Font ready.");
             CreateEnvironment();
-            RemoveTerminalBoardAnnotations();
-            Debug.Log("[OfflineBootstrap] Environment ready.");
             var cameraController = CreateCamera();
+            cameraController.ResetView();
+            RefreshTerminalBoardAnnotations(cameraController.transform);
+            Debug.Log("[OfflineBootstrap] Environment ready.");
             var wireRoot = new GameObject("ElectricalWires").transform;
             CreateDevices();
             CreateOriginalTerminalBoardPorts();
@@ -76,9 +77,15 @@ namespace ElectricalSim
             Debug.Log("[OfflineBootstrap] Build complete.");
         }
 
-        private void RemoveTerminalBoardAnnotations()
+        private void RefreshTerminalBoardAnnotations(Transform viewingCamera)
         {
             if (originalEnvironment == null) return;
+
+            // The imported top strip already carries three correctly placed label
+            // rectangles.  Keep their geometry as the layout reference, but render
+            // the annotations as independent TextMesh objects instead of reviving
+            // the unsupported World Space Canvas/TMP hierarchy.
+            var annotationLayouts = CaptureTopTerminalAnnotationLayouts();
 
             var generatedRoot = originalEnvironment.Find("Terminal Board Annotations");
             if (generatedRoot != null)
@@ -100,6 +107,219 @@ namespace ElectricalSim
                 textMesh.gameObject.SetActive(false);
                 Destroy(textMesh.gameObject);
             }
+
+            CreateTopTerminalBoardAnnotations(viewingCamera, annotationLayouts);
+            CreatePlcRelayTerminalBoardAnnotations(viewingCamera);
+        }
+
+        private TerminalAnnotationLayout[] CaptureTopTerminalAnnotationLayouts()
+        {
+            var board = originalEnvironment.Find(OriginalTerminalBoardMap.BoardTransformPath);
+            var canvas = board != null ? board.GetComponentInChildren<Canvas>(true) : null;
+            if (canvas == null) return Array.Empty<TerminalAnnotationLayout>();
+
+            return canvas.transform.Cast<Transform>()
+                .OfType<RectTransform>()
+                .OrderBy(item => item.anchoredPosition.x)
+                .Take(3)
+                .Select(item => new TerminalAnnotationLayout(item.position))
+                .ToArray();
+        }
+
+        private void CreateTopTerminalBoardAnnotations(
+            Transform viewingCamera,
+            IReadOnlyList<TerminalAnnotationLayout> layouts)
+        {
+            var board = originalEnvironment.Find(OriginalTerminalBoardMap.BoardTransformPath);
+            var pointRoot = board != null ? board.Find("point") : null;
+            if (pointRoot == null || viewingCamera == null) return;
+
+            OriginalTerminalBoardMap map;
+            try
+            {
+                var configurationPath = Path.Combine(
+                    Application.streamingAssetsPath,
+                    OriginalTerminalBoardMap.RelativeConfigurationPath);
+                map = OriginalTerminalBoardMap.Load(configurationPath);
+            }
+            catch (Exception exception)
+            {
+                Debug.LogWarning("[OfflineBootstrap] Terminal annotations could not be created: " + exception.Message);
+                return;
+            }
+
+            var root = new GameObject("Terminal Board Annotations").transform;
+            root.SetParent(originalEnvironment, true);
+            CreateTerminalBoardAnnotation(root, pointRoot, viewingCamera, map,
+                OriginalTerminalZone.ThreePhasePower, "三相电源端子区", "Three Phase Power",
+                layouts.Count == 3 ? layouts[0] : (TerminalAnnotationLayout?)null);
+            CreateTerminalBoardAnnotation(root, pointRoot, viewingCamera, map,
+                OriginalTerminalZone.Indicator, "指示灯（HL）端子区", "Indicator HL",
+                layouts.Count == 3 ? layouts[1] : (TerminalAnnotationLayout?)null);
+            CreateTerminalBoardAnnotation(root, pointRoot, viewingCamera, map,
+                OriginalTerminalZone.SelectorAndButton, "旋钮（SA）、按钮SB端子区", "Selector SA and Button SB",
+                layouts.Count == 3 ? layouts[2] : (TerminalAnnotationLayout?)null);
+        }
+
+        private void CreateTerminalBoardAnnotation(
+            Transform root,
+            Transform pointRoot,
+            Transform viewingCamera,
+            OriginalTerminalBoardMap map,
+            OriginalTerminalZone zone,
+            string content,
+            string objectName,
+            TerminalAnnotationLayout? layout)
+        {
+            var anchors = map.Bindings
+                .Where(binding => binding.Zone == zone)
+                .Select(binding => pointRoot.Find(binding.AnchorId))
+                .Where(anchor => anchor != null)
+                .ToArray();
+            if (anchors.Length == 0) return;
+
+            var center = Vector3.zero;
+            foreach (var anchor in anchors)
+                center += anchor.position;
+            center /= anchors.Length;
+            var front = ResolveBoardFacingDirection(pointRoot);
+            if (Vector3.Dot(front, viewingCamera.position - center) < 0f) front = -front;
+
+            var labelObject = new GameObject("Terminal Annotation - " + objectName);
+            labelObject.transform.SetParent(root, true);
+            if (layout.HasValue)
+            {
+                var centeredLayoutPosition = layout.Value.Position;
+                centeredLayoutPosition.y = center.y;
+                labelObject.transform.position = centeredLayoutPosition + front * 0.0025f;
+            }
+            else
+            {
+                labelObject.transform.position = center + front * 0.0025f;
+            }
+            labelObject.transform.rotation = Quaternion.LookRotation(-front, Vector3.up);
+
+            var textMesh = labelObject.AddComponent<TextMesh>();
+            textMesh.text = content;
+            textMesh.font = uiFont;
+            textMesh.fontSize = 96;
+            textMesh.fontStyle = FontStyle.Bold;
+            textMesh.characterSize = 0.002f;
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.color = new Color(1f, 0.9f, 0f, 1f);
+            labelObject.transform.localScale = new Vector3(0.42f, 0.65f, 1f);
+
+            var renderer = labelObject.GetComponent<MeshRenderer>();
+            if (renderer == null) return;
+            // Raise the label by one and a quarter rendered glyph heights.
+            labelObject.transform.position += Vector3.up * renderer.bounds.size.y * 1.25f;
+            renderer.sharedMaterial = uiFont.material;
+            renderer.sortingOrder = 100;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            labelObject.AddComponent<FrontFaceOnlyTextVisibility>()
+                .Configure(renderer, viewingCamera);
+        }
+
+        private readonly struct TerminalAnnotationLayout
+        {
+            public readonly Vector3 Position;
+
+            public TerminalAnnotationLayout(Vector3 position)
+            {
+                Position = position;
+            }
+        }
+
+        private void CreatePlcRelayTerminalBoardAnnotations(Transform viewingCamera)
+        {
+            if (viewingCamera == null) return;
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, "DuanZiPai_1", StringComparison.Ordinal) && item.Find("point") != null);
+            var pointRoot = board != null ? board.Find("point") : null;
+            var root = originalEnvironment.Find("Terminal Board Annotations");
+            if (pointRoot == null || root == null) return;
+
+            var anchors = pointRoot.Cast<Transform>()
+                .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(item.name))
+                .ToArray();
+            CreateCabinetTerminalBoardAnnotation(root, viewingCamera,
+                anchors.Where(item => item.name.StartsWith("PLC_1_", StringComparison.Ordinal)).ToArray(),
+                "PLC_1DI端子区", "PLC 1 DI");
+            CreateCabinetTerminalBoardAnnotation(root, viewingCamera,
+                anchors.Where(item => item.name.StartsWith("PLC_2_", StringComparison.Ordinal)).ToArray(),
+                "PLC_2DI端子区", "PLC 2 DI");
+            CreateCabinetTerminalBoardAnnotation(root, viewingCamera,
+                anchors.Where(item => item.name.StartsWith("KA", StringComparison.Ordinal)).ToArray(),
+                "中间继电器（KA）1、2、3、4、5、6、7、8端子区", "Intermediate Relays KA1-8");
+        }
+
+        private void CreateCabinetTerminalBoardAnnotation(
+            Transform root,
+            Transform viewingCamera,
+            IReadOnlyCollection<Transform> anchors,
+            string content,
+            string objectName)
+        {
+            if (anchors.Count == 0) return;
+
+            var center = Vector3.zero;
+            foreach (var anchor in anchors) center += anchor.position;
+            center /= anchors.Count;
+            var pointRoot = anchors.First().parent;
+            var front = pointRoot.forward.normalized;
+            if (Vector3.Dot(front, viewingCamera.position - center) < 0f) front = -front;
+
+            var labelObject = new GameObject("Terminal Annotation - " + objectName);
+            labelObject.transform.SetParent(root, true);
+            labelObject.transform.SetPositionAndRotation(
+                center + front * 0.0025f,
+                Quaternion.LookRotation(-front, pointRoot.up));
+
+            var textMesh = labelObject.AddComponent<TextMesh>();
+            textMesh.text = content;
+            textMesh.font = uiFont;
+            textMesh.fontSize = 96;
+            textMesh.fontStyle = FontStyle.Bold;
+            textMesh.characterSize = 0.002f;
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.color = new Color(1f, 0.9f, 0f, 1f);
+            labelObject.transform.localScale = new Vector3(0.42f, 1f, 1f);
+
+            var renderer = labelObject.GetComponent<MeshRenderer>();
+            if (renderer == null) return;
+            var labelRight = labelObject.transform.right;
+            var projectedPositions = anchors.Select(item => Vector3.Dot(item.position, labelRight)).ToArray();
+            var availableWidth = projectedPositions.Max() - projectedPositions.Min();
+            if (renderer.bounds.size.x > availableWidth && availableWidth > 0.001f)
+            {
+                var scale = labelObject.transform.localScale;
+                scale.x *= availableWidth * 0.96f / renderer.bounds.size.x;
+                labelObject.transform.localScale = scale;
+            }
+            labelObject.transform.position -= labelObject.transform.up * renderer.bounds.size.y * 0.25f;
+
+            renderer.sharedMaterial = uiFont.material;
+            renderer.sortingOrder = 100;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            labelObject.AddComponent<FrontFaceOnlyTextVisibility>()
+                .Configure(renderer, viewingCamera);
+        }
+
+        private static Vector3 ResolveBoardFacingDirection(Transform pointRoot)
+        {
+            var forward = pointRoot.forward;
+            forward.y = 0f;
+            return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
         }
 
         private static bool HasTerminalBoardAncestor(Transform transform)
@@ -1468,6 +1688,31 @@ namespace ElectricalSim
             public Text Status;
             public Text Instrument;
             public PortHoverPresenter PortHover;
+        }
+    }
+
+    internal sealed class FrontFaceOnlyTextVisibility : MonoBehaviour
+    {
+        private Renderer targetRenderer;
+        private Transform viewingCamera;
+
+        public void Configure(Renderer renderer, Transform cameraTransform)
+        {
+            targetRenderer = renderer;
+            viewingCamera = cameraTransform;
+            RefreshVisibility();
+        }
+
+        private void LateUpdate()
+        {
+            RefreshVisibility();
+        }
+
+        private void RefreshVisibility()
+        {
+            if (targetRenderer == null || viewingCamera == null) return;
+            var directionToCamera = viewingCamera.position - transform.position;
+            targetRenderer.enabled = Vector3.Dot(-transform.forward, directionToCamera) > 0f;
         }
     }
 }

@@ -29,25 +29,150 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator TerminalBoardAnnotationsAreCompletelyRemoved()
+        public IEnumerator TerminalBoardAnnotationsUseIndependentVisibleTextMeshes()
         {
             var environment = GameObject.Find("OriginalLabEnvironment");
             Assert.That(environment, Is.Not.Null);
 
             var generatedRoot = environment.transform.Find("Terminal Board Annotations");
-            Assert.That(generatedRoot == null || !generatedRoot.gameObject.activeSelf, Is.True);
+            Assert.That(generatedRoot, Is.Not.Null);
+            Assert.That(generatedRoot.gameObject.activeInHierarchy, Is.True);
 
+            var board = environment.transform.Find(OriginalTerminalBoardMap.BoardTransformPath);
+            Assert.That(board, Is.Not.Null);
+            var expectedTopLabels = new[]
+            {
+                "三相电源端子区",
+                "指示灯（HL）端子区",
+                "旋钮（SA）、按钮SB端子区"
+            };
+            var generatedLabels = generatedRoot.GetComponentsInChildren<TextMesh>(true)
+                .Where(text => text.gameObject.activeInHierarchy && expectedTopLabels.Contains(text.text))
+                .ToArray();
+            Assert.That(generatedLabels.Select(text => text.text),
+                Is.EquivalentTo(expectedTopLabels));
+            var camera = Camera.main;
+            Assert.That(camera, Is.Not.Null);
+            var renderTarget = RenderTexture.GetTemporary(960, 540, 24, RenderTextureFormat.ARGB32);
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            var previousCameraPosition = camera.transform.position;
+            var previousCameraRotation = camera.transform.rotation;
+            var frame = new Texture2D(960, 540, TextureFormat.RGBA32, false);
+            try
+            {
+                camera.targetTexture = renderTarget;
+                camera.Render();
+                RenderTexture.active = renderTarget;
+                frame.ReadPixels(new Rect(0f, 0f, frame.width, frame.height), 0, 0);
+                frame.Apply();
+                foreach (var label in generatedLabels)
+                {
+                    var renderer = label.GetComponent<MeshRenderer>();
+                    Assert.That(renderer, Is.Not.Null, label.text);
+                    Assert.That(label.GetComponent("FrontFaceOnlyTextVisibility"), Is.Not.Null, label.text);
+                    Assert.That(renderer.enabled, Is.True, label.text);
+                    Assert.That(renderer.bounds.size.y, Is.InRange(0.012f, 0.04f), label.text);
+                    Assert.That(Vector3.Dot(-label.transform.forward,
+                        (camera.transform.position - label.transform.position).normalized),
+                        Is.GreaterThan(0.65f), label.text);
+                    var viewport = camera.WorldToViewportPoint(renderer.bounds.center);
+                    Assert.That(viewport.z, Is.GreaterThan(0f), label.text);
+                    Assert.That(viewport.x, Is.InRange(0f, 1f), label.text);
+                    Assert.That(viewport.y, Is.InRange(0f, 1f), label.text);
+                    var visibleYellowPixels = CountBrightYellowPixels(camera, frame, renderer.bounds);
+                    renderer.enabled = false;
+                    camera.Render();
+                    RenderTexture.active = renderTarget;
+                    frame.ReadPixels(new Rect(0f, 0f, frame.width, frame.height), 0, 0);
+                    frame.Apply();
+                    var hiddenYellowPixels = CountBrightYellowPixels(camera, frame, renderer.bounds);
+                    renderer.enabled = true;
+                    camera.Render();
+                    RenderTexture.active = renderTarget;
+                    frame.ReadPixels(new Rect(0f, 0f, frame.width, frame.height), 0, 0);
+                    frame.Apply();
+                    Assert.That(visibleYellowPixels - hiddenYellowPixels,
+                        Is.GreaterThan(4), label.text + " must add visible yellow pixels to the rendered frame");
+                }
+
+                var labelRects = generatedLabels
+                    .Select(label => GetViewportRect(camera, label.GetComponent<MeshRenderer>().bounds))
+                    .OrderBy(rect => rect.center.x)
+                    .ToArray();
+                for (var index = 1; index < labelRects.Length; index++)
+                    Assert.That(labelRects[index].xMin,
+                        Is.GreaterThanOrEqualTo(labelRects[index - 1].xMax - 0.002f),
+                        "terminal annotation zones must not overlap");
+
+                var referenceLabel = generatedLabels[1].transform;
+                camera.transform.position = referenceLabel.position + referenceLabel.forward * 2f;
+                foreach (var label in generatedLabels)
+                    label.gameObject.SendMessage("RefreshVisibility", SendMessageOptions.RequireReceiver);
+                Assert.That(generatedLabels.All(label => !label.GetComponent<MeshRenderer>().enabled), Is.True,
+                    "terminal annotations must be hidden from the cabinet rear/fault viewpoint");
+            }
+            finally
+            {
+                camera.transform.SetPositionAndRotation(previousCameraPosition, previousCameraRotation);
+                foreach (var label in generatedLabels)
+                    label.gameObject.SendMessage("RefreshVisibility", SendMessageOptions.DontRequireReceiver);
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                RenderTexture.ReleaseTemporary(renderTarget);
+                Object.Destroy(frame);
+            }
             var boardCanvases = environment.GetComponentsInChildren<Canvas>(true)
                 .Where(canvas => canvas.GetComponentsInParent<Transform>(true)
                     .Any(item => item.name.StartsWith("DuanZiPai_")))
                 .ToArray();
-            Assert.That(boardCanvases.All(canvas => !canvas.gameObject.activeSelf), Is.True);
+            Assert.That(boardCanvases.All(item => !item.gameObject.activeSelf), Is.True);
 
             var boardTextMeshes = environment.GetComponentsInChildren<TextMesh>(true)
                 .Where(textMesh => textMesh.GetComponentsInParent<Transform>(true)
                     .Any(item => item.name.StartsWith("DuanZiPai_")))
                 .ToArray();
             Assert.That(boardTextMeshes.All(textMesh => !textMesh.gameObject.activeSelf), Is.True);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator PlcInputAndRelayTerminalBoardAnnotationsAreVisibleFromTheFront()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            Assert.That(environment, Is.Not.Null);
+            var generatedRoot = environment.transform.Find("Terminal Board Annotations");
+            Assert.That(generatedRoot, Is.Not.Null);
+
+            var expectedLabels = new[]
+            {
+                "PLC_1DI端子区",
+                "PLC_2DI端子区",
+                "中间继电器（KA）1、2、3、4、5、6、7、8端子区"
+            };
+            var labels = generatedRoot.GetComponentsInChildren<TextMesh>(true)
+                .Where(item => expectedLabels.Contains(item.text))
+                .ToArray();
+            Assert.That(labels.Select(item => item.text), Is.EquivalentTo(expectedLabels));
+
+            var board = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "DuanZiPai_1" && item.Find("point") != null);
+            var surfaceNormal = board.Find("point").forward.normalized;
+
+            var camera = Camera.main;
+            Assert.That(camera, Is.Not.Null);
+            foreach (var label in labels)
+            {
+                var renderer = label.GetComponent<MeshRenderer>();
+                Assert.That(renderer, Is.Not.Null, label.text);
+                Assert.That(renderer.enabled, Is.True, label.text);
+                Assert.That(label.GetComponent("FrontFaceOnlyTextVisibility"), Is.Not.Null, label.text);
+                Assert.That(Mathf.Abs(Vector3.Dot(label.transform.forward, surfaceNormal)),
+                    Is.GreaterThan(0.999f), label.text + " must remain parallel to the cabinet surface");
+                Assert.That(Vector3.Dot(-label.transform.forward,
+                    (camera.transform.position - label.transform.position).normalized),
+                    Is.GreaterThan(0f), label.text);
+            }
             yield return null;
         }
 
@@ -639,6 +764,53 @@ namespace ElectricalSim.Tests
             for (var current = item.parent; current != null; current = current.parent)
                 if (current.name == name) return true;
             return false;
+        }
+
+        private static int CountBrightYellowPixels(Camera camera, Texture2D frame, Bounds bounds)
+        {
+            var min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            for (var corner = 0; corner < 8; corner++)
+            {
+                var world = bounds.center + Vector3.Scale(bounds.extents, new Vector3(
+                    (corner & 1) == 0 ? -1f : 1f,
+                    (corner & 2) == 0 ? -1f : 1f,
+                    (corner & 4) == 0 ? -1f : 1f));
+                var viewport = camera.WorldToViewportPoint(world);
+                if (viewport.z <= 0f) continue;
+                min = Vector2.Min(min, viewport);
+                max = Vector2.Max(max, viewport);
+            }
+
+            var xMin = Mathf.Clamp(Mathf.FloorToInt(min.x * frame.width) - 3, 0, frame.width - 1);
+            var xMax = Mathf.Clamp(Mathf.CeilToInt(max.x * frame.width) + 3, 0, frame.width - 1);
+            var yMin = Mathf.Clamp(Mathf.FloorToInt(min.y * frame.height) - 3, 0, frame.height - 1);
+            var yMax = Mathf.Clamp(Mathf.CeilToInt(max.y * frame.height) + 3, 0, frame.height - 1);
+            var count = 0;
+            for (var y = yMin; y <= yMax; y++)
+            for (var x = xMin; x <= xMax; x++)
+            {
+                var pixel = frame.GetPixel(x, y);
+                if (pixel.r > 0.72f && pixel.g > 0.58f && pixel.b < 0.28f && pixel.a > 0.5f) count++;
+            }
+            return count;
+        }
+
+        private static Rect GetViewportRect(Camera camera, Bounds bounds)
+        {
+            var min = new Vector2(float.PositiveInfinity, float.PositiveInfinity);
+            var max = new Vector2(float.NegativeInfinity, float.NegativeInfinity);
+            for (var corner = 0; corner < 8; corner++)
+            {
+                var world = bounds.center + Vector3.Scale(bounds.extents, new Vector3(
+                    (corner & 1) == 0 ? -1f : 1f,
+                    (corner & 2) == 0 ? -1f : 1f,
+                    (corner & 4) == 0 ? -1f : 1f));
+                var viewport = camera.WorldToViewportPoint(world);
+                min = Vector2.Min(min, viewport);
+                max = Vector2.Max(max, viewport);
+            }
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
         }
 
         private static void AssertNamedBoardPort(
