@@ -309,6 +309,9 @@ namespace ElectricalSim.Tests
                 var verticalOffset = Vector3.Dot(label.transform.position - center, label.transform.up);
                 Assert.That(verticalOffset,
                     Is.EqualTo(renderer.bounds.size.y * 1.55f).Within(0.0005f), label.text);
+                var horizontalOffset = Vector3.Dot(label.transform.position - center, label.transform.right);
+                Assert.That(horizontalOffset, Is.EqualTo(0f).Within(0.0005f),
+                    label.text + " must be centered over its lower terminal group");
                 Assert.That(Vector3.Dot(-label.transform.forward,
                     (camera.transform.position - label.transform.position).normalized),
                     Is.GreaterThan(0f), label.text);

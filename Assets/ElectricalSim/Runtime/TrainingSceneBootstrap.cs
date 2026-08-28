@@ -86,7 +86,6 @@ namespace ElectricalSim
             // the annotations as independent TextMesh objects instead of reviving
             // the unsupported World Space Canvas/TMP hierarchy.
             var annotationLayouts = CaptureTopTerminalAnnotationLayouts();
-            var inverterTerminalLayouts = CaptureCabinetTerminalAnnotationLayouts("DuanZiPai_5");
 
             var generatedRoot = originalEnvironment.Find("Terminal Board Annotations");
             if (generatedRoot != null)
@@ -111,29 +110,13 @@ namespace ElectricalSim
 
             CreateTopTerminalBoardAnnotations(viewingCamera, annotationLayouts);
             CreatePlcRelayTerminalBoardAnnotations(viewingCamera);
-            CreateInverterLowerTerminalBoardAnnotations(viewingCamera, inverterTerminalLayouts);
+            CreateInverterLowerTerminalBoardAnnotations(viewingCamera);
             CreateAuxiliaryTerminalBoardAnnotations(viewingCamera);
         }
 
         private TerminalAnnotationLayout[] CaptureTopTerminalAnnotationLayouts()
         {
             var board = originalEnvironment.Find(OriginalTerminalBoardMap.BoardTransformPath);
-            var canvas = board != null ? board.GetComponentInChildren<Canvas>(true) : null;
-            if (canvas == null) return Array.Empty<TerminalAnnotationLayout>();
-
-            return canvas.transform.Cast<Transform>()
-                .OfType<RectTransform>()
-                .OrderBy(item => item.anchoredPosition.x)
-                .Take(3)
-                .Select(item => new TerminalAnnotationLayout(item.position))
-                .ToArray();
-        }
-
-        private TerminalAnnotationLayout[] CaptureCabinetTerminalAnnotationLayouts(string boardName)
-        {
-            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
-            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
-                string.Equals(item.name, boardName, StringComparison.Ordinal) && item.Find("point") != null);
             var canvas = board != null ? board.GetComponentInChildren<Canvas>(true) : null;
             if (canvas == null) return Array.Empty<TerminalAnnotationLayout>();
 
@@ -319,9 +302,7 @@ namespace ElectricalSim
                 root, viewingCamera, "DuanZiPai_8", "场景中传感器、电磁阀端子", "Scene Sensors and Valves");
         }
 
-        private void CreateInverterLowerTerminalBoardAnnotations(
-            Transform viewingCamera,
-            IReadOnlyList<TerminalAnnotationLayout> layouts)
+        private void CreateInverterLowerTerminalBoardAnnotations(Transform viewingCamera)
         {
             if (viewingCamera == null) return;
             if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
@@ -338,18 +319,15 @@ namespace ElectricalSim
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 1, 39)).ToArray(),
-                "G120变频器端子区", "G120 Inverter Below Inverter", 1.55f,
-                layouts.Count == 3 ? layouts[0] : (TerminalAnnotationLayout?)null);
+                "G120变频器端子区", "G120 Inverter Below Inverter", 1.55f);
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 40, 76)).ToArray(),
-                "交流接触器（KM）端子区", "Contactors KM Below Inverter", 1.55f,
-                layouts.Count == 3 ? layouts[1] : (TerminalAnnotationLayout?)null);
+                "交流接触器（KM）端子区", "Contactors KM Below Inverter", 1.55f);
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 numberedAnchors.Where(item => IsNumberedTerminalInRange(item, 77, 85)).ToArray(),
-                "FR端子区KT端子区", "FR and KT Below Inverter", 1.55f,
-                layouts.Count == 3 ? layouts[2] : (TerminalAnnotationLayout?)null);
+                "FR端子区KT端子区", "FR and KT Below Inverter", 1.55f);
         }
 
         private static bool IsNumberedTerminalInRange(Transform anchor, int first, int last)
