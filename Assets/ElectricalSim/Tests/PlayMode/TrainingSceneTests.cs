@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -26,6 +27,112 @@ namespace ElectricalSim.Tests
             Assert.That(Object.FindObjectsOfType<ElectricalDeviceView>().Length, Is.GreaterThanOrEqualTo(20));
             Assert.That(GameObject.Find("Simulation HUD"), Is.Not.Null);
             yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator FaultViewRestoresButtonTerminalStripConnectionPointsAndAnnotation()
+        {
+            Assert.That(GameObject.Find("Fault Button Terminal Strip"), Is.Null,
+                "No generated terminal-strip model should remain");
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var board = environment.GetComponentsInChildren<Transform>(true)
+                .Single(item => item.name == "DuanZiPai_5" && item.Find("point") != null);
+            var pointRoot = board.Find("point");
+            Assert.That(pointRoot, Is.Not.Null);
+            var physicalAnchorNames = new[]
+            {
+                "a1", "a2", "a3", "a4", "a5", "a6",
+                "a7", "a8", "a9", "a10", "a11", "a12"
+            };
+            Assert.That(physicalAnchorNames.All(item => pointRoot.Find(item) != null), Is.True);
+
+            var label = Object.FindObjectsOfType<TextMesh>(true)
+                .Single(item => item.text == "按钮（SB）端子区");
+            var orientationReference = Object.FindObjectsOfType<TextMesh>(true)
+                .Single(item => item.text == "三相电源端子区");
+            var labelRenderer = label.GetComponent<MeshRenderer>();
+            Assert.That(labelRenderer, Is.Not.Null);
+            Assert.That(label.GetComponent("FaultViewOnlyRendererVisibility"), Is.Not.Null);
+            var expectedOppositeRotation = orientationReference.transform.rotation *
+                                           Quaternion.Euler(0f, 180f, 0f);
+            Assert.That(Quaternion.Angle(label.transform.rotation, expectedOppositeRotation),
+                Is.LessThan(0.01f),
+                "The SB annotation must use the opposite-facing three-phase annotation direction");
+            Assert.That(Vector3.Distance(label.transform.localScale, orientationReference.transform.localScale),
+                Is.LessThan(0.0001f),
+                "The SB annotation must exactly match the three-phase annotation size");
+            var anchorCenter = physicalAnchorNames
+                .Select(item => pointRoot.Find(item).position)
+                .Aggregate(Vector3.zero, (sum, position) => sum + position) /
+                               physicalAnchorNames.Length;
+            var surfacePosition = anchorCenter + orientationReference.transform.forward * 0.0025f;
+            var verticalOffset = Vector3.Dot(
+                label.transform.position - surfacePosition,
+                label.transform.up);
+            Assert.That(verticalOffset,
+                Is.EqualTo(labelRenderer.bounds.size.y * 1.15f).Within(0.0001f),
+                "The SB annotation must be raised by one additional glyph height");
+            Assert.That(labelRenderer.enabled, Is.False,
+                "The troubleshooting annotation must not appear in the normal cabinet view");
+
+            var controller = Object.FindObjectOfType<SimulationController>();
+            Assert.That(controller, Is.Not.Null);
+            controller.SetMode(SimulationMode.Fault);
+            yield return null;
+
+            Assert.That(labelRenderer.enabled, Is.True);
+            var camera = Camera.main;
+            Assert.That(camera, Is.Not.Null);
+            Assert.That(Vector3.Dot(-label.transform.forward,
+                    (camera.transform.position - label.transform.position).normalized),
+                Is.GreaterThan(0f),
+                "The SB annotation front face must point toward the troubleshooting camera");
+            var faultCameraController = camera.GetComponent<TrainingCameraController>();
+            Assert.That(faultCameraController, Is.Not.Null);
+            var faultDistance = Vector3.Distance(camera.transform.position, label.transform.position);
+            camera.transform.position = label.transform.position + label.transform.forward * faultDistance;
+            yield return null;
+            Assert.That(labelRenderer.enabled, Is.False,
+                "The SB annotation must be hidden when the user walks around to the cabinet front while fault mode remains active");
+            faultCameraController.SetFaultView();
+            yield return null;
+            Assert.That(labelRenderer.enabled, Is.True);
+            var boardView = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(item => item.Runtime.DeviceId == OriginalTerminalBoardMap.DeviceId);
+            var buttonPorts = boardView.Ports
+                .Where(item => item.HoverLabel.StartsWith("SB1_", System.StringComparison.OrdinalIgnoreCase) ||
+                               item.HoverLabel.StartsWith("SB2_", System.StringComparison.OrdinalIgnoreCase) ||
+                               item.HoverLabel.StartsWith("SB3_", System.StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            Assert.That(buttonPorts.Length, Is.EqualTo(12));
+            Assert.That(buttonPorts.All(item => item.CurrentAnchor != null &&
+                                                item.CurrentAnchor.IsChildOf(board)), Is.True);
+            Assert.That(buttonPorts.Select(item => item.CurrentAnchor.name),
+                Is.EquivalentTo(physicalAnchorNames));
+            Assert.That(buttonPorts.Single(item => item.HoverLabel == "SB3_COM2").CurrentAnchor.name,
+                Is.EqualTo("a12"));
+
+            foreach (var nonFaultMode in new[]
+                     {
+                         SimulationMode.View,
+                         SimulationMode.Drag,
+                         SimulationMode.Simulate
+                     })
+            {
+                controller.SetMode(nonFaultMode);
+                yield return null;
+                Assert.That(labelRenderer.enabled, Is.False,
+                    $"The SB annotation must be hidden in {nonFaultMode} mode even while the fault camera preset remains active");
+                controller.SetMode(SimulationMode.Fault);
+                yield return null;
+                Assert.That(labelRenderer.enabled, Is.True);
+            }
+
+            controller.SetMode(SimulationMode.Wiring);
+            yield return null;
+            Assert.That(labelRenderer.enabled, Is.False);
+            Assert.That(buttonPorts.All(item => item.CurrentAnchor != null &&
+                                                !item.CurrentAnchor.IsChildOf(board)), Is.True);
         }
 
         [UnityTest]
@@ -361,11 +468,73 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator OriginalModelConnectionPointsUseTerminalTransforms()
+        public IEnumerator DeviceBodyConnectionPointsAppearOnlyInFaultView()
         {
-            AssertPortMatchesMappedTerminal("QF", "L1", "L1", "123");
-            AssertPortMatchesMappedTerminal("QF", "T3", "L6", "123");
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var terminalBoardIds = new HashSet<string>(
+                OriginalCabinetTerminalBoardMap.Boards.Select(item => item.DeviceId))
+            {
+                OriginalTerminalBoardMap.DeviceId
+            };
+            var faultDevices = new[]
+            {
+                new { Id = "KMF", PortCount = 18, BackNut = "111" },
+                new { Id = "KM1", PortCount = 18, BackNut = "112" },
+                new { Id = "KMR", PortCount = 18, BackNut = "113" },
+                new { Id = "FR", PortCount = 10, BackNut = "114" }
+            };
+            var faultDeviceIds = new HashSet<string>(faultDevices.Select(item => item.Id));
+            var deviceViews = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Where(view => !terminalBoardIds.Contains(view.Runtime.DeviceId) &&
+                               !faultDeviceIds.Contains(view.Runtime.DeviceId))
+                .ToArray();
+
+            Assert.That(deviceViews, Is.Not.Empty);
+            foreach (var view in deviceViews)
+                Assert.That(view.Ports, Is.Empty,
+                    view.Runtime.DeviceId + " must use the original cabinet terminal boards");
+
+            Assert.That(Object.FindObjectsOfType<ElectricalPortView>()
+                .All(port => terminalBoardIds.Contains(port.DeviceId) ||
+                             faultDeviceIds.Contains(port.DeviceId)), Is.True);
+
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
             yield return null;
+            foreach (var device in faultDevices)
+            {
+                var ports = Object.FindObjectsOfType<ElectricalDeviceView>()
+                    .Single(view => view.Runtime.DeviceId == device.Id).Ports;
+                Assert.That(ports.Count, Is.EqualTo(device.PortCount));
+                Assert.That(ports.All(port => port.CurrentAnchor == null), Is.True);
+                Assert.That(ports.All(port => !port.IsVisible), Is.True);
+                Assert.That(ports.All(port => !port.GetComponent<SphereCollider>().enabled), Is.True);
+            }
+
+            controller.SetMode(SimulationMode.Fault);
+            yield return null;
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.FaultBack));
+            foreach (var device in faultDevices)
+            {
+                var ports = Object.FindObjectsOfType<ElectricalDeviceView>()
+                    .Single(view => view.Runtime.DeviceId == device.Id).Ports;
+                Assert.That(ports.All(port => port.CurrentAnchor != null &&
+                                                   HasAncestor(port.CurrentAnchor, device.BackNut)), Is.True);
+                Assert.That(ports.All(port => port.IsVisible), Is.True);
+                Assert.That(ports.All(port => port.GetComponent<MeshRenderer>().enabled), Is.True);
+                Assert.That(ports.All(port => port.GetComponent<SphereCollider>().enabled), Is.True);
+            }
+
+            var thermalRelayPorts = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == "FR").Ports;
+            var t1 = thermalRelayPorts.Single(port => port.PortName == "T1");
+            var t2 = thermalRelayPorts.Single(port => port.PortName == "T2");
+            var t3 = thermalRelayPorts.Single(port => port.PortName == "T3");
+            var expectedT2Position = Vector3.Lerp(t1.CurrentAnchorPosition, t3.CurrentAnchorPosition, 0.5f);
+            Assert.That(t2.HoverLabel, Is.EqualTo("4T2"));
+            Assert.That(t2.CurrentAnchor.name, Is.EqualTo("FR_4T2_FaultAnchor"));
+            Assert.That(Vector3.Distance(t2.CurrentAnchorPosition, expectedT2Position), Is.LessThan(0.0005f));
         }
 
         [UnityTest]
@@ -426,7 +595,7 @@ namespace ElectricalSim.Tests
         [UnityTest]
         public IEnumerator LowerCabinetDevicesExposeConnectionsOnlyOnTerminalBoards()
         {
-            var routedDeviceIds = new[] { "KMF", "KM1", "KMR", "KM2", "KMB", "KB", "FR", "KT" };
+            var routedDeviceIds = new[] { "KM2", "KMB", "KB", "KT" };
             var views = Object.FindObjectsOfType<ElectricalDeviceView>();
             foreach (var deviceId in routedDeviceIds)
             {
@@ -437,66 +606,16 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator AllThreeMotorsExposeSixPhysicalConnectionPointsOnlyInJumperMode()
+        public IEnumerator MotorsExposeConnectionsOnlyOnTheOriginalMotorTerminalBoard()
         {
-            var controller = Object.FindObjectOfType<SimulationController>();
-            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
-            var environment = GameObject.Find("OriginalLabEnvironment");
-            var transforms = environment.GetComponentsInChildren<Transform>(true);
             var views = Object.FindObjectsOfType<ElectricalDeviceView>();
-            var expectedPorts = new[] { "U", "V", "W", "U2", "V2", "W2" };
+            foreach (var motorId in new[] { "M1", "M_DOUBLE", "M2" })
+                Assert.That(views.Single(item => item.Runtime.DeviceId == motorId).Ports, Is.Empty);
 
-            cameraController.SetWiringView();
-            controller.SetMode(SimulationMode.Wiring);
-            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            var motorBoard = views.Single(item => item.Runtime.DeviceId == "DuanZiPai_7");
+            Assert.That(motorBoard.Ports.Count, Is.EqualTo(18));
+            Assert.That(motorBoard.Runtime.GetConductiveLinks().Count(), Is.EqualTo(18));
             yield return null;
-
-            var motors = new[]
-            {
-                new { Id = "M1", Nut = "38" },
-                new { Id = "M_DOUBLE", Nut = "118" },
-                new { Id = "M2", Nut = "49" }
-            };
-
-            foreach (var motor in motors)
-            {
-                var view = views.Single(item => item.Runtime.DeviceId == motor.Id);
-                Assert.That(view.Ports.Select(item => item.PortName), Is.EquivalentTo(expectedPorts));
-                Assert.That(view.Ports.Count, Is.EqualTo(6));
-
-                foreach (var port in view.Ports)
-                {
-                    var terminalName = port.PortName.Length == 1 ? port.PortName + "1" : port.PortName;
-                    var terminal = transforms.Single(item => item.name == terminalName &&
-                        HasAncestor(item, motor.Nut) && HasAncestor(item, "point"));
-                    Assert.That(Vector3.Distance(port.CurrentAnchorPosition, terminal.position), Is.LessThan(0.0005f),
-                        motor.Id + "." + port.PortName + " must stay on the original motor terminal");
-                    Assert.That(port.JumperOnly, Is.True);
-                    Assert.That(port.IsVisible, Is.False);
-                    Assert.That(port.GetComponent<MeshRenderer>().enabled, Is.False);
-                    Assert.That(port.GetComponent<SphereCollider>().enabled, Is.False);
-                }
-            }
-
-            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
-            yield return null;
-
-            foreach (var motor in motors)
-            {
-                var view = views.Single(item => item.Runtime.DeviceId == motor.Id);
-                var positions = view.Ports.Select(item => item.transform.position).ToArray();
-                for (var first = 0; first < positions.Length; first++)
-                for (var second = first + 1; second < positions.Length; second++)
-                    Assert.That(Vector3.Distance(positions[first], positions[second]), Is.GreaterThan(0.001f),
-                        motor.Id + " connection markers must occupy six distinct terminals");
-                foreach (var port in view.Ports)
-                {
-                    Assert.That(port.UsesJumperAnchor, Is.True);
-                    Assert.That(port.IsVisible, Is.True);
-                    Assert.That(port.GetComponent<MeshRenderer>().enabled, Is.True);
-                    Assert.That(port.GetComponent<SphereCollider>().enabled, Is.True);
-                }
-            }
         }
 
         [UnityTest]
@@ -511,13 +630,17 @@ namespace ElectricalSim.Tests
             var ports = Object.FindObjectsOfType<ElectricalPortView>();
             var jumperPorts = ports.Where(port => port.JumperOnly).ToArray();
             var electricalPorts = ports.Where(port => port.ElectricalOnly).ToArray();
+            var faultDeviceIds = new HashSet<string> { "KMF", "KM1", "KMR", "FR" };
+            var faultBodyPorts = electricalPorts.Where(port => faultDeviceIds.Contains(port.DeviceId)).ToArray();
+            var terminalElectricalPorts = electricalPorts.Where(port => !faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var motorBoardPorts = ports.Where(port => port.DeviceId == "DuanZiPai_7").ToArray();
-            Assert.That(jumperPorts.Length, Is.EqualTo(18));
+            Assert.That(jumperPorts, Is.Empty);
             Assert.That(electricalPorts.Length, Is.GreaterThan(0));
             Assert.That(motorBoardPorts.Length, Is.EqualTo(18));
             Assert.That(motorBoardPorts.All(port => !port.JumperOnly && !port.ElectricalOnly), Is.True);
             Assert.That(jumperPorts.All(port => !port.IsVisible), Is.True);
-            Assert.That(electricalPorts.All(port => port.IsVisible), Is.True);
+            Assert.That(terminalElectricalPorts.All(port => port.IsVisible), Is.True);
+            Assert.That(faultBodyPorts.All(port => !port.IsVisible), Is.True);
             Assert.That(motorBoardPorts.All(port => port.IsVisible && !port.UsesJumperAnchor), Is.True);
 
             controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
@@ -907,7 +1030,7 @@ namespace ElectricalSim.Tests
             controller.SetMode(SimulationMode.Wiring);
             yield return null;
 
-            foreach (var port in Object.FindObjectsOfType<ElectricalPortView>())
+            foreach (var port in Object.FindObjectsOfType<ElectricalPortView>().Where(item => item.IsVisible))
             {
                 var position = port.transform.position;
                 Assert.That(position.x, Is.InRange(-0.7f, 0.7f), $"{port.QualifiedPort} x={position.x}");
@@ -1003,34 +1126,5 @@ namespace ElectricalSim.Tests
             return string.Join("/", names);
         }
 
-        private static void AssertPortMatchesTerminal(string deviceId, string portName, string terminalName)
-        {
-            var device = Object.FindObjectsOfType<ElectricalDeviceView>()
-                .Single(view => view.Runtime.DeviceId == deviceId);
-            var port = device.Ports.Single(view => view.PortName == portName);
-            var environment = GameObject.Find("OriginalLabEnvironment");
-            var environmentNames = deviceId == "FR"
-                ? new[] { "FR1_" + terminalName, "FR_" + terminalName }
-                : new[] { deviceId + "_" + terminalName };
-            var terminal = environment == null ? null : environment.GetComponentsInChildren<Transform>(true)
-                .FirstOrDefault(transform => environmentNames.Any(name =>
-                    string.Equals(transform.name, name, System.StringComparison.OrdinalIgnoreCase)));
-            if (terminal == null)
-                terminal = device.GetComponentsInChildren<Transform>(true)
-                    .First(transform => string.Equals(transform.name, terminalName, System.StringComparison.OrdinalIgnoreCase));
-            Assert.That(Vector3.Distance(port.transform.position, terminal.position), Is.LessThan(0.0005f),
-                $"{deviceId}.{portName} must be located on original terminal {terminalName}");
-        }
-
-        private static void AssertPortMatchesMappedTerminal(string deviceId, string portName, string terminalName, string nut)
-        {
-            var port = Object.FindObjectsOfType<ElectricalDeviceView>()
-                .Single(view => view.Runtime.DeviceId == deviceId).Ports.Single(view => view.PortName == portName);
-            var environment = GameObject.Find("OriginalLabEnvironment");
-            var terminal = environment.GetComponentsInChildren<Transform>(true).First(item =>
-                string.Equals(item.name, terminalName, System.StringComparison.OrdinalIgnoreCase) &&
-                HasAncestor(item, nut) && HasAncestor(item, "point"));
-            Assert.That(Vector3.Distance(port.transform.position, terminal.position), Is.LessThan(0.0005f));
-        }
     }
 }

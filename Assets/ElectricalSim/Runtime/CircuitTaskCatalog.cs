@@ -76,8 +76,8 @@ namespace ElectricalSim
             var task = Base("forward-reverse", "三相异步电动机联锁正反转控制仿真", "两个接触器交换任意两相，并通过常闭辅助触点互锁。", "KMF");
             AddReversePower(task);
             Add(task,
-                "POWER.L1", "SB0.COM", "SB0.NC", "SBF.COM", "SBF.NO", "KMR.21", "KMR.22", "KMF.A1", "KMF.A2", "POWER.N",
-                "SB0.NC", "SBR.COM", "SBR.NO", "KMF.21", "KMF.22", "KMR.A1", "KMR.A2", "POWER.N");
+                "POWER.L1", "SB0.COM", "SB0.NC", "SBF.COM", "SBF.NO", "KMR.A1", "KMR.A2", "KMF.A1", "KMF.A2", "POWER.N",
+                "SB0.NC", "SBR.COM", "SBR.NO", "KMF.A1", "KMF.A2", "KMR.A1", "KMR.A2", "POWER.N");
             task.Actions.Add(Action("SBF", true, "M1", MotorDirection.Forward));
             task.Actions.Add(Action("SB0", true, "M1", MotorDirection.Stopped));
             task.Actions.Add(Action("SBF", false, "M1", MotorDirection.Stopped));

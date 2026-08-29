@@ -88,10 +88,6 @@ namespace ElectricalSim
                         yield return new PortPair("L3", "T3");
                         yield return new PortPair("13", "14");
                     }
-                    else
-                    {
-                        yield return new PortPair("21", "22");
-                    }
                     break;
                 case ElectricalDeviceKind.TimeRelay:
                     if (IsActive) yield return new PortPair("15", "18");
@@ -189,7 +185,10 @@ namespace ElectricalSim
 
         public static ElectricalDeviceRuntime CreateContactor(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Contactor,
-                ThreePhasePorts().Concat(new[] { "A1", "A2", "13", "14", "21", "22" }));
+                ThreePhasePorts().Concat(new[]
+                {
+                    "13", "14", "53", "54", "61", "62", "71", "72", "83", "84", "A1", "A2"
+                }));
 
         public static ElectricalDeviceRuntime CreateThermalRelay(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.ThermalRelay,

@@ -22,6 +22,8 @@ namespace ElectricalSim
         private Transform originalEnvironment;
         private Dictionary<string, List<Transform>> originalTerminals;
         private Transform[] originalEnvironmentTransforms;
+        private readonly Dictionary<string, Transform> faultButtonTerminalAnchors =
+            new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private OfflineExamController examController;
         private LocalCaptureRecorder captureRecorder;
 
@@ -58,6 +60,7 @@ namespace ElectricalSim
             var cameraController = CreateCamera();
             cameraController.ResetView();
             RefreshTerminalBoardAnnotations(cameraController.transform);
+            CreateFaultButtonTerminalConnections(cameraController);
             Debug.Log("[OfflineBootstrap] Environment ready.");
             var wireRoot = new GameObject("ElectricalWires").transform;
             CreateDevices();
@@ -552,9 +555,9 @@ namespace ElectricalSim
         {
             CreateDevice(ElectricalDeviceRuntime.CreatePowerSource(), "三相电源", new Vector3(-1.15f, 2.82f, -0.16f), new Vector3(0.52f, 0.3f, 0.18f), new Color(0.18f, 0.22f, 0.26f));
             CreateDevice(ElectricalDeviceRuntime.CreateBreaker("QF"), "断路器 QF", new Vector3(-0.45f, 2.82f, -0.16f), new Vector3(0.55f, 0.34f, 0.18f), new Color(0.86f, 0.88f, 0.9f));
-            CreateDevice(ElectricalDeviceRuntime.CreateContactor("KMF"), "正转接触器", new Vector3(-0.95f, 2.22f, -0.16f), new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
-            CreateDevice(ElectricalDeviceRuntime.CreateContactor("KM1"), "接触器 KM1", new Vector3(-0.35f, 2.22f, -0.16f), new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
-            CreateDevice(ElectricalDeviceRuntime.CreateContactor("KMR"), "反转接触器", new Vector3(0.25f, 2.22f, -0.16f), new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
+            CreateContactorDevice("KMF", "正转接触器", new Vector3(-0.95f, 2.22f, -0.16f));
+            CreateContactorDevice("KM1", "接触器 KM1", new Vector3(-0.35f, 2.22f, -0.16f));
+            CreateContactorDevice("KMR", "反转接触器", new Vector3(0.25f, 2.22f, -0.16f));
             CreateDevice(ElectricalDeviceRuntime.CreateContactor("KM2"), "接触器 KM2", new Vector3(0.85f, 2.22f, -0.16f), new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
             CreateDevice(ElectricalDeviceRuntime.CreateContactor("KMB"), "反接制动", new Vector3(1.22f, 1.68f, -0.16f), new Vector3(0.42f, 0.34f, 0.18f), new Color(0.25f, 0.18f, 0.2f));
             CreateDevice(ElectricalDeviceRuntime.CreateContactor("KB"), "能耗制动", new Vector3(0.72f, 1.68f, -0.16f), new Vector3(0.42f, 0.34f, 0.18f), new Color(0.25f, 0.18f, 0.2f));
@@ -582,6 +585,11 @@ namespace ElectricalSim
         private void CreateButton(string id, string label, bool normallyClosed, Vector3 position, Color color)
         {
             CreateDevice(ElectricalDeviceRuntime.CreatePushButton(id, normallyClosed), label, position, new Vector3(0.28f, 0.25f, 0.16f), color);
+        }
+
+        private void CreateContactorDevice(string id, string label, Vector3 position)
+        {
+            CreateDevice(ElectricalDeviceRuntime.CreateContactor(id), label, position, new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
         }
 
         private void CreateMotor(string id, string label, Vector3 position)
@@ -656,10 +664,21 @@ namespace ElectricalSim
             // but its generic IN/OUT points are not physical cabinet connection points.
             if (view.Runtime.Kind == ElectricalDeviceKind.BrakeUnit) return;
 
+            // In the original environment most devices are wired only through terminal boards.
+            // The three main contactors and FR are the exception: troubleshooting needs their
+            // rear physical terminals. Keep those ports, but give them no front anchor so they
+            // cannot reappear as detached markers in the wiring view.
+            var faultBodyPorts = originalEnvironment != null &&
+                                 (ShouldExposeContactorBodyPorts(view.Runtime) ||
+                                  ShouldExposeThermalRelayBodyPorts(view.Runtime));
+            if (originalEnvironment != null && !faultBodyPorts) return;
+
             // Controls and lower-cabinet switching devices are wired exclusively through
             // their original terminal boards. Keep runtime behaviour, but do not leave a
             // second set of clickable spheres on the device models themselves.
-            if (RoutesThroughOriginalTerminalBoard(view.Runtime)) return;
+            if (RoutesThroughOriginalTerminalBoard(view.Runtime) &&
+                !ShouldExposeContactorBodyPorts(view.Runtime) &&
+                !ShouldExposeThermalRelayBodyPorts(view.Runtime)) return;
 
             var list = ports.ToList();
             var columns = Mathf.Min(6, Mathf.Max(2, Mathf.CeilToInt(list.Count / 2f)));
@@ -670,20 +689,54 @@ namespace ElectricalSim
                 var x = columns == 1 ? 0f : Mathf.Lerp(-bounds.x * 0.42f, bounds.x * 0.42f, column / (float)(columns - 1));
                 var y = row == 0 ? bounds.y * 0.48f : -bounds.y * 0.48f;
                 var fallback = new Vector3(x, y, -bounds.z * 0.68f - 0.025f);
-                var frontElectrical = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], false) ??
-                                      FindMappedEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], false) ??
-                                      FindTerminal(parent, view.Runtime.Kind, list[index]);
-                var frontJumper = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical;
-                var backElectrical = FindMappedEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical;
-                var localPosition = frontElectrical != null ? parent.InverseTransformPoint(frontElectrical.position) : fallback;
+                Transform frontElectrical;
+                Transform frontJumper;
+                Transform backElectrical;
+                Vector3 localPosition;
+                if (faultBodyPorts)
+                {
+                    frontElectrical = null;
+                    frontJumper = null;
+                    backElectrical = ResolveFaultBodyTerminal(
+                        view.Runtime.DeviceId, view.Runtime.Kind, list[index], true);
+                    if (backElectrical == null)
+                    {
+                        Debug.LogWarning($"[OfflineBootstrap] Rear terminal is missing: {view.Runtime.DeviceId}/{list[index]}");
+                        continue;
+                    }
+                    localPosition = parent.InverseTransformPoint(backElectrical.position);
+                }
+                else
+                {
+                    frontElectrical = FindTerminal(parent, view.Runtime.Kind, list[index]) ??
+                                      FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], false) ??
+                                      FindMappedEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], false);
+                    frontJumper = FindOriginalEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical;
+                    backElectrical = FindMappedEnvironmentTerminal(view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical;
+                    localPosition = frontElectrical != null ? parent.InverseTransformPoint(frontElectrical.position) : fallback;
+                }
+                if (!faultBodyPorts && ShouldExposeThermalRelayBodyPorts(view.Runtime) && list[index] == "T2")
+                    localPosition += new Vector3(0f, -0.012f, 0.018f);
                 // Original terminal highlights are small snap dots, not device-sized bulbs.
-                var worldMarkerSize = frontElectrical != null ? 0.0075f : 0.009f;
+                var worldMarkerSize = ShouldExposeContactorBodyPorts(view.Runtime) ||
+                                      ShouldExposeThermalRelayBodyPorts(view.Runtime)
+                    ? 0.016f
+                    : frontElectrical != null ? 0.0075f : 0.009f;
                 var parentScale = Mathf.Max(Mathf.Abs(parent.lossyScale.x), Mathf.Abs(parent.lossyScale.y), Mathf.Abs(parent.lossyScale.z));
                 var markerSize = worldMarkerSize / Mathf.Max(0.0001f, parentScale);
                 var portObject = CreatePrimitive(PrimitiveType.Sphere, "Port", parent, localPosition, Vector3.one * markerSize, new Color(0.08f, 1f, 0.32f));
                 var port = portObject.AddComponent<ElectricalPortView>();
                 port.Initialize(view.Runtime.DeviceId, list[index], new Color(0.12f, 0.86f, 0.36f));
-                port.ConfigureOriginalAnchors(frontElectrical, frontJumper, backElectrical, backElectrical);
+                if (ShouldExposeContactorBodyPorts(view.Runtime))
+                    port.ConfigureHover(GetContactorHoverLabel(list[index]), list[index]);
+                else if (ShouldExposeThermalRelayBodyPorts(view.Runtime))
+                    port.ConfigureHover(GetThermalRelayBodyLabel(list[index]), list[index]);
+                port.ConfigureOriginalAnchors(
+                    frontElectrical,
+                    frontJumper,
+                    backElectrical,
+                    backElectrical,
+                    !faultBodyPorts);
                 if (view.Runtime.Kind == ElectricalDeviceKind.Motor)
                     port.ConfigureJumperOnly();
                 else
@@ -704,6 +757,62 @@ namespace ElectricalSim
             return runtime.Kind == ElectricalDeviceKind.Contactor ||
                    runtime.Kind == ElectricalDeviceKind.ThermalRelay ||
                    runtime.Kind == ElectricalDeviceKind.TimeRelay;
+        }
+
+        private static bool ShouldExposeContactorBodyPorts(ElectricalDeviceRuntime runtime)
+        {
+            return runtime != null &&
+                   runtime.Kind == ElectricalDeviceKind.Contactor &&
+                   (runtime.DeviceId == "KMF" || runtime.DeviceId == "KM1" || runtime.DeviceId == "KMR");
+        }
+
+        private static bool ShouldExposeThermalRelayBodyPorts(ElectricalDeviceRuntime runtime)
+        {
+            return runtime != null &&
+                   runtime.Kind == ElectricalDeviceKind.ThermalRelay &&
+                   runtime.DeviceId == "FR";
+        }
+
+        private static string GetThermalRelayBodyLabel(string port)
+        {
+            switch (port)
+            {
+                case "L1": return "1L1";
+                case "L2": return "3L2";
+                case "L3": return "5L3";
+                case "T1": return "2T1";
+                case "T2": return "4T2";
+                case "T3": return "6T3";
+                case "95": return "95NC";
+                case "96": return "96NC";
+                case "97": return "97NO";
+                case "98": return "98NO";
+                default: return port;
+            }
+        }
+
+        private static string GetContactorHoverLabel(string port)
+        {
+            switch (port)
+            {
+                case "L1": return "1L1";
+                case "L2": return "3L2";
+                case "L3": return "5L3";
+                case "T1": return "2T1";
+                case "T2": return "4T2";
+                case "T3": return "6T3";
+                case "13": return "13NO";
+                case "14": return "14NO";
+                case "53": return "53NO";
+                case "54": return "54NO";
+                case "61": return "61NC";
+                case "62": return "62NC";
+                case "71": return "71NC";
+                case "72": return "72NC";
+                case "83": return "83NO";
+                case "84": return "84NO";
+                default: return port;
+            }
         }
 
         private void CreateOriginalTerminalBoardPorts()
@@ -763,13 +872,115 @@ namespace ElectricalSim
                 port.ConfigureHover(binding.DisplayName, binding.AnchorId);
                 // The terminal strip is the sole physical endpoint. Its uppercase A* points
                 // were duplicate jump-wire markers and must not appear in the runtime view.
-                port.ConfigureOriginalAnchors(electricalAnchor, null, electricalAnchor, null, false);
+                // In troubleshooting view the SB1-SB3 terminals move to the physical
+                // twelve-position strip already mounted in the imported cabinet.
+                var faultAnchor = ResolveFaultButtonTerminalAnchor(binding.DisplayName);
+                port.ConfigureOriginalAnchors(
+                    electricalAnchor,
+                    null,
+                    faultAnchor != null ? faultAnchor : electricalAnchor,
+                    null,
+                    false);
                 port.ConfigureElectricalOnly();
                 view.AddPort(port);
             }
 
             deviceViews.Add(view);
             Debug.Log($"[OfflineBootstrap] Original top terminal board ready: {view.Ports.Count}/{map.Bindings.Count} terminals.");
+        }
+
+        private void CreateFaultButtonTerminalConnections(TrainingCameraController cameraController)
+        {
+            faultButtonTerminalAnchors.Clear();
+            if (originalEnvironment == null || cameraController == null)
+            {
+                return;
+            }
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+
+            var board = originalEnvironmentTransforms.FirstOrDefault(item =>
+                string.Equals(item.name, "DuanZiPai_5", StringComparison.Ordinal) &&
+                item.Find("point") != null);
+            var pointRoot = board != null ? board.Find("point") : null;
+            if (pointRoot == null)
+            {
+                Debug.LogError("[OfflineBootstrap] Existing DuanZiPai_5/point hierarchy is missing.");
+                return;
+            }
+
+            var semanticNames = new[]
+            {
+                "SB1_NO1", "SB1_COM1", "SB1_NC2", "SB1_COM2",
+                "SB2_NO1", "SB2_COM1", "SB2_NC2", "SB2_COM2",
+                "SB3_NO1", "SB3_COM1", "SB3_NC2", "SB3_COM2"
+            };
+            var physicalNames = new[]
+            {
+                "a1", "a2", "a3", "a4", "a5", "a6",
+                "a7", "a8", "a9", "a10", "a11", "a12"
+            };
+            for (var index = 0; index < semanticNames.Length; index++)
+            {
+                var anchor = pointRoot.Find(physicalNames[index]);
+                if (anchor == null) continue;
+                faultButtonTerminalAnchors[semanticNames[index]] = anchor;
+            }
+
+            if (faultButtonTerminalAnchors.Count != 12)
+                Debug.LogWarning($"[OfflineBootstrap] Existing DuanZiPai_5 exposes {faultButtonTerminalAnchors.Count}/12 SB anchors.");
+            CreateFaultButtonTerminalAnnotation(cameraController);
+        }
+
+        private void CreateFaultButtonTerminalAnnotation(TrainingCameraController cameraController)
+        {
+            if (faultButtonTerminalAnchors.Count == 0) return;
+
+            var anchors = faultButtonTerminalAnchors.Values.ToArray();
+            var center = anchors.Aggregate(Vector3.zero, (sum, anchor) => sum + anchor.position) /
+                         anchors.Length;
+            var annotationRoot = originalEnvironment.Find("Terminal Board Annotations");
+            var orientationReference = annotationRoot != null
+                ? annotationRoot.Find("Terminal Annotation - Three Phase Power")
+                : null;
+            if (orientationReference == null) return;
+            var oppositeFacingRotation = orientationReference.rotation * Quaternion.Euler(0f, 180f, 0f);
+            var front = orientationReference.forward;
+
+            var labelObject = new GameObject("Terminal Annotation - Fault Buttons SB");
+            labelObject.transform.SetParent(originalEnvironment, true);
+            labelObject.transform.SetPositionAndRotation(
+                center + front * 0.0025f,
+                oppositeFacingRotation);
+
+            var textMesh = labelObject.AddComponent<TextMesh>();
+            textMesh.text = "按钮（SB）端子区";
+            textMesh.font = uiFont;
+            textMesh.fontSize = 96;
+            textMesh.fontStyle = FontStyle.Bold;
+            textMesh.characterSize = 0.002f;
+            textMesh.anchor = TextAnchor.MiddleCenter;
+            textMesh.alignment = TextAlignment.Center;
+            textMesh.color = new Color(1f, 0.9f, 0f, 1f);
+            labelObject.transform.localScale = orientationReference.localScale;
+
+            var renderer = labelObject.GetComponent<MeshRenderer>();
+            if (renderer == null) return;
+            renderer.sharedMaterial = uiFont.material;
+            renderer.sortingOrder = 101;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            labelObject.transform.position += labelObject.transform.up * renderer.bounds.size.y * 1.15f;
+            labelObject.AddComponent<FaultViewOnlyRendererVisibility>()
+                .Configure(new Renderer[] { renderer }, cameraController);
+        }
+
+        private Transform ResolveFaultButtonTerminalAnchor(string displayName)
+        {
+            if (string.IsNullOrWhiteSpace(displayName)) return null;
+            faultButtonTerminalAnchors.TryGetValue(displayName, out var anchor);
+            return anchor;
         }
 
         private void CreateOriginalCabinetTerminalBoardPorts()
@@ -895,6 +1106,7 @@ namespace ElectricalSim
         private Transform FindMappedEnvironmentTerminal(string deviceId, ElectricalDeviceKind kind, string port, bool back)
         {
             if (originalEnvironment == null) return null;
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
             var nut = back ? BackDeviceNut(deviceId) : FrontDeviceNut(deviceId);
             if (string.IsNullOrEmpty(nut)) return null;
             foreach (var alias in TerminalAliases(kind, port))
@@ -909,6 +1121,22 @@ namespace ElectricalSim
             // instead of falling back to the near-camera hidden prefab.
             return originalEnvironmentTransforms.FirstOrDefault(item =>
                 IsTerminalPointTransform(item) && HasAncestor(item, nut));
+        }
+
+        private Transform ResolveFaultBodyTerminal(string deviceId, ElectricalDeviceKind kind, string port, bool back)
+        {
+            var mapped = FindMappedEnvironmentTerminal(deviceId, kind, port, back);
+            if (!back || deviceId != "FR" || port != "T2") return mapped;
+
+            var left = FindMappedEnvironmentTerminal(deviceId, kind, "T1", true);
+            var right = FindMappedEnvironmentTerminal(deviceId, kind, "T3", true);
+            if (left == null || right == null) return mapped;
+
+            var anchorObject = new GameObject("FR_4T2_FaultAnchor");
+            anchorObject.transform.SetParent(left.parent, true);
+            anchorObject.transform.position = Vector3.Lerp(left.position, right.position, 0.5f);
+            anchorObject.transform.rotation = Quaternion.Slerp(left.rotation, right.rotation, 0.5f);
+            return anchorObject.transform;
         }
 
         private static string FrontDeviceNut(string deviceId)
@@ -1365,10 +1593,14 @@ namespace ElectricalSim
             {
                 var contactor = new Dictionary<string, string[]>
                 {
+                    { "A1", new[] { "A1" } }, { "A2", new[] { "A2" } },
                     { "L1", new[] { "1L1" } }, { "L2", new[] { "3L2" } }, { "L3", new[] { "5L3" } },
                     { "T1", new[] { "2T1" } }, { "T2", new[] { "4T2" } }, { "T3", new[] { "6T3" } },
-                    { "13", new[] { "13NO" } }, { "14", new[] { "14NO" } },
-                    { "21", new[] { "21NC" } }, { "22", new[] { "22NC" } }
+                    { "13", new[] { "13", "13NO" } }, { "14", new[] { "14", "14NO" } },
+                    { "53", new[] { "53", "53NO" } }, { "54", new[] { "54", "54NO" } },
+                    { "61", new[] { "61", "61NC" } }, { "62", new[] { "62", "62NC" } },
+                    { "71", new[] { "71", "71NC" } }, { "72", new[] { "72", "72NC" } },
+                    { "83", new[] { "83", "83NO" } }, { "84", new[] { "84", "84NO" } }
                 };
                 if (contactor.TryGetValue(port, out var aliases)) return aliases;
             }
@@ -1841,6 +2073,63 @@ namespace ElectricalSim
             if (targetRenderer == null || viewingCamera == null) return;
             var directionToCamera = viewingCamera.position - transform.position;
             targetRenderer.enabled = Vector3.Dot(-transform.forward, directionToCamera) > 0f;
+        }
+    }
+
+    internal sealed class FaultViewOnlyRendererVisibility : MonoBehaviour
+    {
+        private Renderer[] targetRenderers = Array.Empty<Renderer>();
+        private TrainingCameraController cameraController;
+        private SimulationController simulationController;
+
+        public void Configure(Renderer[] renderers, TrainingCameraController controller)
+        {
+            targetRenderers = renderers ?? Array.Empty<Renderer>();
+            cameraController = controller;
+            if (cameraController != null) cameraController.PresetChanged += OnPresetChanged;
+            RefreshVisibility();
+        }
+
+        private void OnDestroy()
+        {
+            if (cameraController != null) cameraController.PresetChanged -= OnPresetChanged;
+            if (simulationController != null) simulationController.ModeChanged -= OnModeChanged;
+        }
+
+        private void OnPresetChanged(TrainingViewPreset preset)
+        {
+            RefreshVisibility();
+        }
+
+        private void OnModeChanged(SimulationMode mode)
+        {
+            RefreshVisibility();
+        }
+
+        private void LateUpdate()
+        {
+            if (simulationController == null)
+            {
+                simulationController = FindObjectOfType<SimulationController>();
+                if (simulationController != null) simulationController.ModeChanged += OnModeChanged;
+            }
+            RefreshVisibility();
+        }
+
+        private void RefreshVisibility()
+        {
+            var directionToCamera = cameraController != null
+                ? cameraController.transform.position - transform.position
+                : Vector3.zero;
+            var viewedFromTextFront = directionToCamera.sqrMagnitude > 0.0001f &&
+                                      Vector3.Dot(-transform.forward, directionToCamera) > 0f;
+            var visible = simulationController != null &&
+                          simulationController.Mode == SimulationMode.Fault &&
+                          cameraController != null &&
+                          cameraController.CurrentPreset == TrainingViewPreset.FaultBack &&
+                          viewedFromTextFront;
+            foreach (var targetRenderer in targetRenderers)
+                if (targetRenderer != null) targetRenderer.enabled = visible;
         }
     }
 }
