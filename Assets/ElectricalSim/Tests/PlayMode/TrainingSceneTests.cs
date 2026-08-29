@@ -52,7 +52,7 @@ namespace ElectricalSim.Tests
                 .Single(item => item.text == "三相电源端子区");
             var labelRenderer = label.GetComponent<MeshRenderer>();
             Assert.That(labelRenderer, Is.Not.Null);
-            Assert.That(label.GetComponent("FaultViewOnlyRendererVisibility"), Is.Not.Null);
+            Assert.That(label.GetComponent("BackViewPersistentRendererVisibility"), Is.Not.Null);
             var expectedOppositeRotation = orientationReference.transform.rotation *
                                            Quaternion.Euler(0f, 180f, 0f);
             Assert.That(Quaternion.Angle(label.transform.rotation, expectedOppositeRotation),
@@ -121,8 +121,8 @@ namespace ElectricalSim.Tests
             {
                 controller.SetMode(nonFaultMode);
                 yield return null;
-                Assert.That(labelRenderer.enabled, Is.False,
-                    $"The SB annotation must be hidden in {nonFaultMode} mode even while the fault camera preset remains active");
+                Assert.That(labelRenderer.enabled, Is.True,
+                    $"The SB annotation must remain visible behind the cabinet in {nonFaultMode} mode");
                 controller.SetMode(SimulationMode.Fault);
                 yield return null;
                 Assert.That(labelRenderer.enabled, Is.True);
@@ -130,9 +130,27 @@ namespace ElectricalSim.Tests
 
             controller.SetMode(SimulationMode.Wiring);
             yield return null;
-            Assert.That(labelRenderer.enabled, Is.False);
+            Assert.That(labelRenderer.enabled, Is.True,
+                "The SB annotation must remain visible in electrical-wire mode");
             Assert.That(buttonPorts.All(item => item.CurrentAnchor != null &&
-                                                !item.CurrentAnchor.IsChildOf(board)), Is.True);
+                                                item.CurrentAnchor.IsChildOf(board) &&
+                                                item.IsVisible), Is.True,
+                "Wiring entered from fault view must retain the rear SB connection points");
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            Assert.That(labelRenderer.enabled, Is.True,
+                "Changing to jumper mode must not hide the SB annotation");
+            Assert.That(buttonPorts.All(item => !item.IsVisible), Is.True,
+                "The rear SB contact points must be hidden in jumper mode");
+
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            Assert.That(labelRenderer.enabled, Is.True);
+            Assert.That(buttonPorts.All(item => item.IsVisible &&
+                                                item.CurrentAnchor != null &&
+                                                item.CurrentAnchor.IsChildOf(board)), Is.True,
+                "The rear SB contact points must return only in electrical-wire mode");
         }
 
         [UnityTest]
@@ -535,6 +553,67 @@ namespace ElectricalSim.Tests
             Assert.That(t2.HoverLabel, Is.EqualTo("4T2"));
             Assert.That(t2.CurrentAnchor.name, Is.EqualTo("FR_4T2_FaultAnchor"));
             Assert.That(Vector3.Distance(t2.CurrentAnchorPosition, expectedT2Position), Is.LessThan(0.0005f));
+        }
+
+        [UnityTest]
+        public IEnumerator WiringLineTypesFollowActualCameraSideWithoutEnteringFaultMode()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var topBoard = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == OriginalTerminalBoardMap.DeviceId);
+            var faultButtonPorts = topBoard.Ports
+                .Where(port => port.HoverLabel.StartsWith("SB1_", System.StringComparison.OrdinalIgnoreCase) ||
+                               port.HoverLabel.StartsWith("SB2_", System.StringComparison.OrdinalIgnoreCase) ||
+                               port.HoverLabel.StartsWith("SB3_", System.StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var motorBoardPorts = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(view => view.Runtime.DeviceId == "DuanZiPai_7").Ports.ToArray();
+            var faultBodyPorts = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Where(view => new[] { "KMF", "KM1", "KMR", "FR" }.Contains(view.Runtime.DeviceId))
+                .SelectMany(view => view.Ports)
+                .ToArray();
+
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.WiringFront));
+            Assert.That(cameraController.IsViewingFaultSide, Is.False);
+            Assert.That(faultBodyPorts.All(port => !port.IsVisible), Is.True);
+
+            cameraController.transform.position = cameraController.FaultPosition;
+            cameraController.transform.LookAt(cameraController.CurrentFaultTarget);
+            yield return null;
+            yield return null;
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Wiring));
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.WiringFront),
+                "Moving behind the cabinet must not require entering fault mode");
+            Assert.That(cameraController.IsViewingFaultSide, Is.True);
+            Assert.That(faultButtonPorts.All(port => port.IsVisible &&
+                                                     HasAncestor(port.CurrentAnchor, "DuanZiPai_5")), Is.True,
+                "Electrical-wire points must automatically move to their rear physical terminals");
+            Assert.That(faultBodyPorts.All(port => port.IsVisible && port.CurrentAnchor != null), Is.True,
+                "Fault-device body terminals must appear automatically behind the cabinet");
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            Assert.That(faultButtonPorts.All(port => !port.IsVisible), Is.True,
+                "The rear SB contact points must be hidden in jumper mode");
+            Assert.That(motorBoardPorts.All(port => port.IsVisible && port.UsesJumperAnchor), Is.True,
+                "Jumper mode must immediately expose its matching connection points in the current rear view");
+
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            Assert.That(faultButtonPorts.All(port => port.IsVisible &&
+                                                     HasAncestor(port.CurrentAnchor, "DuanZiPai_5")), Is.True,
+                "Switching back to electrical wire must restore rear points without entering fault mode");
+
+            cameraController.transform.position = cameraController.DefaultPosition;
+            yield return null;
+            yield return null;
+            Assert.That(cameraController.IsViewingFaultSide, Is.False);
+            Assert.That(faultBodyPorts.All(port => !port.IsVisible), Is.True,
+                "Fault-device body terminals must disappear again on the cabinet front");
         }
 
         [UnityTest]

@@ -972,7 +972,7 @@ namespace ElectricalSim
             renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
             renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
             labelObject.transform.position += labelObject.transform.up * renderer.bounds.size.y * 1.15f;
-            labelObject.AddComponent<FaultViewOnlyRendererVisibility>()
+            labelObject.AddComponent<BackViewPersistentRendererVisibility>()
                 .Configure(new Renderer[] { renderer }, cameraController);
         }
 
@@ -2076,43 +2076,31 @@ namespace ElectricalSim
         }
     }
 
-    internal sealed class FaultViewOnlyRendererVisibility : MonoBehaviour
+    internal sealed class BackViewPersistentRendererVisibility : MonoBehaviour
     {
         private Renderer[] targetRenderers = Array.Empty<Renderer>();
         private TrainingCameraController cameraController;
-        private SimulationController simulationController;
 
         public void Configure(Renderer[] renderers, TrainingCameraController controller)
         {
             targetRenderers = renderers ?? Array.Empty<Renderer>();
             cameraController = controller;
-            if (cameraController != null) cameraController.PresetChanged += OnPresetChanged;
+            if (cameraController != null) cameraController.ViewSideChanged += OnViewSideChanged;
             RefreshVisibility();
         }
 
         private void OnDestroy()
         {
-            if (cameraController != null) cameraController.PresetChanged -= OnPresetChanged;
-            if (simulationController != null) simulationController.ModeChanged -= OnModeChanged;
+            if (cameraController != null) cameraController.ViewSideChanged -= OnViewSideChanged;
         }
 
-        private void OnPresetChanged(TrainingViewPreset preset)
-        {
-            RefreshVisibility();
-        }
-
-        private void OnModeChanged(SimulationMode mode)
+        private void OnViewSideChanged(bool viewingFaultSide)
         {
             RefreshVisibility();
         }
 
         private void LateUpdate()
         {
-            if (simulationController == null)
-            {
-                simulationController = FindObjectOfType<SimulationController>();
-                if (simulationController != null) simulationController.ModeChanged += OnModeChanged;
-            }
             RefreshVisibility();
         }
 
@@ -2123,10 +2111,8 @@ namespace ElectricalSim
                 : Vector3.zero;
             var viewedFromTextFront = directionToCamera.sqrMagnitude > 0.0001f &&
                                       Vector3.Dot(-transform.forward, directionToCamera) > 0f;
-            var visible = simulationController != null &&
-                          simulationController.Mode == SimulationMode.Fault &&
-                          cameraController != null &&
-                          cameraController.CurrentPreset == TrainingViewPreset.FaultBack &&
+            var visible = cameraController != null &&
+                          cameraController.IsViewingFaultSide &&
                           viewedFromTextFront;
             foreach (var targetRenderer in targetRenderers)
                 if (targetRenderer != null) targetRenderer.enabled = visible;

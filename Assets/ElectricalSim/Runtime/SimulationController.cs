@@ -64,6 +64,7 @@ namespace ElectricalSim
         {
             trainingCamera = cameraController;
             trainingCamera.PresetChanged += OnViewPresetChanged;
+            trainingCamera.ViewSideChanged += OnViewSideChanged;
             wireRoot = wireContainer;
             modeText = modeLabel;
             taskText = taskLabel;
@@ -109,7 +110,12 @@ namespace ElectricalSim
             var showPorts = mode == SimulationMode.Wiring || mode == SimulationMode.Fault;
             foreach (var port in portViews.Values) port.SetVisible(showPorts);
             modeText.text = $"当前模式：{ModeName(mode)}";
-            if (mode == SimulationMode.Wiring) trainingCamera.SetWiringView();
+            // Preserve any camera that is already behind the cabinet. Rear
+            // connection points are selected from the actual camera side, so the
+            // user does not need to enter fault mode before wiring there.
+            if (mode == SimulationMode.Wiring &&
+                !trainingCamera.IsViewingFaultSide)
+                trainingCamera.SetWiringView();
             else if (mode == SimulationMode.Fault) trainingCamera.SetFaultView();
             SetStatus($"已进入{ModeName(mode)}模式。", false);
             ModeChanged?.Invoke(mode);
@@ -220,11 +226,21 @@ namespace ElectricalSim
 
         private void OnDestroy()
         {
-            if (trainingCamera != null) trainingCamera.PresetChanged -= OnViewPresetChanged;
+            if (trainingCamera != null)
+            {
+                trainingCamera.PresetChanged -= OnViewPresetChanged;
+                trainingCamera.ViewSideChanged -= OnViewSideChanged;
+            }
             if (portHover != null) portHover.Hide();
         }
 
         private void OnViewPresetChanged(TrainingViewPreset preset)
+        {
+            if (portHover != null) portHover.Hide();
+            ApplyPortAnchors();
+        }
+
+        private void OnViewSideChanged(bool viewingFaultSide)
         {
             if (portHover != null) portHover.Hide();
             ApplyPortAnchors();
@@ -236,8 +252,11 @@ namespace ElectricalSim
             var jumper = currentLineType.IndexOf("jumper", StringComparison.OrdinalIgnoreCase) >= 0 ||
                          currentLineType.IndexOf("rope", StringComparison.OrdinalIgnoreCase) >= 0 ||
                          currentLineType.IndexOf("跳", StringComparison.Ordinal) >= 0;
+            var effectivePreset = trainingCamera.IsViewingFaultSide
+                ? TrainingViewPreset.FaultBack
+                : TrainingViewPreset.WiringFront;
             foreach (var port in portViews.Values)
-                port.ApplyOriginalAnchor(trainingCamera.CurrentPreset, jumper);
+                port.ApplyOriginalAnchor(effectivePreset, jumper);
             foreach (var wire in wireViews) wire.Refresh();
         }
 
