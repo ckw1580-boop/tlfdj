@@ -15,6 +15,7 @@ namespace ElectricalSim
         private readonly Dictionary<string, ElectricalDeviceRuntime> devices = new Dictionary<string, ElectricalDeviceRuntime>();
         private readonly Dictionary<string, ElectricalPortView> portViews = new Dictionary<string, ElectricalPortView>();
         private readonly List<ElectricalWireView> wireViews = new List<ElectricalWireView>();
+        private readonly List<CabinetBreakerInteractable> cabinetBreakers = new List<CabinetBreakerInteractable>();
         private IReadOnlyList<CircuitTaskSpec> tasks;
         private int taskIndex;
         private ElectricalPortView selectedPort;
@@ -46,6 +47,8 @@ namespace ElectricalSim
         public SimulationMode Mode { get; private set; } = SimulationMode.View;
         public CircuitGraph Graph => graph;
         public CircuitTaskSpec CurrentTask => tasks[taskIndex];
+        public IReadOnlyList<CabinetBreakerInteractable> CabinetBreakers => cabinetBreakers;
+        public bool AreCabinetBreakersClosed => cabinetBreakers.Count == 0 || cabinetBreakers.All(item => item.IsClosed);
         public event Action<SimulationMode> ModeChanged;
 
         public void Initialize(
@@ -90,6 +93,34 @@ namespace ElectricalSim
             SetStatus("系统就绪。请选择任务后进行接线，或点击“标准接线”加载参考拓扑。", false);
         }
 
+        public void RegisterCabinetBreakers(IEnumerable<CabinetBreakerInteractable> breakers)
+        {
+            foreach (var breaker in cabinetBreakers)
+                if (breaker != null)
+                {
+                    breaker.StateChanged -= OnCabinetBreakerStateChanged;
+                    breaker.SetHighlighted(false);
+                }
+
+            cabinetBreakers.Clear();
+            if (breakers != null)
+                cabinetBreakers.AddRange(breakers.Where(item => item != null).Distinct());
+
+            foreach (var breaker in cabinetBreakers)
+            {
+                breaker.StateChanged += OnCabinetBreakerStateChanged;
+                breaker.SetHighlighted(Mode == SimulationMode.Drag);
+            }
+            ApplyCabinetBreakerState();
+        }
+
+        public bool TryToggleCabinetBreaker(CabinetBreakerInteractable breaker)
+        {
+            if (Mode != SimulationMode.Drag || breaker == null || !cabinetBreakers.Contains(breaker)) return false;
+            breaker.Toggle();
+            return true;
+        }
+
         private void Update()
         {
             HandleHotkeys();
@@ -105,6 +136,8 @@ namespace ElectricalSim
         public void SetMode(SimulationMode mode)
         {
             Mode = mode;
+            foreach (var breaker in cabinetBreakers)
+                if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
             ClearSelection();
             if (portHover != null) portHover.Hide();
             var showPorts = mode == SimulationMode.Wiring || mode == SimulationMode.Fault;
@@ -147,9 +180,12 @@ namespace ElectricalSim
         {
             PushWireHistory();
             graph.ClearWires();
+            foreach (var breaker in cabinetBreakers) breaker.ResetClosed();
             foreach (var device in devices.Values)
             {
-                if (device.Kind == ElectricalDeviceKind.Breaker || device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);
+                if (device.Kind == ElectricalDeviceKind.Breaker)
+                    device.SetControl(!IsMainBreaker(device) || AreCabinetBreakersClosed);
+                else if (device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);
                 else device.SetControl(false);
             }
             RefreshWireViews();
@@ -231,6 +267,12 @@ namespace ElectricalSim
                 trainingCamera.PresetChanged -= OnViewPresetChanged;
                 trainingCamera.ViewSideChanged -= OnViewSideChanged;
             }
+            foreach (var breaker in cabinetBreakers)
+                if (breaker != null)
+                {
+                    breaker.StateChanged -= OnCabinetBreakerStateChanged;
+                    breaker.SetHighlighted(false);
+                }
             if (portHover != null) portHover.Hide();
         }
 
@@ -336,7 +378,9 @@ namespace ElectricalSim
             SetStatus("拓扑检查通过，正在执行动作序列……", false);
             foreach (var device in devices.Values)
             {
-                if (device.Kind == ElectricalDeviceKind.Breaker || device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);
+                if (device.Kind == ElectricalDeviceKind.Breaker)
+                    device.SetControl(!IsMainBreaker(device) || AreCabinetBreakersClosed);
+                else if (device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);
                 else device.SetControl(false);
             }
 
@@ -408,6 +452,13 @@ namespace ElectricalSim
             var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Input.GetMouseButtonDown(0) && Physics.Raycast(ray, out var hit, 100f))
             {
+                var cabinetBreaker = hit.collider.GetComponentInParent<CabinetBreakerInteractable>();
+                if (TryToggleCabinetBreaker(cabinetBreaker))
+                {
+                    draggedDevice = null;
+                    return;
+                }
+
                 draggedDevice = hit.collider.GetComponentInParent<ElectricalDeviceView>();
                 if (draggedDevice != null)
                 {
@@ -466,10 +517,34 @@ namespace ElectricalSim
                 return;
             }
             if (device.Kind == ElectricalDeviceKind.Breaker || device.Kind == ElectricalDeviceKind.Fuse)
+            {
+                if (IsMainBreaker(device) && cabinetBreakers.Count > 0)
+                {
+                    ApplyCabinetBreakerState();
+                    return;
+                }
                 device.SetControl(!device.IsClosed);
+            }
             else if (device.Kind == ElectricalDeviceKind.ThermalRelay)
                 device.SetControl(!device.IsTripped);
         }
+
+        private void OnCabinetBreakerStateChanged(CabinetBreakerInteractable breaker, bool closed)
+        {
+            ApplyCabinetBreakerState();
+            var mainState = AreCabinetBreakersClosed ? "主回路已接通" : "主回路已断开";
+            SetStatus($"{breaker.DisplayName}已{(closed ? "合闸" : "分闸")}，{mainState}。", false);
+        }
+
+        private void ApplyCabinetBreakerState()
+        {
+            if (devices.TryGetValue("QF", out var mainBreaker))
+                mainBreaker.SetControl(AreCabinetBreakersClosed);
+        }
+
+        private static bool IsMainBreaker(ElectricalDeviceRuntime device)
+            => device != null && device.Kind == ElectricalDeviceKind.Breaker &&
+               string.Equals(device.DeviceId, "QF", StringComparison.OrdinalIgnoreCase);
 
         private IEnumerator Pulse(ElectricalDeviceRuntime device)
         {

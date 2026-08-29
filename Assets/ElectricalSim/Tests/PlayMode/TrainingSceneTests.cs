@@ -30,6 +30,145 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator CabinetBreakersAnimateAndGateTheMainBreaker()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var breakers = controller.CabinetBreakers.OrderBy(item => item.BreakerId).ToArray();
+            Assert.That(breakers.Select(item => item.BreakerId), Is.EqualTo(new[] { "106", "122" }));
+            Assert.That(breakers.All(item => item.IsClosed), Is.True);
+            Assert.That(breakers.All(item => item.Handle != null && item.Pivot != null), Is.True);
+            Assert.That(breakers.All(item => item.InteractionCollider != null &&
+                                             item.InteractionCollider.enabled &&
+                                             item.InteractionCollider.GetComponentInParent<CabinetBreakerInteractable>() == item),
+                Is.True,
+                "Both original picker colliders must resolve to their cabinet breaker interaction");
+
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            cameraController.SetFaultView();
+            yield return null;
+            Physics.SyncTransforms();
+            foreach (var breaker in breakers)
+            {
+                var direction = breaker.InteractionCollider.bounds.center - Camera.main.transform.position;
+                Assert.That(Physics.Raycast(Camera.main.transform.position, direction.normalized, out var hit, 100f),
+                    Is.True);
+                Assert.That(hit.collider.GetComponentInParent<CabinetBreakerInteractable>(), Is.EqualTo(breaker),
+                    $"The troubleshooting camera must have an unobstructed ray to breaker {breaker.BreakerId}");
+            }
+
+            var mainBreaker = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(item => item.Runtime.DeviceId == "QF").Runtime;
+            var closedRotations = breakers.ToDictionary(item => item.BreakerId, item => item.Handle.localRotation);
+            var closedHandleHeights = breakers.ToDictionary(
+                item => item.BreakerId,
+                item => item.transform.InverseTransformPoint(item.Handle.position).y);
+            var baseHandleColors = breakers.ToDictionary(
+                item => item.BreakerId,
+                item => item.Handle.GetComponent<Renderer>().material.color);
+            Assert.That(breakers.All(item => !item.IsHighlighted), Is.True);
+
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.False,
+                "Cabinet breakers must ignore interactions outside drag mode");
+            Assert.That(breakers[0].IsClosed, Is.True);
+
+            controller.SetMode(SimulationMode.Drag);
+            Assert.That(breakers.All(item => item.IsHighlighted), Is.True);
+            foreach (var breaker in breakers)
+            {
+                var highlightedColor = breaker.Handle.GetComponent<Renderer>().material.color;
+                Assert.That(Vector4.Distance(highlightedColor, baseHandleColors[breaker.BreakerId]),
+                    Is.GreaterThan(0.05f),
+                    $"Breaker {breaker.BreakerId} handle must visibly highlight in drag mode");
+            }
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True);
+            yield return new WaitForSecondsRealtime(breakers[0].AnimationDuration * 0.25f);
+            var midAnimationAngle = Quaternion.Angle(
+                breakers[0].Handle.localRotation,
+                closedRotations[breakers[0].BreakerId]);
+            Assert.That(midAnimationAngle, Is.GreaterThan(0.1f).And.LessThan(40f));
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True,
+                "Clicking again during the animation must reverse from the current pose");
+            yield return new WaitForSecondsRealtime(breakers[0].AnimationDuration + 0.05f);
+            Assert.That(breakers[0].IsClosed, Is.True);
+            Assert.That(mainBreaker.IsClosed, Is.True);
+            Assert.That(Quaternion.Angle(
+                    breakers[0].Handle.localRotation,
+                    closedRotations[breakers[0].BreakerId]),
+                Is.LessThan(0.01f));
+
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True);
+            Assert.That(breakers[0].IsClosed, Is.False);
+            Assert.That(mainBreaker.IsClosed, Is.False);
+            Assert.That(mainBreaker.GetConductiveLinks(), Is.Empty);
+            yield return new WaitForSecondsRealtime(breakers[0].AnimationDuration + 0.05f);
+            Assert.That(Quaternion.Angle(breakers[0].Handle.localRotation, closedRotations[breakers[0].BreakerId]),
+                Is.GreaterThan(40f));
+            Assert.That(breakers[0].transform.InverseTransformPoint(breakers[0].Handle.position).y,
+                Is.LessThan(closedHandleHeights[breakers[0].BreakerId]),
+                "The open handle must move downward instead of rotating into the breaker housing");
+            Assert.That(breakers[0].InteractionCollider.bounds.Intersects(
+                    breakers[0].Handle.GetComponent<Renderer>().bounds),
+                Is.True,
+                "The open handle must remain inside the breaker interaction area");
+
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[1]), Is.True);
+            yield return new WaitForSecondsRealtime(breakers[1].AnimationDuration + 0.05f);
+            Assert.That(Quaternion.Angle(breakers[1].Handle.localRotation, closedRotations[breakers[1].BreakerId]),
+                Is.GreaterThan(40f));
+            Assert.That(breakers[1].transform.InverseTransformPoint(breakers[1].Handle.position).y,
+                Is.LessThan(closedHandleHeights[breakers[1].BreakerId]),
+                "The open handle must move downward instead of rotating into the breaker housing");
+            Assert.That(breakers[1].InteractionCollider.bounds.Intersects(
+                    breakers[1].Handle.GetComponent<Renderer>().bounds),
+                Is.True,
+                "The open handle must remain inside the breaker interaction area");
+            Assert.That(mainBreaker.IsClosed, Is.False);
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True);
+            Assert.That(mainBreaker.IsClosed, Is.False,
+                "Closing only one physical breaker must not restore the main circuit");
+            Assert.That(controller.TryToggleCabinetBreaker(breakers[1]), Is.True);
+            Assert.That(mainBreaker.IsClosed, Is.True);
+            Assert.That(mainBreaker.GetConductiveLinks().Count(), Is.EqualTo(3));
+
+            controller.TryToggleCabinetBreaker(breakers[0]);
+            yield return null;
+            controller.ResetTraining();
+            Assert.That(controller.AreCabinetBreakersClosed, Is.True);
+            Assert.That(mainBreaker.IsClosed, Is.True);
+            foreach (var breaker in breakers)
+            {
+                Assert.That(breaker.IsHighlighted, Is.False);
+                Assert.That(Vector4.Distance(
+                        breaker.Handle.GetComponent<Renderer>().material.color,
+                        baseHandleColors[breaker.BreakerId]),
+                    Is.LessThan(0.001f));
+                Assert.That(breaker.IsClosed, Is.True);
+                Assert.That(Quaternion.Angle(breaker.Handle.localRotation, closedRotations[breaker.BreakerId]),
+                    Is.LessThan(0.01f));
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator TaskEvaluationDoesNotBypassAnOpenCabinetBreaker()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var breaker = controller.CabinetBreakers.Single(item => item.BreakerId == "106");
+            var mainBreaker = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(item => item.Runtime.DeviceId == "QF").Runtime;
+
+            controller.LoadReferenceWiring();
+            controller.SetMode(SimulationMode.Drag);
+            Assert.That(controller.TryToggleCabinetBreaker(breaker), Is.True);
+            controller.SubmitTask();
+            yield return null;
+
+            Assert.That(breaker.IsClosed, Is.False);
+            Assert.That(mainBreaker.IsClosed, Is.False,
+                "The task action initializer must preserve the physical breaker interlock");
+            controller.StopAllCoroutines();
+        }
+
+        [UnityTest]
         public IEnumerator FaultViewRestoresButtonTerminalStripConnectionPointsAndAnnotation()
         {
             Assert.That(GameObject.Find("Fault Button Terminal Strip"), Is.Null,

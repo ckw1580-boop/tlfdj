@@ -74,6 +74,7 @@ namespace ElectricalSim
             examController = gameObject.AddComponent<OfflineExamController>();
             captureRecorder = gameObject.AddComponent<LocalCaptureRecorder>();
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, originalVisuals, ui.PortHover);
+            controller.RegisterCabinetBreakers(CreateCabinetBreakerInteractions());
             BindUi(ui);
             BindOriginalUi(ui);
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
@@ -581,6 +582,57 @@ namespace ElectricalSim
             CreateMotor("M1", "三相电机 M1", new Vector3(-0.55f, 0.25f, -0.45f));
             CreateMotor("M_DOUBLE", "双速电机", new Vector3(0f, 0.25f, -0.45f));
             CreateMotor("M2", "三相电机 M2", new Vector3(0.45f, 0.25f, -0.45f));
+        }
+
+        private IReadOnlyList<CabinetBreakerInteractable> CreateCabinetBreakerInteractions()
+        {
+            var result = new List<CabinetBreakerInteractable>();
+            if (originalEnvironment == null) return result;
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+
+            AddCabinetBreaker("106", "KongQiKaiGuan_3PK", "三极断路器 106", 45f, 1f);
+            AddCabinetBreaker("122", "KongQiKaiGuan_4PK", "四极断路器 122", -45f, 0.25f);
+            return result;
+
+            void AddCabinetBreaker(
+                string breakerId,
+                string modelName,
+                string displayName,
+                float openAngleDegrees,
+                float positionTravelScale)
+            {
+                var deviceRoot = originalEnvironmentTransforms.FirstOrDefault(item =>
+                    item.name == breakerId && item.gameObject.activeInHierarchy);
+                var model = deviceRoot != null
+                    ? deviceRoot.GetComponentsInChildren<Transform>(true).FirstOrDefault(item =>
+                        string.Equals(item.name, modelName, StringComparison.OrdinalIgnoreCase) &&
+                        item.gameObject.activeInHierarchy)
+                    : null;
+                var handle = model != null
+                    ? model.GetComponentsInChildren<Transform>(true).FirstOrDefault(item =>
+                        string.Equals(item.name, "switch", StringComparison.OrdinalIgnoreCase) &&
+                        item.gameObject.activeInHierarchy)
+                    : null;
+                var pivot = model != null ? model.Find("RotateCenter") : null;
+                var picker = model != null ? model.Find("picker")?.GetComponent<Collider>() : null;
+                if (model == null || handle == null || pivot == null || picker == null)
+                {
+                    Debug.LogWarning($"[OfflineBootstrap] Cabinet breaker {breakerId}/{modelName} is incomplete and cannot be interactive.");
+                    return;
+                }
+
+                var interaction = model.gameObject.AddComponent<CabinetBreakerInteractable>();
+                interaction.Initialize(
+                    breakerId,
+                    displayName,
+                    handle,
+                    pivot,
+                    picker,
+                    openAngleDegrees,
+                    0.2f,
+                    positionTravelScale);
+                result.Add(interaction);
+            }
         }
 
         private void CreateButton(string id, string label, bool normallyClosed, Vector3 position, Color color)
