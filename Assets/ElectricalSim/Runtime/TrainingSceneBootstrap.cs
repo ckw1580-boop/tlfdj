@@ -474,6 +474,7 @@ namespace ElectricalSim
             {
                 var environment = Instantiate(originalVisuals.EnvironmentPrefab, Vector3.zero, Quaternion.identity);
                 environment.name = "OriginalLabEnvironment";
+                RemoveOriginalMotorSideTerminals(environment.transform);
                 originalEnvironment = environment.transform;
                 CacheOriginalEnvironmentTransforms();
                 CreateOriginalRoomShell();
@@ -671,7 +672,9 @@ namespace ElectricalSim
             var faultBodyPorts = originalEnvironment != null &&
                                  (ShouldExposeContactorBodyPorts(view.Runtime) ||
                                   ShouldExposeThermalRelayBodyPorts(view.Runtime));
-            if (originalEnvironment != null && !faultBodyPorts) return;
+            var motorBodyPorts = originalEnvironment != null &&
+                                 view.Runtime.Kind == ElectricalDeviceKind.Motor;
+            if (originalEnvironment != null && !faultBodyPorts && !motorBodyPorts) return;
 
             // Controls and lower-cabinet switching devices are wired exclusively through
             // their original terminal boards. Keep runtime behaviour, but do not leave a
@@ -684,6 +687,9 @@ namespace ElectricalSim
             var columns = Mathf.Min(6, Mathf.Max(2, Mathf.CeilToInt(list.Count / 2f)));
             for (var index = 0; index < list.Count; index++)
             {
+                var dualLineFaultTerminal = faultBodyPorts &&
+                                            ShouldExposeThermalRelayTerminalInBothLineModes(
+                                                view.Runtime, list[index]);
                 var row = index / columns;
                 var column = index % columns;
                 var x = columns == 1 ? 0f : Mathf.Lerp(-bounds.x * 0.42f, bounds.x * 0.42f, column / (float)(columns - 1));
@@ -706,6 +712,23 @@ namespace ElectricalSim
                     }
                     localPosition = parent.InverseTransformPoint(backElectrical.position);
                 }
+                else if (motorBodyPorts)
+                {
+                    frontElectrical = FindMappedEnvironmentTerminal(
+                        view.Runtime.DeviceId, view.Runtime.Kind, list[index], false);
+                    if (frontElectrical == null)
+                    {
+                        Debug.LogWarning($"[OfflineBootstrap] Motor terminal is missing: {view.Runtime.DeviceId}/{list[index]}");
+                        continue;
+                    }
+
+                    frontJumper = frontElectrical;
+                    backElectrical = view.Runtime.DeviceId == "M1"
+                        ? FindMappedEnvironmentTerminal(
+                            view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical
+                        : frontElectrical;
+                    localPosition = parent.InverseTransformPoint(frontElectrical.position);
+                }
                 else
                 {
                     frontElectrical = FindTerminal(parent, view.Runtime.Kind, list[index]) ??
@@ -721,6 +744,7 @@ namespace ElectricalSim
                 var worldMarkerSize = ShouldExposeContactorBodyPorts(view.Runtime) ||
                                       ShouldExposeThermalRelayBodyPorts(view.Runtime)
                     ? 0.016f
+                    : motorBodyPorts ? 0.0125f
                     : frontElectrical != null ? 0.0075f : 0.009f;
                 var parentScale = Mathf.Max(Mathf.Abs(parent.lossyScale.x), Mathf.Abs(parent.lossyScale.y), Mathf.Abs(parent.lossyScale.z));
                 var markerSize = worldMarkerSize / Mathf.Max(0.0001f, parentScale);
@@ -731,15 +755,17 @@ namespace ElectricalSim
                     port.ConfigureHover(GetContactorHoverLabel(list[index]), list[index]);
                 else if (ShouldExposeThermalRelayBodyPorts(view.Runtime))
                     port.ConfigureHover(GetThermalRelayBodyLabel(list[index]), list[index]);
+                else if (motorBodyPorts)
+                    port.ConfigureHover(frontElectrical.name, frontElectrical.name);
                 port.ConfigureOriginalAnchors(
                     frontElectrical,
                     frontJumper,
                     backElectrical,
                     backElectrical,
-                    !faultBodyPorts);
+                    !faultBodyPorts || dualLineFaultTerminal);
                 if (view.Runtime.Kind == ElectricalDeviceKind.Motor)
                     port.ConfigureJumperOnly();
-                else
+                else if (!dualLineFaultTerminal)
                     port.ConfigureElectricalOnly();
                 view.AddPort(port);
             }
@@ -773,6 +799,14 @@ namespace ElectricalSim
                    runtime.DeviceId == "FR";
         }
 
+        private static bool ShouldExposeThermalRelayTerminalInBothLineModes(
+            ElectricalDeviceRuntime runtime,
+            string port)
+        {
+            return ShouldExposeThermalRelayBodyPorts(runtime) &&
+                   (port == "T1" || port == "T2" || port == "T3");
+        }
+
         private static string GetThermalRelayBodyLabel(string port)
         {
             switch (port)
@@ -788,6 +822,32 @@ namespace ElectricalSim
                 case "97": return "97NO";
                 case "98": return "98NO";
                 default: return port;
+            }
+        }
+
+        private static void RemoveOriginalMotorSideTerminals(Transform environment)
+        {
+            var markerPaths = new[]
+            {
+                "Bench/ElectricBench/Nuts/38/SanXiangShuLongDianJi/Cube",
+                "Bench/ElectricBench/Nuts/49/SanXiangShuLongDianJi/Cube",
+                "Bench/ElectricBench/Nuts/107/SanXiangShuLongDianJi/Cube",
+                "Bench/ElectricBench/Nuts/118/ShuangSuDianJi/Cube"
+            };
+
+            foreach (var markerPath in markerPaths)
+            {
+                var marker = environment.Find(markerPath);
+                if (marker == null)
+                {
+                    Debug.LogWarning("[OfflineBootstrap] Motor-side terminal is missing: " + markerPath);
+                    continue;
+                }
+
+                // Disable immediately so the imported green helper cannot flash for one frame;
+                // Destroy removes it from the live hierarchy at the end of the frame.
+                marker.gameObject.SetActive(false);
+                Destroy(marker.gameObject);
             }
         }
 

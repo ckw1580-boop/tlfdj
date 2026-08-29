@@ -505,7 +505,8 @@ namespace ElectricalSim.Tests
             var faultDeviceIds = new HashSet<string>(faultDevices.Select(item => item.Id));
             var deviceViews = Object.FindObjectsOfType<ElectricalDeviceView>()
                 .Where(view => !terminalBoardIds.Contains(view.Runtime.DeviceId) &&
-                               !faultDeviceIds.Contains(view.Runtime.DeviceId))
+                               !faultDeviceIds.Contains(view.Runtime.DeviceId) &&
+                               view.Runtime.Kind != ElectricalDeviceKind.Motor)
                 .ToArray();
 
             Assert.That(deviceViews, Is.Not.Empty);
@@ -515,7 +516,8 @@ namespace ElectricalSim.Tests
 
             Assert.That(Object.FindObjectsOfType<ElectricalPortView>()
                 .All(port => terminalBoardIds.Contains(port.DeviceId) ||
-                             faultDeviceIds.Contains(port.DeviceId)), Is.True);
+                             faultDeviceIds.Contains(port.DeviceId) ||
+                             new[] { "M1", "M_DOUBLE", "M2" }.Contains(port.DeviceId)), Is.True);
 
             controller.SetMode(SimulationMode.Wiring);
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
@@ -553,6 +555,16 @@ namespace ElectricalSim.Tests
             Assert.That(t2.HoverLabel, Is.EqualTo("4T2"));
             Assert.That(t2.CurrentAnchor.name, Is.EqualTo("FR_4T2_FaultAnchor"));
             Assert.That(Vector3.Distance(t2.CurrentAnchorPosition, expectedT2Position), Is.LessThan(0.0005f));
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            Assert.That(new[] { t1, t2, t3 }.All(port =>
+                port.IsVisible && port.UsesJumperAnchor), Is.True,
+                "2T1, 4T2 and 6T3 must remain visible in fault-view jumper mode");
+            Assert.That(thermalRelayPorts
+                .Except(new[] { t1, t2, t3 })
+                .All(port => !port.IsVisible), Is.True,
+                "Other FR body terminals must remain electrical-wire-only");
         }
 
         [UnityTest]
@@ -572,6 +584,10 @@ namespace ElectricalSim.Tests
             var faultBodyPorts = Object.FindObjectsOfType<ElectricalDeviceView>()
                 .Where(view => new[] { "KMF", "KM1", "KMR", "FR" }.Contains(view.Runtime.DeviceId))
                 .SelectMany(view => view.Ports)
+                .ToArray();
+            var dualLineFrPorts = faultBodyPorts
+                .Where(port => port.DeviceId == "FR" &&
+                               new[] { "T1", "T2", "T3" }.Contains(port.PortName))
                 .ToArray();
 
             controller.SetMode(SimulationMode.Wiring);
@@ -599,6 +615,10 @@ namespace ElectricalSim.Tests
             yield return null;
             Assert.That(faultButtonPorts.All(port => !port.IsVisible), Is.True,
                 "The rear SB contact points must be hidden in jumper mode");
+            Assert.That(dualLineFrPorts.All(port => port.IsVisible && port.UsesJumperAnchor), Is.True,
+                "2T1, 4T2 and 6T3 must remain visible after switching to jumper mode");
+            Assert.That(faultBodyPorts.Except(dualLineFrPorts).All(port => !port.IsVisible), Is.True,
+                "Other fault-device body terminals must stay hidden in jumper mode");
             Assert.That(motorBoardPorts.All(port => port.IsVisible && port.UsesJumperAnchor), Is.True,
                 "Jumper mode must immediately expose its matching connection points in the current rear view");
 
@@ -685,15 +705,91 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator MotorsExposeConnectionsOnlyOnTheOriginalMotorTerminalBoard()
+        public IEnumerator MotorsExposeSixConnectionsOnTheirOriginalTerminalBoxes()
         {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
             var views = Object.FindObjectsOfType<ElectricalDeviceView>();
-            foreach (var motorId in new[] { "M1", "M_DOUBLE", "M2" })
-                Assert.That(views.Single(item => item.Runtime.DeviceId == motorId).Ports, Is.Empty);
+            var motors = new[]
+            {
+                new { DeviceId = "M1", Nut = "38" },
+                new { DeviceId = "M_DOUBLE", Nut = "118" },
+                new { DeviceId = "M2", Nut = "49" }
+            };
+            var expectedAnchors = new[] { "U1", "V1", "W1", "U2", "V2", "W2" };
+
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+
+            foreach (var motor in motors)
+            {
+                var ports = views.Single(item => item.Runtime.DeviceId == motor.DeviceId).Ports;
+                Assert.That(ports.Count, Is.EqualTo(6));
+                Assert.That(ports.Select(port => port.CurrentAnchor.name), Is.EquivalentTo(expectedAnchors));
+                Assert.That(ports.All(port => !port.IsVisible &&
+                                              HasAncestor(port.CurrentAnchor, motor.Nut)), Is.True,
+                    motor.DeviceId + " terminals must stay hidden in electrical-wire mode");
+                Assert.That(ports.All(port => port.JumperOnly && !port.ElectricalOnly), Is.True);
+            }
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            foreach (var motor in motors)
+            {
+                var ports = views.Single(item => item.Runtime.DeviceId == motor.DeviceId).Ports;
+                Assert.That(ports.All(port => port.IsVisible && port.UsesJumperAnchor), Is.True);
+            }
+
+            cameraController.SetFaultView();
+            yield return null;
+            var faultMotorPorts = views.Single(item => item.Runtime.DeviceId == "M1").Ports;
+            Assert.That(faultMotorPorts.Select(port => port.CurrentAnchor.name),
+                Is.EquivalentTo(expectedAnchors));
+            Assert.That(faultMotorPorts.All(port => port.IsVisible &&
+                                                   HasAncestor(port.CurrentAnchor, "107")), Is.True,
+                "Troubleshooting-view motor terminals must move to its six rear studs");
+
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            Assert.That(faultMotorPorts.All(port => !port.IsVisible), Is.True,
+                "Troubleshooting-view motor terminals must also be jumper-only");
 
             var motorBoard = views.Single(item => item.Runtime.DeviceId == "DuanZiPai_7");
             Assert.That(motorBoard.Ports.Count, Is.EqualTo(18));
             Assert.That(motorBoard.Runtime.GetConductiveLinks().Count(), Is.EqualTo(18));
+        }
+
+        [UnityTest]
+        public IEnumerator MotorSideGreenTerminalsAreRemovedButSixTerminalAssembliesRemain()
+        {
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            Assert.That(environment, Is.Not.Null);
+
+            var motors = new[]
+            {
+                new { Root = "38", Model = "SanXiangShuLongDianJi" },
+                new { Root = "49", Model = "SanXiangShuLongDianJi" },
+                new { Root = "107", Model = "SanXiangShuLongDianJi" },
+                new { Root = "118", Model = "ShuangSuDianJi" }
+            };
+            var nuts = environment.transform.Find("Bench/ElectricBench/Nuts");
+            Assert.That(nuts, Is.Not.Null);
+
+            foreach (var motor in motors)
+            {
+                var model = nuts.Find(motor.Root + "/" + motor.Model);
+                Assert.That(model, Is.Not.Null, motor.Root + " motor model must remain");
+                Assert.That(model.Find("Cube"), Is.Null,
+                    motor.Root + " green side terminal must be removed");
+
+                var terminalAssembly = model.Find("mesh/xian_");
+                Assert.That(terminalAssembly, Is.Not.Null,
+                    motor.Root + " six-terminal assembly must remain");
+                Assert.That(terminalAssembly.gameObject.activeInHierarchy, Is.True);
+                Assert.That(terminalAssembly.GetComponent<Renderer>().enabled, Is.True);
+            }
+
             yield return null;
         }
 
@@ -713,7 +809,9 @@ namespace ElectricalSim.Tests
             var faultBodyPorts = electricalPorts.Where(port => faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var terminalElectricalPorts = electricalPorts.Where(port => !faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var motorBoardPorts = ports.Where(port => port.DeviceId == "DuanZiPai_7").ToArray();
-            Assert.That(jumperPorts, Is.Empty);
+            Assert.That(jumperPorts.Length, Is.EqualTo(18));
+            Assert.That(jumperPorts.Select(port => port.DeviceId).Distinct(),
+                Is.EquivalentTo(new[] { "M1", "M_DOUBLE", "M2" }));
             Assert.That(electricalPorts.Length, Is.GreaterThan(0));
             Assert.That(motorBoardPorts.Length, Is.EqualTo(18));
             Assert.That(motorBoardPorts.All(port => !port.JumperOnly && !port.ElectricalOnly), Is.True);
