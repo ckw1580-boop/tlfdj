@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -26,6 +27,12 @@ namespace ElectricalSim
             new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
         private OfflineExamController examController;
         private LocalCaptureRecorder captureRecorder;
+        private GameObject instrumentTools;
+        private GameObject motorFaultBlocks;
+        private SlidePanelState statusPanelSlide;
+        private SlidePanelState rightPanelSlide;
+
+        private const float PanelSlideDuration = 0.2f;
 
         private readonly Color darkBlue = new Color(0.015f, 0.075f, 0.16f, 0.96f);
         private readonly Color cyan = new Color(0.05f, 0.72f, 0.95f, 1f);
@@ -476,7 +483,7 @@ namespace ElectricalSim
             {
                 var environment = Instantiate(originalVisuals.EnvironmentPrefab, Vector3.zero, Quaternion.identity);
                 environment.name = "OriginalLabEnvironment";
-                RemoveOriginalMotorSideTerminals(environment.transform);
+                RebuildMotorFaultBlocks(environment.transform);
                 originalEnvironment = environment.transform;
                 CacheOriginalEnvironmentTransforms();
                 CreateOriginalRoomShell();
@@ -973,7 +980,7 @@ namespace ElectricalSim
             }
         }
 
-        private static void RemoveOriginalMotorSideTerminals(Transform environment)
+        private void RebuildMotorFaultBlocks(Transform environment)
         {
             var markerPaths = new[]
             {
@@ -983,8 +990,11 @@ namespace ElectricalSim
                 "Bench/ElectricBench/Nuts/118/ShuangSuDianJi/Cube"
             };
 
-            foreach (var markerPath in markerPaths)
+            motorFaultBlocks = new GameObject("MotorFaultBlocks");
+            motorFaultBlocks.transform.SetParent(environment, false);
+            for (var index = 0; index < markerPaths.Length; index++)
             {
+                var markerPath = markerPaths[index];
                 var marker = environment.Find(markerPath);
                 if (marker == null)
                 {
@@ -992,11 +1002,14 @@ namespace ElectricalSim
                     continue;
                 }
 
-                // Disable immediately so the imported green helper cannot flash for one frame;
-                // Destroy removes it from the live hierarchy at the end of the frame.
+                var replacement = Instantiate(marker.gameObject, marker.parent);
+                replacement.name = "MotorFaultBlock_" + (index + 1);
+                replacement.transform.SetParent(motorFaultBlocks.transform, true);
+                replacement.SetActive(true);
                 marker.gameObject.SetActive(false);
                 Destroy(marker.gameObject);
             }
+            motorFaultBlocks.SetActive(false);
         }
 
         private static string GetContactorHoverLabel(string port)
@@ -1564,7 +1577,10 @@ namespace ElectricalSim
                     // portion of bq_0.png. Unity pixel coordinates start at the bottom.
                     var clearX = Mathf.RoundToInt(source.width * 0.015f);
                     var clearY = Mathf.RoundToInt(source.height * 0.915f);
-                    var clearWidth = Mathf.RoundToInt(source.width * 0.16f);
+                    // Stop before the title begins at roughly 15.7% of the texture
+                    // width. The previous 16% mask clipped the upper-left corner of
+                    // the first “电” glyph on both cabinet faces.
+                    var clearWidth = Mathf.RoundToInt(source.width * 0.135f);
                     var clearHeight = Mathf.RoundToInt(source.height * 0.075f);
                     cleaned.SetPixels(
                         clearX,
@@ -1890,7 +1906,7 @@ namespace ElectricalSim
             var description = Label("TaskDescription", right.transform, "", 18, TextAnchor.UpperLeft, new Color(0.76f, 0.9f, 0.96f));
             SetRect(description.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -200f), new Vector2(-18f, -92f));
 
-            var schematicFrame = Panel("SchematicFrame", right.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -506f), new Vector2(-18f, -210f), new Color(0.92f, 0.94f, 0.94f, 0.98f));
+            var schematicFrame = Panel("SchematicFrame", right.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -470f), new Vector2(-18f, -174f), new Color(0.92f, 0.94f, 0.94f, 0.98f));
             var schematicObject = new GameObject("TaskSchematic", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(AspectRatioFitter));
             schematicObject.transform.SetParent(schematicFrame.transform, false);
             var schematic = schematicObject.GetComponent<Image>();
@@ -1904,9 +1920,12 @@ namespace ElectricalSim
             var instrument = Label("InstrumentReadout", right.transform, "万用表：请选择两个端子", 17, TextAnchor.UpperLeft, new Color(1f, 0.9f, 0.28f));
             SetRect(instrument.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.42f), new Vector2(18f, 156f), new Vector2(-18f, -8f));
 
-            var statusPanel = Panel("StatusPanel", canvas.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-305f, 18f), new Vector2(-8f, 180f), new Color(0.12f, 0.28f, 0.29f, 0.94f));
+            var statusPanel = Panel("StatusPanel", canvas.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(8f, 18f), new Vector2(305f, 180f), new Color(0.12f, 0.28f, 0.29f, 0.94f));
             var status = Label("Status", statusPanel.transform, "系统就绪", 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.2f));
             SetRect(status.rectTransform, Vector2.zero, Vector2.one, new Vector2(20f, 5f), new Vector2(-20f, -5f));
+
+            rightPanelSlide = ConfigureSlidePanel(right, "RightPanelSlideHandle", new Vector2(305f, 0f), false, "▶", "◀");
+            statusPanelSlide = ConfigureSlidePanel(statusPanel, "StatusPanelSlideHandle", new Vector2(-305f, 0f), true, "◀", "▶");
 
             var hoverObject = new GameObject("PortHoverPresenter");
             var portHover = hoverObject.AddComponent<PortHoverPresenter>();
@@ -1929,11 +1948,26 @@ namespace ElectricalSim
 
         private void BindUi(HudReferences ui)
         {
+            instrumentTools = new GameObject("InstrumentTools", typeof(RectTransform));
+            instrumentTools.transform.SetParent(ui.Canvas.transform, false);
+            var instrumentToolsRect = instrumentTools.GetComponent<RectTransform>();
+            var instrumentGroupAnchor = new Vector2(0.6f, 0.77f);
+            const float instrumentGroupWidth = 342f;
+            const float instrumentGroupHeight = 110f;
+            var instrumentGroupOffset = new Vector2(instrumentGroupWidth * 1.75f, -instrumentGroupHeight * 2f);
+            SetRect(instrumentToolsRect, instrumentGroupAnchor, instrumentGroupAnchor,
+                instrumentGroupOffset - new Vector2(instrumentGroupWidth * 0.5f, instrumentGroupHeight * 0.5f),
+                instrumentGroupOffset + new Vector2(instrumentGroupWidth * 0.5f, instrumentGroupHeight * 0.5f));
+
             var modes = new[] { SimulationMode.View, SimulationMode.Drag, SimulationMode.Wiring, SimulationMode.Simulate, SimulationMode.Fault };
             for (var i = 0; i < modes.Length; i++)
             {
                 var captured = modes[i];
-                var button = Button("Mode_" + captured, ui.Top.transform, ModeLabel(captured), () => controller.SetMode(captured));
+                var button = Button("Mode_" + captured, ui.Top.transform, ModeLabel(captured), () =>
+                {
+                    if (captured == SimulationMode.Fault) ToggleInstrumentTools();
+                    else controller.SetMode(captured);
+                });
                 SetRect(button.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(930f + i * 112f, 14f), new Vector2(1032f + i * 112f, -14f));
             }
 
@@ -1957,11 +1991,14 @@ namespace ElectricalSim
             for (var i = 0; i < instruments.Length; i++)
             {
                 var captured = instruments[i];
-                var button = Button("Instrument_" + captured, ui.Right.transform, InstrumentLabel(captured), () => controller.SelectInstrument(captured));
+                var button = Button("Instrument_" + captured, instrumentTools.transform, InstrumentLabel(captured), () => controller.SelectInstrument(captured));
                 var row = i / 2;
                 var col = i % 2;
-                SetRect(button.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(18f + col * 176f, 62f + row * 60f), new Vector2(184f + col * 176f, 112f + row * 60f));
+                SetRect(button.GetComponent<RectTransform>(), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f),
+                    new Vector2(-171f + col * 176f, -55f + row * 60f),
+                    new Vector2(-5f + col * 176f, -5f + row * 60f));
             }
+            instrumentTools.SetActive(false);
         }
 
         private void BindOriginalUi(HudReferences ui)
@@ -1993,7 +2030,7 @@ namespace ElectricalSim
             if (toolbar != null)
             {
                 BindOriginalViewMenu(toolbar);
-                BindNamedButton(toolbar, "btn_paigu", () => controller.SetMode(SimulationMode.Fault));
+                BindNamedButton(toolbar, "btn_paigu", ToggleInstrumentTools);
                 BindNamedButton(toolbar, "btn_drag", () => controller.SetMode(SimulationMode.Drag));
                 BindNamedButton(toolbar, "btn_line", () => controller.SetMode(SimulationMode.Wiring));
                 BindNamedButton(toolbar, "btn_sim", () => controller.SetMode(SimulationMode.Simulate));
@@ -2010,6 +2047,7 @@ namespace ElectricalSim
             var lineParam = InstantiateUi("LineParam", ui.Canvas.transform);
             if (lineForm != null)
             {
+                PositionLineFormBelowToolbar(lineForm, toolbar);
                 BindOriginalLineForm(lineForm);
                 lineForm.SetActive(false);
             }
@@ -2024,7 +2062,85 @@ namespace ElectricalSim
             var ticker = ui.Canvas.gameObject.AddComponent<OfflineUiTicker>();
             ticker.Initialize(navigation, toolbar, examController);
 
-            void ToggleTaskPanel() => ui.Right.gameObject.SetActive(!ui.Right.gameObject.activeSelf);
+            void ToggleTaskPanel() => ToggleSlidePanel(rightPanelSlide);
+        }
+
+        private SlidePanelState ConfigureSlidePanel(
+            RectTransform panel,
+            string handleName,
+            Vector2 collapsedOffset,
+            bool handleOnRight,
+            string expandedGlyph,
+            string collapsedGlyph)
+        {
+            var state = new SlidePanelState
+            {
+                Panel = panel,
+                ExpandedPosition = panel.anchoredPosition,
+                CollapsedPosition = panel.anchoredPosition + collapsedOffset,
+                ExpandedGlyph = expandedGlyph,
+                CollapsedGlyph = collapsedGlyph
+            };
+            var handle = Button(handleName, panel.transform, expandedGlyph, () => ToggleSlidePanel(state), new Color(0.03f, 0.36f, 0.48f, 0.98f));
+            var handleAnchor = new Vector2(handleOnRight ? 1f : 0f, 0.5f);
+            SetRect(handle.GetComponent<RectTransform>(), handleAnchor, handleAnchor,
+                new Vector2(handleOnRight ? 0f : -36f, -28f),
+                new Vector2(handleOnRight ? 36f : 0f, 28f));
+            state.HandleLabel = handle.GetComponentInChildren<Text>(true);
+            return state;
+        }
+
+        private void ToggleSlidePanel(SlidePanelState state)
+        {
+            if (state == null || state.Panel == null) return;
+            state.IsCollapsed = !state.IsCollapsed;
+            if (state.Animation != null) StopCoroutine(state.Animation);
+            if (state.HandleLabel != null)
+                state.HandleLabel.text = state.IsCollapsed ? state.CollapsedGlyph : state.ExpandedGlyph;
+            var target = state.IsCollapsed ? state.CollapsedPosition : state.ExpandedPosition;
+            state.Animation = StartCoroutine(AnimateSlidePanel(state, target));
+        }
+
+        private IEnumerator AnimateSlidePanel(SlidePanelState state, Vector2 target)
+        {
+            var start = state.Panel.anchoredPosition;
+            var elapsed = 0f;
+            while (elapsed < PanelSlideDuration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                var progress = Mathf.Clamp01(elapsed / PanelSlideDuration);
+                progress = progress * progress * (3f - 2f * progress);
+                state.Panel.anchoredPosition = Vector2.LerpUnclamped(start, target, progress);
+                yield return null;
+            }
+            state.Panel.anchoredPosition = target;
+            state.Animation = null;
+        }
+
+        private void ToggleInstrumentTools()
+        {
+            if (instrumentTools == null) return;
+            var shouldShow = !instrumentTools.activeSelf;
+            instrumentTools.SetActive(shouldShow);
+            if (motorFaultBlocks != null) motorFaultBlocks.SetActive(shouldShow);
+            if (!shouldShow && controller != null && controller.Mode == SimulationMode.Fault)
+                controller.SetMode(SimulationMode.View);
+        }
+
+        private static void PositionLineFormBelowToolbar(GameObject lineForm, GameObject toolbar)
+        {
+            var lineRect = lineForm.GetComponent<RectTransform>();
+            var toolbarRect = toolbar != null ? toolbar.GetComponent<RectTransform>() : null;
+            if (lineRect == null || toolbarRect == null) return;
+
+            const float verticalGap = 56f;
+            var toolbarBottom = toolbarRect.anchoredPosition.y - toolbarRect.rect.height * toolbarRect.pivot.y;
+            var lineTop = toolbarBottom - verticalGap + lineRect.rect.height * 0.5f;
+            lineRect.anchorMin = new Vector2(0.5f, 1f);
+            lineRect.anchorMax = new Vector2(0.5f, 1f);
+            lineRect.anchoredPosition = new Vector2(
+                lineRect.anchoredPosition.x,
+                lineTop - lineRect.rect.height * (1f - lineRect.pivot.y));
         }
 
         private void BindOriginalViewMenu(GameObject toolbar)
@@ -2256,6 +2372,18 @@ namespace ElectricalSim
             public Text Status;
             public Text Instrument;
             public PortHoverPresenter PortHover;
+        }
+
+        private sealed class SlidePanelState
+        {
+            public RectTransform Panel;
+            public Text HandleLabel;
+            public Vector2 ExpandedPosition;
+            public Vector2 CollapsedPosition;
+            public string ExpandedGlyph;
+            public string CollapsedGlyph;
+            public bool IsCollapsed;
+            public Coroutine Animation;
         }
     }
 

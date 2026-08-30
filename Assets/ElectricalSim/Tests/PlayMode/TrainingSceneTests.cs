@@ -810,10 +810,15 @@ namespace ElectricalSim.Tests
                                new[] { "T1", "T2", "T3" }.Contains(port.PortName))
                 .ToArray();
 
+            var preservedPreset = cameraController.CurrentPreset;
+            var preservedPosition = cameraController.transform.position;
+            var preservedRotation = cameraController.transform.rotation;
             controller.SetMode(SimulationMode.Wiring);
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
             yield return null;
-            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.WiringFront));
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(preservedPreset));
+            Assert.That(Vector3.Distance(cameraController.transform.position, preservedPosition), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(cameraController.transform.rotation, preservedRotation), Is.LessThan(0.0001f));
             Assert.That(cameraController.IsViewingFaultSide, Is.False);
             Assert.That(faultBodyPorts.All(port => !port.IsVisible), Is.True);
 
@@ -822,7 +827,7 @@ namespace ElectricalSim.Tests
             yield return null;
             yield return null;
             Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Wiring));
-            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.WiringFront),
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(preservedPreset),
                 "Moving behind the cabinet must not require entering fault mode");
             Assert.That(cameraController.IsViewingFaultSide, Is.True);
             Assert.That(faultButtonPorts.All(port => port.IsVisible &&
@@ -1208,6 +1213,39 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator CabinetTitleKeepsFirstDianCharacterWhenRemovingLegacyLogo()
+        {
+            yield return new WaitForSecondsRealtime(0.15f);
+            var cabinetRenderers = Object.FindObjectsOfType<MeshRenderer>(true)
+                .Where(item => item.name == "DQG01")
+                .ToArray();
+            Assert.That(cabinetRenderers, Is.Not.Empty);
+
+            var cleanedTextures = cabinetRenderers
+                .SelectMany(item => item.materials)
+                .Where(item => item != null &&
+                               item.name.IndexOf("bq", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                .Select(item => item.mainTexture as Texture2D)
+                .Where(item => item != null)
+                .ToArray();
+            Assert.That(cleanedTextures, Is.Not.Empty);
+
+            foreach (var texture in cleanedTextures)
+            {
+                var removedLogoPixel = texture.GetPixel(
+                    Mathf.RoundToInt(texture.width * 0.044f),
+                    Mathf.RoundToInt(texture.height * 0.95f));
+                var firstDianCornerPixel = texture.GetPixel(
+                    Mathf.RoundToInt(texture.width * 0.17f),
+                    Mathf.RoundToInt(texture.height * 0.921f));
+                Assert.That(removedLogoPixel.a, Is.LessThan(0.01f),
+                    "The legacy upper-left logo must remain removed.");
+                Assert.That(firstDianCornerPixel.a, Is.GreaterThan(0.05f),
+                    "The removal mask must not clip the first 电 glyph shared by the front and back faces.");
+            }
+        }
+
+        [UnityTest]
         public IEnumerator CabinetBrandingCoversBothOriginalHeaderLogos()
         {
             var environment = GameObject.Find("OriginalLabEnvironment");
@@ -1247,6 +1285,167 @@ namespace ElectricalSim.Tests
             var backScreen = Camera.main.WorldToScreenPoint(back.position);
             Debug.Log($"[CabinetBranding] back local={back.localPosition}, world={back.position}, screen={backScreen}");
             Assert.That(backScreen.z, Is.GreaterThan(0f));
+        }
+
+        [UnityTest]
+        public IEnumerator WiringToolbarKeepsCameraAndPlacesLineFormBelowToolbar()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var toolbar = GameObject.Find("OriginalUI_ExperimentToolbar");
+            var lineForm = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "OriginalUI_LineForm");
+            Assert.That(toolbar, Is.Not.Null);
+
+            controller.SetMode(SimulationMode.View);
+            cameraController.transform.position = cameraController.DefaultPosition + new Vector3(0.23f, 0.11f, 0.37f);
+            cameraController.transform.rotation = Quaternion.Euler(13f, 167f, 0f);
+            var expectedPosition = cameraController.transform.position;
+            var expectedRotation = cameraController.transform.rotation;
+            var expectedPreset = cameraController.CurrentPreset;
+
+            toolbar.GetComponentsInChildren<Button>(true).Single(item => item.name == "btn_line").onClick.Invoke();
+            yield return null;
+
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Wiring));
+            Assert.That(Vector3.Distance(cameraController.transform.position, expectedPosition), Is.LessThan(0.0001f));
+            Assert.That(Quaternion.Angle(cameraController.transform.rotation, expectedRotation), Is.LessThan(0.0001f));
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(expectedPreset));
+            Assert.That(lineForm.gameObject.activeSelf, Is.True);
+            Assert.That(lineForm.anchorMin, Is.EqualTo(new Vector2(0.5f, 1f)));
+            Assert.That(lineForm.anchorMax, Is.EqualTo(new Vector2(0.5f, 1f)));
+
+            var toolbarRect = toolbar.GetComponent<RectTransform>();
+            var toolbarBottom = toolbarRect.anchoredPosition.y - toolbarRect.rect.height * toolbarRect.pivot.y;
+            var lineTop = lineForm.anchoredPosition.y + lineForm.rect.height * (1f - lineForm.pivot.y);
+            var expectedGap = 56f - lineForm.rect.height * 0.5f;
+            Assert.That(toolbarBottom - lineTop, Is.EqualTo(expectedGap).Within(0.1f),
+                "The line-style form should be raised by half of its own height from the reference position.");
+        }
+
+        [UnityTest]
+        public IEnumerator TroubleshootingButtonTogglesToolsAndClosesFaultMode()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var toolbar = GameObject.Find("OriginalUI_ExperimentToolbar");
+            var instrumentTools = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "InstrumentTools");
+            var motorFaultBlocks = Object.FindObjectsOfType<Transform>(true)
+                .Single(item => item.name == "MotorFaultBlocks");
+            var troubleshootingButton = toolbar.GetComponentsInChildren<Button>(true)
+                .Single(item => item.name == "btn_paigu");
+
+            controller.SetMode(SimulationMode.View);
+            var expectedPosition = cameraController.transform.position;
+            var expectedRotation = cameraController.transform.rotation;
+            var expectedPreset = cameraController.CurrentPreset;
+
+            Assert.That(instrumentTools.gameObject.activeSelf, Is.False);
+            Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.False);
+            Assert.That(motorFaultBlocks.childCount, Is.EqualTo(4));
+            Assert.That(motorFaultBlocks.Cast<Transform>().All(item =>
+                item.GetComponent<MeshRenderer>() != null && item.GetComponent<BoxCollider>() != null), Is.True);
+            Assert.That(instrumentTools.anchorMin, Is.EqualTo(new Vector2(0.6f, 0.77f)));
+            Assert.That(instrumentTools.anchorMax, Is.EqualTo(new Vector2(0.6f, 0.77f)));
+            Assert.That(instrumentTools.anchoredPosition, Is.EqualTo(new Vector2(598.5f, -220f)));
+
+            troubleshootingButton.onClick.Invoke();
+            yield return null;
+
+            Assert.That(instrumentTools.gameObject.activeSelf, Is.True);
+            Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.True);
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.View));
+            Assert.That(cameraController.transform.position, Is.EqualTo(expectedPosition));
+            Assert.That(cameraController.transform.rotation, Is.EqualTo(expectedRotation));
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(expectedPreset));
+
+            instrumentTools.GetComponentsInChildren<Button>(true)
+                .Single(item => item.name == "Instrument_Multimeter").onClick.Invoke();
+            yield return null;
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Fault));
+            Assert.That(instrumentTools.gameObject.activeSelf, Is.True);
+            Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.True);
+
+            troubleshootingButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.View));
+            Assert.That(instrumentTools.gameObject.activeSelf, Is.False);
+            Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator SchematicStaysInsideRightPanel()
+        {
+            var rightPanel = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "RightPanel");
+            var schematicFrame = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "SchematicFrame");
+            var panelCorners = new Vector3[4];
+            var schematicCorners = new Vector3[4];
+            rightPanel.GetWorldCorners(panelCorners);
+            schematicFrame.GetWorldCorners(schematicCorners);
+
+            Assert.That(schematicFrame.offsetMin, Is.EqualTo(new Vector2(18f, -470f)));
+            Assert.That(schematicFrame.offsetMax, Is.EqualTo(new Vector2(-18f, -174f)));
+            Assert.That(schematicCorners[0].x, Is.GreaterThan(panelCorners[0].x));
+            Assert.That(schematicCorners[0].y, Is.GreaterThan(panelCorners[0].y));
+            Assert.That(schematicCorners[2].x, Is.LessThan(panelCorners[2].x));
+            Assert.That(schematicCorners[2].y, Is.LessThan(panelCorners[2].y));
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator SidePanelsSlideIndependentlyReverseAndShareNavigationState()
+        {
+            var canvas = GameObject.Find("Simulation HUD").GetComponent<RectTransform>();
+            var statusPanel = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "StatusPanel");
+            var rightPanel = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "RightPanel");
+            var statusHandle = Object.FindObjectsOfType<Button>(true)
+                .Single(item => item.name == "StatusPanelSlideHandle");
+            var rightHandle = Object.FindObjectsOfType<Button>(true)
+                .Single(item => item.name == "RightPanelSlideHandle");
+            var navigation = GameObject.Find("OriginalUI_TopNavigation");
+            var homeButton = navigation.GetComponentsInChildren<Button>(true)
+                .Single(item => item.name == "homeBtn");
+            var scheduleButton = navigation.GetComponentsInChildren<Button>(true)
+                .Single(item => item.name == "scheduleBtn");
+            var statusExpanded = statusPanel.anchoredPosition;
+            var rightExpanded = rightPanel.anchoredPosition;
+
+            statusHandle.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded + new Vector2(-305f, 0f)), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded), Is.LessThan(0.01f));
+            AssertRectStaysInside(statusHandle.GetComponent<RectTransform>(), canvas);
+
+            rightHandle.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded + new Vector2(305f, 0f)), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded + new Vector2(-305f, 0f)), Is.LessThan(0.01f));
+            AssertRectStaysInside(rightHandle.GetComponent<RectTransform>(), canvas);
+
+            statusHandle.onClick.Invoke();
+            rightHandle.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded), Is.LessThan(0.01f));
+
+            statusHandle.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.08f);
+            statusHandle.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded), Is.LessThan(0.01f));
+            Assert.That(statusHandle.GetComponentInChildren<Text>(true).text, Is.EqualTo("◀"));
+
+            homeButton.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded + new Vector2(305f, 0f)), Is.LessThan(0.01f));
+            scheduleButton.onClick.Invoke();
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded), Is.LessThan(0.01f));
         }
 
         [UnityTest]
@@ -1439,6 +1638,18 @@ namespace ElectricalSim.Tests
         private static Button ButtonWithText(Transform root, string label)
             => root.GetComponentsInChildren<Button>(true).Single(button =>
                 button.GetComponentsInChildren<Text>(true).Any(text => text.text == label));
+
+        private static void AssertRectStaysInside(RectTransform inner, RectTransform outer)
+        {
+            var innerCorners = new Vector3[4];
+            var outerCorners = new Vector3[4];
+            inner.GetWorldCorners(innerCorners);
+            outer.GetWorldCorners(outerCorners);
+            Assert.That(innerCorners[0].x, Is.GreaterThanOrEqualTo(outerCorners[0].x - 0.1f));
+            Assert.That(innerCorners[0].y, Is.GreaterThanOrEqualTo(outerCorners[0].y - 0.1f));
+            Assert.That(innerCorners[2].x, Is.LessThanOrEqualTo(outerCorners[2].x + 0.1f));
+            Assert.That(innerCorners[2].y, Is.LessThanOrEqualTo(outerCorners[2].y + 0.1f));
+        }
 
         private static bool HasAncestor(Transform item, string name)
         {

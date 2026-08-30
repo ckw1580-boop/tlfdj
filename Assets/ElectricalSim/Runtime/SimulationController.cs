@@ -142,13 +142,10 @@ namespace ElectricalSim
             if (portHover != null) portHover.Hide();
             foreach (var port in portViews.Values) port.SetVisibleForMode(mode);
             modeText.text = $"当前模式：{ModeName(mode)}";
-            // Preserve any camera that is already behind the cabinet. Rear
-            // connection points are selected from the actual camera side, so the
-            // user does not need to enter fault mode before wiring there.
-            if (mode == SimulationMode.Wiring &&
-                !trainingCamera.IsViewingFaultSide)
-                trainingCamera.SetWiringView();
-            else if (mode == SimulationMode.Fault) trainingCamera.SetFaultView();
+            // Entering wiring mode must preserve the user's current camera pose.
+            // Connection points already follow the actual camera side, while the
+            // explicit view menu remains available for choosing a preset.
+            if (mode == SimulationMode.Fault) trainingCamera.SetFaultView();
             SetStatus($"已进入{ModeName(mode)}模式。", false);
             ModeChanged?.Invoke(mode);
         }
