@@ -66,6 +66,7 @@ namespace ElectricalSim
             CreateDevices();
             CreateOriginalTerminalBoardPorts();
             CreateOriginalCabinetTerminalBoardPorts();
+            CreateCabinetBreakerConnectionPorts();
             Debug.Log("[OfflineBootstrap] Devices ready.");
             var ui = CreateHud();
             Debug.Log("[OfflineBootstrap] HUD ready.");
@@ -632,6 +633,101 @@ namespace ElectricalSim
                     0.2f,
                     positionTravelScale);
                 result.Add(interaction);
+            }
+        }
+
+        private void CreateCabinetBreakerConnectionPorts()
+        {
+            if (originalEnvironment == null) return;
+            if (originalEnvironmentTransforms == null) CacheOriginalEnvironmentTransforms();
+
+            AddBreakerPorts(
+                "106",
+                "KongQiKaiGuan_3PK",
+                "三极断路器 106",
+                new[] { "L1", "L3", "L5", "L2", "L4", "L6" });
+            AddBreakerPorts(
+                "122",
+                "KongQiKaiGuan_4PK",
+                "四极断路器 122",
+                new[] { "N1", "L1", "L3", "L5", "N2", "L2", "L4", "L6" });
+
+            void AddBreakerPorts(
+                string breakerId,
+                string modelName,
+                string displayName,
+                IReadOnlyList<string> terminalNames)
+            {
+                var deviceRoot = originalEnvironmentTransforms.FirstOrDefault(item =>
+                    item.name == breakerId && item.gameObject.activeInHierarchy);
+                var model = deviceRoot != null
+                    ? deviceRoot.GetComponentsInChildren<Transform>(true).FirstOrDefault(item =>
+                        string.Equals(item.name, modelName, StringComparison.OrdinalIgnoreCase) &&
+                        item.gameObject.activeInHierarchy)
+                    : null;
+                var pointRoot = model != null ? model.Find("point") : null;
+                if (pointRoot == null)
+                {
+                    Debug.LogWarning($"[OfflineBootstrap] Cabinet breaker terminal root is missing: {breakerId}/{modelName}/point");
+                    return;
+                }
+
+                var anchors = terminalNames
+                    .Select(pointRoot.Find)
+                    .Where(item => item != null && item.gameObject.activeInHierarchy)
+                    .ToList();
+                if (anchors.Count != terminalNames.Count)
+                {
+                    var found = new HashSet<string>(anchors.Select(item => item.name), StringComparer.Ordinal);
+                    var missing = terminalNames.Where(item => !found.Contains(item));
+                    Debug.LogWarning($"[OfflineBootstrap] Cabinet breaker {breakerId} terminals are missing: {string.Join(", ", missing)}");
+                }
+                if (anchors.Count == 0) return;
+
+                var runtimeId = "QF" + breakerId;
+                var runtime = new ElectricalDeviceRuntime(
+                    runtimeId,
+                    ElectricalDeviceKind.Terminal,
+                    anchors.Select(item => item.name));
+                AddPhaseAlias("L1", "L1");
+                AddPhaseAlias("L3", "L2");
+                AddPhaseAlias("L5", "L3");
+                AddPhaseAlias("L2", "T1");
+                AddPhaseAlias("L4", "T2");
+                AddPhaseAlias("L6", "T3");
+
+                var portRoot = new GameObject(runtimeId + " Original Breaker Connection Points");
+                portRoot.transform.SetParent(originalEnvironment, false);
+                var view = portRoot.AddComponent<ElectricalDeviceView>();
+                view.Initialize(runtime, displayName + "连接点");
+                foreach (var anchor in anchors)
+                {
+                    var portObject = CreatePrimitive(
+                        PrimitiveType.Sphere,
+                        "Port",
+                        portRoot.transform,
+                        portRoot.transform.InverseTransformPoint(anchor.position),
+                        Vector3.one * 0.0085f,
+                        new Color(0.12f, 0.86f, 0.36f));
+                    var collider = portObject.GetComponent<SphereCollider>();
+                    if (collider != null) collider.radius = 0.9f;
+                    var port = portObject.AddComponent<ElectricalPortView>();
+                    port.Initialize(runtimeId, anchor.name, new Color(0.12f, 0.86f, 0.36f));
+                    port.ConfigureHover(anchor.name, anchor.name);
+                    port.ConfigureOriginalAnchors(anchor, anchor, anchor, anchor);
+                    port.ConfigureElectricalOnly();
+                    port.ConfigureWiringModeOnly();
+                    view.AddPort(port);
+                }
+
+                deviceViews.Add(view);
+                Debug.Log($"[OfflineBootstrap] Cabinet breaker {breakerId} ready: {view.Ports.Count} physical connection points.");
+
+                void AddPhaseAlias(string physicalPort, string qfPort)
+                {
+                    if (anchors.Any(item => item.name == physicalPort))
+                        runtime.AddFixedLink(physicalPort, CircuitGraph.Port("QF", qfPort));
+                }
             }
         }
 

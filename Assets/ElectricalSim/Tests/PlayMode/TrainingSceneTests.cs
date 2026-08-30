@@ -66,6 +66,10 @@ namespace ElectricalSim.Tests
                 item => item.BreakerId,
                 item => item.Handle.GetComponent<Renderer>().material.color);
             Assert.That(breakers.All(item => !item.IsHighlighted), Is.True);
+            Assert.That(breakers.All(item => item.HighlightRenderers.Count > 0 &&
+                                             item.HighlightRenderers.All(renderer => !renderer.enabled)),
+                Is.True,
+                "Both breaker handles must have a hidden yellow outline outside drag mode");
 
             Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.False,
                 "Cabinet breakers must ignore interactions outside drag mode");
@@ -75,10 +79,13 @@ namespace ElectricalSim.Tests
             Assert.That(breakers.All(item => item.IsHighlighted), Is.True);
             foreach (var breaker in breakers)
             {
-                var highlightedColor = breaker.Handle.GetComponent<Renderer>().material.color;
-                Assert.That(Vector4.Distance(highlightedColor, baseHandleColors[breaker.BreakerId]),
-                    Is.GreaterThan(0.05f),
-                    $"Breaker {breaker.BreakerId} handle must visibly highlight in drag mode");
+                Assert.That(breaker.HighlightRenderers.All(renderer => renderer.enabled), Is.True,
+                    $"Breaker {breaker.BreakerId} yellow outline must be visible in drag mode");
+                Assert.That(Vector4.Distance(
+                        breaker.Handle.GetComponent<Renderer>().material.color,
+                        baseHandleColors[breaker.BreakerId]),
+                    Is.LessThan(0.001f),
+                    $"Breaker {breaker.BreakerId} must retain its original blue material");
             }
             Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True);
             yield return new WaitForSecondsRealtime(breakers[0].AnimationDuration * 0.25f);
@@ -138,6 +145,7 @@ namespace ElectricalSim.Tests
             foreach (var breaker in breakers)
             {
                 Assert.That(breaker.IsHighlighted, Is.False);
+                Assert.That(breaker.HighlightRenderers.All(renderer => !renderer.enabled), Is.True);
                 Assert.That(Vector4.Distance(
                         breaker.Handle.GetComponent<Renderer>().material.color,
                         baseHandleColors[breaker.BreakerId]),
@@ -166,6 +174,79 @@ namespace ElectricalSim.Tests
             Assert.That(mainBreaker.IsClosed, Is.False,
                 "The task action initializer must preserve the physical breaker interlock");
             controller.StopAllCoroutines();
+        }
+
+        [UnityTest]
+        public IEnumerator CabinetBreakerConnectionPointsAppearOnlyInElectricalWiringMode()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var views = Object.FindObjectsOfType<ElectricalDeviceView>();
+            var breaker106 = views.Single(item => item.Runtime.DeviceId == "QF106");
+            var breaker122 = views.Single(item => item.Runtime.DeviceId == "QF122");
+            Assert.That(breaker106.Ports.Select(item => item.PortName),
+                Is.EquivalentTo(new[] { "L1", "L3", "L5", "L2", "L4", "L6" }));
+            Assert.That(breaker122.Ports.Select(item => item.PortName),
+                Is.EquivalentTo(new[] { "N1", "L1", "L3", "L5", "N2", "L2", "L4", "L6" }));
+
+            var allPorts = breaker106.Ports.Concat(breaker122.Ports).ToArray();
+            Assert.That(allPorts.All(item => item.HoverLabel == item.PortName), Is.True,
+                "Breaker connection-point remarks should only display the terminal name.");
+            Assert.That(allPorts.All(item => !item.HoverLabel.StartsWith("106-") && !item.HoverLabel.StartsWith("122-")), Is.True,
+                "Breaker connection-point remarks should not include the cabinet-number prefix.");
+            Assert.That(allPorts.All(item => item.CurrentAnchor != null &&
+                                              item.CurrentAnchor.parent != null &&
+                                              item.CurrentAnchor.parent.name == "point"),
+                Is.True,
+                "Every breaker marker must use a detected original point Transform");
+            Assert.That(allPorts.All(item => item.ElectricalOnly && item.WiringModeOnly), Is.True);
+            Assert.That(allPorts.All(item => !item.IsVisible), Is.True);
+
+            var expectedAliases = new Dictionary<string, string>
+            {
+                ["L1"] = "QF.L1",
+                ["L3"] = "QF.L2",
+                ["L5"] = "QF.L3",
+                ["L2"] = "QF.T1",
+                ["L4"] = "QF.T2",
+                ["L6"] = "QF.T3"
+            };
+            foreach (var view in new[] { breaker106, breaker122 })
+            {
+                var links = view.Runtime.GetConductiveLinks().ToDictionary(item => item.A, item => item.B);
+                Assert.That(links, Is.EquivalentTo(expectedAliases));
+                Assert.That(links.ContainsKey("N1") || links.ContainsKey("N2"), Is.False,
+                    "The four-pole neutral anchors must not add a neutral circuit topology");
+            }
+
+            controller.SetMode(SimulationMode.Fault);
+            yield return null;
+            Assert.That(allPorts.All(item => !item.IsVisible), Is.True);
+
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            controller.SetMode(SimulationMode.Wiring);
+            yield return null;
+            Assert.That(allPorts.All(item => item.IsVisible && item.GetComponent<Collider>().enabled), Is.True);
+            Assert.That(allPorts.All(item => Vector3.Distance(item.transform.position, item.CurrentAnchor.position) < 0.001f),
+                Is.True);
+            Physics.SyncTransforms();
+            foreach (var port in allPorts)
+            {
+                var direction = port.transform.position - Camera.main.transform.position;
+                Assert.That(Physics.Raycast(Camera.main.transform.position, direction.normalized, out var hit, 100f),
+                    Is.True,
+                    port.HoverLabel);
+                Assert.That(hit.collider.GetComponentInParent<ElectricalPortView>(), Is.EqualTo(port),
+                    $"The electrical wiring camera must directly hit {port.HoverLabel}");
+            }
+
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            Assert.That(allPorts.All(item => !item.IsVisible), Is.True);
+
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            controller.SetMode(SimulationMode.Drag);
+            yield return null;
+            Assert.That(allPorts.All(item => !item.IsVisible), Is.True);
         }
 
         [UnityTest]

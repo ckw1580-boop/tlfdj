@@ -140,8 +140,7 @@ namespace ElectricalSim
                 if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
             ClearSelection();
             if (portHover != null) portHover.Hide();
-            var showPorts = mode == SimulationMode.Wiring || mode == SimulationMode.Fault;
-            foreach (var port in portViews.Values) port.SetVisible(showPorts);
+            foreach (var port in portViews.Values) port.SetVisibleForMode(mode);
             modeText.text = $"当前模式：{ModeName(mode)}";
             // Preserve any camera that is already behind the cabinet. Rear
             // connection points are selected from the actual camera side, so the

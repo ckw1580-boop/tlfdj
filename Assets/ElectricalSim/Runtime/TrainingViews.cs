@@ -17,6 +17,7 @@ namespace ElectricalSim
         private bool supportsJumperAnchor = true;
         private bool jumperOnly;
         private bool electricalOnly;
+        private bool wiringModeOnly;
         private bool requestedVisible;
         private bool isVisible;
 
@@ -29,6 +30,7 @@ namespace ElectricalSim
         public bool SupportsJumperAnchor => supportsJumperAnchor;
         public bool JumperOnly => jumperOnly;
         public bool ElectricalOnly => electricalOnly;
+        public bool WiringModeOnly => wiringModeOnly;
         public bool UsesJumperAnchor { get; private set; }
         public Transform CurrentAnchor { get; private set; }
         public Vector3 CurrentAnchorPosition => CurrentAnchor != null ? CurrentAnchor.position : transform.position;
@@ -62,6 +64,12 @@ namespace ElectricalSim
         {
             electricalOnly = value;
             if (value) jumperOnly = false;
+            RefreshVisibility();
+        }
+
+        public void ConfigureWiringModeOnly(bool value = true)
+        {
+            wiringModeOnly = value;
             RefreshVisibility();
         }
 
@@ -109,6 +117,12 @@ namespace ElectricalSim
         {
             requestedVisible = visible;
             RefreshVisibility();
+        }
+
+        public void SetVisibleForMode(SimulationMode mode)
+        {
+            SetVisible(mode == SimulationMode.Wiring ||
+                       (!wiringModeOnly && mode == SimulationMode.Fault));
         }
 
         private void RefreshVisibility()
@@ -185,11 +199,8 @@ namespace ElectricalSim
         private float animationDuration;
         private float openPositionTravelScale;
         private Coroutine animationRoutine;
-        private Renderer[] handleRenderers = Array.Empty<Renderer>();
-        private Material[][] handleMaterials = Array.Empty<Material[]>();
-        private Color[][] baseMaterialColors = Array.Empty<Color[]>();
-        private Color[][] baseEmissionColors = Array.Empty<Color[]>();
-        private bool[][] baseEmissionEnabled = Array.Empty<bool[]>();
+        private readonly List<Renderer> highlightRenderers = new List<Renderer>();
+        private Material outlineMaterial;
 
         public string BreakerId { get; private set; } = string.Empty;
         public string DisplayName { get; private set; } = string.Empty;
@@ -200,6 +211,7 @@ namespace ElectricalSim
         public float AnimationDuration => animationDuration;
         public float OpenPositionTravelScale => openPositionTravelScale;
         public bool IsHighlighted { get; private set; }
+        public IReadOnlyList<Renderer> HighlightRenderers => highlightRenderers;
 
         public event Action<CabinetBreakerInteractable, bool> StateChanged;
 
@@ -224,7 +236,7 @@ namespace ElectricalSim
             if (handle == null || pivot == null)
                 throw new ArgumentException("A cabinet breaker requires both a switch handle and a rotation pivot.");
 
-            CaptureHighlightMaterials();
+            CreateHighlightOutlines();
             closedLocalPosition = handle.localPosition;
             closedLocalRotation = handle.localRotation;
             CaptureOpenPose(openAngleDegrees);
@@ -238,35 +250,8 @@ namespace ElectricalSim
         public void SetHighlighted(bool highlighted)
         {
             IsHighlighted = highlighted;
-            var highlightColor = new Color(0.12f, 0.78f, 1f, 1f);
-            var highlightEmission = new Color(0.04f, 0.38f, 0.75f, 1f);
-            for (var rendererIndex = 0; rendererIndex < handleMaterials.Length; rendererIndex++)
-            {
-                var materials = handleMaterials[rendererIndex];
-                for (var materialIndex = 0; materialIndex < materials.Length; materialIndex++)
-                {
-                    var material = materials[materialIndex];
-                    if (material == null) continue;
-                    if (material.HasProperty("_Color") || material.HasProperty("_BaseColor"))
-                    {
-                        var baseColor = baseMaterialColors[rendererIndex][materialIndex];
-                        material.color = highlighted
-                            ? Color.Lerp(baseColor, highlightColor, 0.72f)
-                            : baseColor;
-                    }
-
-                    if (!material.HasProperty("_EmissionColor")) continue;
-                    material.SetColor(
-                        "_EmissionColor",
-                        highlighted
-                            ? baseEmissionColors[rendererIndex][materialIndex] + highlightEmission
-                            : baseEmissionColors[rendererIndex][materialIndex]);
-                    if (highlighted || baseEmissionEnabled[rendererIndex][materialIndex])
-                        material.EnableKeyword("_EMISSION");
-                    else
-                        material.DisableKeyword("_EMISSION");
-                }
-            }
+            foreach (var renderer in highlightRenderers)
+                if (renderer != null) renderer.enabled = highlighted;
         }
 
         public void SetClosed(bool closed, bool animate)
@@ -306,31 +291,50 @@ namespace ElectricalSim
             openLocalRotation = Quaternion.Inverse(parent.rotation) * openWorldRotation;
         }
 
-        private void CaptureHighlightMaterials()
+        private void CreateHighlightOutlines()
         {
-            handleRenderers = handle.GetComponentsInChildren<Renderer>(true);
-            handleMaterials = new Material[handleRenderers.Length][];
-            baseMaterialColors = new Color[handleRenderers.Length][];
-            baseEmissionColors = new Color[handleRenderers.Length][];
-            baseEmissionEnabled = new bool[handleRenderers.Length][];
-            for (var rendererIndex = 0; rendererIndex < handleRenderers.Length; rendererIndex++)
+            var shader = Resources.Load<Shader>("CabinetBreakerOutline");
+            if (shader == null) shader = Shader.Find("ElectricalSim/Cabinet Breaker Outline");
+            if (shader == null)
             {
-                var materials = handleRenderers[rendererIndex].materials;
-                handleMaterials[rendererIndex] = materials;
-                baseMaterialColors[rendererIndex] = new Color[materials.Length];
-                baseEmissionColors[rendererIndex] = new Color[materials.Length];
-                baseEmissionEnabled[rendererIndex] = new bool[materials.Length];
-                for (var materialIndex = 0; materialIndex < materials.Length; materialIndex++)
-                {
-                    var material = materials[materialIndex];
-                    if (material == null) continue;
-                    if (material.HasProperty("_Color") || material.HasProperty("_BaseColor"))
-                        baseMaterialColors[rendererIndex][materialIndex] = material.color;
-                    if (!material.HasProperty("_EmissionColor")) continue;
-                    baseEmissionColors[rendererIndex][materialIndex] = material.GetColor("_EmissionColor");
-                    baseEmissionEnabled[rendererIndex][materialIndex] = material.IsKeywordEnabled("_EMISSION");
-                }
+                Debug.LogWarning($"Cabinet breaker {BreakerId} highlight shader is unavailable.");
+                return;
             }
+
+            outlineMaterial = new Material(shader)
+            {
+                name = $"Cabinet Breaker {BreakerId} Yellow Outline",
+                hideFlags = HideFlags.DontSave
+            };
+            outlineMaterial.SetColor("_OutlineColor", new Color(1f, 0.82f, 0.04f, 1f));
+            outlineMaterial.SetColor("_GlowColor", new Color(1f, 0.68f, 0.02f, 0.28f));
+            outlineMaterial.SetFloat("_OutlineWidth", 0.0009f);
+            outlineMaterial.SetFloat("_GlowWidth", 0.0022f);
+
+            var sourceRenderers = handle.GetComponentsInChildren<MeshRenderer>(true);
+            foreach (var sourceRenderer in sourceRenderers)
+            {
+                var sourceFilter = sourceRenderer.GetComponent<MeshFilter>();
+                if (sourceFilter == null || sourceFilter.sharedMesh == null) continue;
+                var outlineObject = new GameObject("Drag Mode Yellow Outline");
+                outlineObject.layer = sourceRenderer.gameObject.layer;
+                outlineObject.transform.SetParent(sourceRenderer.transform, false);
+                var outlineFilter = outlineObject.AddComponent<MeshFilter>();
+                outlineFilter.sharedMesh = sourceFilter.sharedMesh;
+                var outlineRenderer = outlineObject.AddComponent<MeshRenderer>();
+                outlineRenderer.sharedMaterial = outlineMaterial;
+                outlineRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                outlineRenderer.receiveShadows = false;
+                outlineRenderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+                outlineRenderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+                outlineRenderer.enabled = false;
+                highlightRenderers.Add(outlineRenderer);
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (outlineMaterial != null) Destroy(outlineMaterial);
         }
 
         private IEnumerator AnimateTo(Vector3 targetPosition, Quaternion targetRotation)
