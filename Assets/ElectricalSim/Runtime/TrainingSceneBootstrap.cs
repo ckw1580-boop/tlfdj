@@ -18,6 +18,7 @@ namespace ElectricalSim
         [SerializeField] private Texture2D cabinetBrandLogo;
 
         private readonly List<ElectricalDeviceView> deviceViews = new List<ElectricalDeviceView>();
+        private readonly List<GameObject> cabinetWireDuctCoverGroups = new List<GameObject>();
         private Font uiFont;
         private SimulationController controller;
         private Transform originalEnvironment;
@@ -92,11 +93,19 @@ namespace ElectricalSim
             examController = gameObject.AddComponent<OfflineExamController>();
             captureRecorder = gameObject.AddComponent<LocalCaptureRecorder>();
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, originalVisuals, ui.PortHover);
+            controller.ModeChanged += SetCabinetWireDuctCoversForMode;
+            SetCabinetWireDuctCoversForMode(controller.Mode);
             controller.RegisterCabinetBreakers(CreateCabinetBreakerInteractions());
             BindUi(ui);
             BindOriginalUi(ui);
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
             Debug.Log("[OfflineBootstrap] Build complete.");
+        }
+
+        private void OnDestroy()
+        {
+            if (controller != null)
+                controller.ModeChanged -= SetCabinetWireDuctCoversForMode;
         }
 
         private void RefreshTerminalBoardAnnotations(Transform viewingCamera)
@@ -496,6 +505,7 @@ namespace ElectricalSim
                 RebuildMotorFaultBlocks(environment.transform);
                 originalEnvironment = environment.transform;
                 CacheOriginalEnvironmentTransforms();
+                CacheCabinetWireDuctCoverGroups();
                 CreateOriginalRoomShell();
                 if (environment.GetComponentInChildren<Light>(true) == null) CreateMainLight();
             }
@@ -650,6 +660,35 @@ namespace ElectricalSim
                     0.2f,
                     positionTravelScale);
                 result.Add(interaction);
+            }
+        }
+
+        private void CacheCabinetWireDuctCoverGroups()
+        {
+            cabinetWireDuctCoverGroups.Clear();
+            if (originalEnvironment == null) return;
+
+            foreach (var path in new[]
+                     {
+                         "Bench/ElectricBench/mesh/xiancaogai",
+                         "Bench/ElectricBench/mesh/xiancaogai_1"
+                     })
+            {
+                var group = originalEnvironment.Find(path);
+                if (group != null)
+                    cabinetWireDuctCoverGroups.Add(group.gameObject);
+                else
+                    Debug.LogWarning("[OfflineBootstrap] Cabinet wire-duct cover group not found: " + path);
+            }
+        }
+
+        private void SetCabinetWireDuctCoversForMode(SimulationMode mode)
+        {
+            var visible = mode != SimulationMode.Wiring;
+            foreach (var group in cabinetWireDuctCoverGroups)
+            {
+                if (group != null && group.activeSelf != visible)
+                    group.SetActive(visible);
             }
         }
 

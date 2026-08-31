@@ -877,6 +877,55 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator WiringModeHidesBothCabinetWireDuctCoverGroupsAndRestoresThemOnExit()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var environment = GameObject.Find("OriginalLabEnvironment");
+            var cabinetMesh = environment.transform.Find("Bench/ElectricBench/mesh");
+            var frontCoverGroup = cabinetMesh.Find("xiancaogai");
+            var rearCoverGroup = cabinetMesh.Find("xiancaogai_1");
+
+            Assert.That(frontCoverGroup, Is.Not.Null);
+            Assert.That(rearCoverGroup, Is.Not.Null);
+            Assert.That(frontCoverGroup.childCount, Is.EqualTo(6));
+            Assert.That(rearCoverGroup.childCount, Is.EqualTo(7));
+
+            var coverGroups = new[] { frontCoverGroup, rearCoverGroup };
+            var covers = coverGroups.SelectMany(group => group.Cast<Transform>()).ToArray();
+            var unaffectedCabinetObjects = cabinetMesh.Cast<Transform>()
+                .Where(item => !coverGroups.Contains(item))
+                .ToDictionary(item => item, item => item.gameObject.activeSelf);
+
+            Assert.That(covers.Length, Is.EqualTo(13));
+            Assert.That(covers.All(item => item.name.StartsWith("gaizi_", System.StringComparison.Ordinal)), Is.True);
+            Assert.That(coverGroups.All(group => group.gameObject.activeInHierarchy), Is.True);
+            Assert.That(covers.All(item => item.gameObject.activeInHierarchy), Is.True);
+
+            cameraController.SetWiringView();
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            controller.SetMode(SimulationMode.Wiring);
+            yield return null;
+            Assert.That(coverGroups.All(group => !group.gameObject.activeSelf), Is.True);
+            Assert.That(covers.All(item => !item.gameObject.activeInHierarchy), Is.True);
+
+            cameraController.SetFaultView();
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            yield return null;
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Wiring));
+            Assert.That(coverGroups.All(group => !group.gameObject.activeSelf), Is.True,
+                "Both cover groups must stay hidden from the rear in jumper-line mode");
+
+            controller.SetMode(SimulationMode.View);
+            yield return null;
+            Assert.That(coverGroups.All(group => group.gameObject.activeInHierarchy), Is.True);
+            Assert.That(covers.All(item => item.gameObject.activeInHierarchy), Is.True);
+            foreach (var item in unaffectedCabinetObjects)
+                Assert.That(item.Key.gameObject.activeSelf, Is.EqualTo(item.Value),
+                    item.Key.name + " must not be changed with the wire-duct covers");
+        }
+
+        [UnityTest]
         public IEnumerator TopPanelControlsExposeOnlyTerminalBoardConnectionPoints()
         {
             var views = Object.FindObjectsOfType<ElectricalDeviceView>();
