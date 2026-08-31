@@ -703,6 +703,21 @@ namespace ElectricalSim.Tests
             var result = CircuitTaskEvaluator.EvaluateTopology(controller.Graph, controller.CurrentTask);
             Assert.That(result.Passed, Is.True, result.Summary());
             Assert.That(controller.Graph.Wires.Count, Is.GreaterThan(10));
+
+            var camera = Camera.main;
+            var wireViews = Object.FindObjectsOfType<ElectricalWireView>();
+            Assert.That(wireViews.Length, Is.EqualTo(controller.Graph.Wires.Count));
+            foreach (var wireView in wireViews)
+            {
+                var renderer = wireView.GetComponent<LineRenderer>();
+                var points = new Vector3[renderer.positionCount];
+                renderer.GetPositions(points);
+                var depths = points
+                    .Select(point => camera.transform.InverseTransformPoint(point).z)
+                    .ToArray();
+                Assert.That(depths.Max() - depths.Min(), Is.LessThan(0.0001f),
+                    $"{wireView.name} crosses the cabinet depth and may be partially hidden.");
+            }
         }
 
         [UnityTest]
@@ -1321,6 +1336,36 @@ namespace ElectricalSim.Tests
             var expectedGap = 56f - lineForm.rect.height * 0.5f;
             Assert.That(toolbarBottom - lineTop, Is.EqualTo(expectedGap).Within(0.1f),
                 "The line-style form should be raised by half of its own height from the reference position.");
+        }
+
+        [UnityTest]
+        public IEnumerator OriginalLineFormColorControlsConnectionColorAndSurvivesLineTypeChanges()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var lineForm = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "OriginalUI_LineForm");
+            var colorDropdown = lineForm.GetComponentsInChildren<Dropdown>(true)
+                .Single(item => item.name == "Color");
+            var lineTypeDropdown = lineForm.GetComponentsInChildren<Dropdown>(true)
+                .Single(item => item.name == "LineType");
+
+            Assert.That(colorDropdown.options.Count, Is.EqualTo(6));
+            Assert.That(Vector4.Distance(controller.CurrentWireColor, Color.red), Is.LessThan(0.0001f));
+
+            colorDropdown.value = 2;
+            yield return null;
+            Assert.That(Vector4.Distance(controller.CurrentWireColor, Color.blue), Is.LessThan(0.0001f));
+
+            lineTypeDropdown.value = 1;
+            yield return null;
+            Assert.That(controller.CurrentLineType, Is.EqualTo("JumperLine"));
+            Assert.That(Vector4.Distance(controller.CurrentWireColor, Color.blue), Is.LessThan(0.0001f),
+                "Changing the connection type must not reset the selected wire color.");
+
+            colorDropdown.value = 0;
+            yield return null;
+            Assert.That(Vector4.Distance(controller.CurrentWireColor, Color.red), Is.LessThan(0.0001f),
+                "The red option must create a red wire instead of enabling automatic port coloring.");
         }
 
         [UnityTest]

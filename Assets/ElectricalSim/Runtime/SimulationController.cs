@@ -19,6 +19,9 @@ namespace ElectricalSim
         private IReadOnlyList<CircuitTaskSpec> tasks;
         private int taskIndex;
         private ElectricalPortView selectedPort;
+        private readonly List<Vector3> pendingWirePoints = new List<Vector3>();
+        private ElectricalWireDraftView wireDraftView;
+        private Vector3 wireDraftCursor;
         private readonly List<ElectricalPortView> meterPorts = new List<ElectricalPortView>();
         private ElectricalDeviceView draggedDevice;
         private Plane dragPlane;
@@ -49,6 +52,10 @@ namespace ElectricalSim
         public CircuitTaskSpec CurrentTask => tasks[taskIndex];
         public IReadOnlyList<CabinetBreakerInteractable> CabinetBreakers => cabinetBreakers;
         public bool AreCabinetBreakersClosed => cabinetBreakers.Count == 0 || cabinetBreakers.All(item => item.IsClosed);
+        public bool IsRoutingWire => selectedPort != null && Mode == SimulationMode.Wiring;
+        public Color CurrentWireColor => currentWireColor;
+        public float CurrentWireArea => currentWireArea;
+        public string CurrentLineType => currentLineType;
         public event Action<SimulationMode> ModeChanged;
 
         public void Initialize(
@@ -125,6 +132,7 @@ namespace ElectricalSim
         {
             HandleHotkeys();
             UpdatePortHover();
+            UpdateWiringDraft();
             HandleSceneInput();
             lastSnapshot = graph.Solve(Time.deltaTime);
             foreach (var view in wireViews) view.Refresh();
@@ -269,6 +277,7 @@ namespace ElectricalSim
                     breaker.StateChanged -= OnCabinetBreakerStateChanged;
                     breaker.SetHighlighted(false);
                 }
+            DestroyWireDraft();
             if (portHover != null) portHover.Hide();
         }
 
@@ -433,13 +442,22 @@ namespace ElectricalSim
             }
             if (!Input.GetMouseButtonDown(0)) return;
 
-            var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-            if (!Physics.Raycast(ray, out var hit, 100f)) return;
-            var port = hit.collider.GetComponent<ElectricalPortView>();
+            var camera = Camera.main;
+            if (camera == null) return;
+            var ray = camera.ScreenPointToRay(Input.mousePosition);
+            var hasHit = Physics.Raycast(ray, out var hit, 100f);
+            var port = hasHit ? hit.collider.GetComponent<ElectricalPortView>() : null;
+
+            if (Mode == SimulationMode.Wiring)
+            {
+                HandleWiringClick(port, ray);
+                return;
+            }
+
+            if (!hasHit) return;
             var deviceView = hit.collider.GetComponentInParent<ElectricalDeviceView>();
 
-            if (Mode == SimulationMode.Wiring && port != null) HandleWiringPort(port);
-            else if (Mode == SimulationMode.Fault && port != null) HandleMeterPort(port);
+            if (Mode == SimulationMode.Fault && port != null) HandleMeterPort(port);
             else if (Mode == SimulationMode.Simulate && deviceView != null) HandleDeviceControl(deviceView.Runtime);
         }
 
@@ -467,29 +485,104 @@ namespace ElectricalSim
             if (Input.GetMouseButtonUp(0)) draggedDevice = null;
         }
 
-        private void HandleWiringPort(ElectricalPortView port)
+        private void HandleWiringClick(ElectricalPortView port, Ray ray)
         {
             if (selectedPort == null)
             {
-                selectedPort = port;
-                selectedPort.SetHighlighted(true);
-                SetStatus($"起点：{port.QualifiedPort}，请选择终点。", false);
+                if (port == null) return;
+                BeginWireRoute(port);
                 return;
             }
 
-            if (selectedPort == port)
+            if (port != null)
             {
-                ClearSelection();
+                if (selectedPort == port)
+                {
+                    ClearSelection();
+                    SetStatus("已取消当前接线。", false);
+                    return;
+                }
+
+                CompleteWireRoute(port);
                 return;
             }
 
+            if (!TryProjectWirePoint(ray, out var point)) return;
+            var previous = pendingWirePoints.Count > 0
+                ? pendingWirePoints[pendingWirePoints.Count - 1]
+                : selectedPort.CurrentAnchorPosition;
+            if (Vector3.Distance(previous, point) < ElectricalWireView.WidthForArea(currentWireArea) * 1.5f) return;
+            pendingWirePoints.Add(point);
+            wireDraftCursor = point;
+            wireDraftView?.Refresh(pendingWirePoints, wireDraftCursor);
+            SetStatus($"已添加第 {pendingWirePoints.Count} 个路径点；继续点选路径，或点击终点端子完成。", false);
+        }
+
+        private void BeginWireRoute(ElectricalPortView port)
+        {
+            pendingWirePoints.Clear();
+            selectedPort = port;
+            selectedPort.SetHighlighted(true);
+            wireDraftCursor = port.CurrentAnchorPosition;
+
+            DestroyWireDraft();
+            var draftObject = new GameObject("Wire_Draft");
+            draftObject.transform.SetParent(wireRoot, false);
+            wireDraftView = draftObject.AddComponent<ElectricalWireDraftView>();
+            var startPortName = port.QualifiedPort;
+            wireDraftView.Initialize(
+                () => ResolvePortPosition(startPortName),
+                wireMaterial,
+                currentWireColor,
+                currentWireArea);
+            wireDraftView.Refresh(pendingWirePoints, wireDraftCursor);
+            SetStatus($"起点：{port.QualifiedPort}。左键空白处添加路径点，点击另一个端子完成。", false);
+        }
+
+        private void CompleteWireRoute(ElectricalPortView port)
+        {
+            var startPort = selectedPort;
+            var startPortName = startPort.QualifiedPort;
+            var beforeCount = graph.Wires.Count;
             PushWireHistory();
-            var color = currentWireColor == Color.red ? ColorForPort(selectedPort.QualifiedPort) : currentWireColor;
-            graph.AddWire(selectedPort.QualifiedPort, port.QualifiedPort, color, currentLineType, currentWireArea);
-            selectedPort.SetHighlighted(false);
+            var wire = graph.AddWire(
+                startPortName,
+                port.QualifiedPort,
+                currentWireColor,
+                currentLineType,
+                currentWireArea);
+            if (graph.Wires.Count > beforeCount) wire.Points.AddRange(pendingWirePoints);
+            startPort.SetHighlighted(false);
             selectedPort = null;
+            pendingWirePoints.Clear();
+            DestroyWireDraft();
             RefreshWireViews();
             SetStatus($"线路已连接到 {port.QualifiedPort}。", false);
+        }
+
+        private void UpdateWiringDraft()
+        {
+            if (!IsRoutingWire || wireDraftView == null || Camera.main == null) return;
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
+            var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            if (!TryProjectWirePoint(ray, out wireDraftCursor)) return;
+            wireDraftView.Refresh(pendingWirePoints, wireDraftCursor);
+        }
+
+        private bool TryProjectWirePoint(Ray ray, out Vector3 point)
+        {
+            point = Vector3.zero;
+            if (selectedPort == null || Camera.main == null) return false;
+            var plane = new Plane(-Camera.main.transform.forward, selectedPort.CurrentAnchorPosition);
+            if (!plane.Raycast(ray, out var distance) || distance < 0f) return false;
+            point = ray.GetPoint(distance);
+            return true;
+        }
+
+        private void DestroyWireDraft()
+        {
+            if (wireDraftView != null) Destroy(wireDraftView.gameObject);
+            wireDraftView = null;
         }
 
         private void HandleMeterPort(ElectricalPortView port)
@@ -610,6 +703,8 @@ namespace ElectricalSim
         {
             if (selectedPort != null) selectedPort.SetHighlighted(false);
             selectedPort = null;
+            pendingWirePoints.Clear();
+            DestroyWireDraft();
             foreach (var port in meterPorts) port.SetHighlighted(false);
             meterPorts.Clear();
             draggedDevice = null;

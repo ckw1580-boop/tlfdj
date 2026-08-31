@@ -34,6 +34,16 @@ namespace ElectricalSim
 
         private const float PanelSlideDuration = 0.2f;
 
+        private static readonly Color[] OriginalWireColors =
+        {
+            Color.red,
+            Color.yellow,
+            Color.blue,
+            Color.green,
+            Color.white,
+            Color.black
+        };
+
         private readonly Color darkBlue = new Color(0.015f, 0.075f, 0.16f, 0.96f);
         private readonly Color cyan = new Color(0.05f, 0.72f, 0.95f, 1f);
         private readonly Color panelBlue = new Color(0.04f, 0.19f, 0.27f, 0.94f);
@@ -2161,16 +2171,41 @@ namespace ElectricalSim
         private void BindOriginalLineForm(GameObject lineForm)
         {
             var lineTypeObject = lineForm.GetComponentsInChildren<Transform>(true).FirstOrDefault(item => item.name == "LineType");
-            var dropdown = lineTypeObject != null ? lineTypeObject.GetComponent<Dropdown>() : null;
-            if (dropdown == null) return;
-            dropdown.ClearOptions();
-            dropdown.AddOptions(new List<string> { "电线", "跳线" });
-            dropdown.onValueChanged.RemoveAllListeners();
-            dropdown.onValueChanged.AddListener(value =>
-                controller.SetWireStyle(Color.red, 0.01f, value == 0 ? "ElectricalWire" : "JumperLine"));
-            dropdown.value = 0;
-            dropdown.RefreshShownValue();
-            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            var lineTypeDropdown = lineTypeObject != null ? lineTypeObject.GetComponent<Dropdown>() : null;
+            var colorObject = lineForm.GetComponentsInChildren<Transform>(true).FirstOrDefault(item => item.name == "Color");
+            var colorDropdown = colorObject != null ? colorObject.GetComponent<Dropdown>() : null;
+            var selectedColor = Color.red;
+            var selectedLineType = "ElectricalWire";
+
+            void ApplyStyle() => controller.SetWireStyle(selectedColor, 0.01f, selectedLineType);
+
+            if (lineTypeDropdown != null)
+            {
+                lineTypeDropdown.ClearOptions();
+                lineTypeDropdown.AddOptions(new List<string> { "电线", "跳线" });
+                lineTypeDropdown.onValueChanged.RemoveAllListeners();
+                lineTypeDropdown.onValueChanged.AddListener(value =>
+                {
+                    selectedLineType = value == 0 ? "ElectricalWire" : "JumperLine";
+                    ApplyStyle();
+                });
+                lineTypeDropdown.SetValueWithoutNotify(0);
+                lineTypeDropdown.RefreshShownValue();
+            }
+
+            if (colorDropdown != null)
+            {
+                colorDropdown.onValueChanged.RemoveAllListeners();
+                colorDropdown.onValueChanged.AddListener(value =>
+                {
+                    selectedColor = OriginalWireColors[Mathf.Clamp(value, 0, OriginalWireColors.Length - 1)];
+                    ApplyStyle();
+                });
+                colorDropdown.SetValueWithoutNotify(0);
+                colorDropdown.RefreshShownValue();
+            }
+
+            ApplyStyle();
         }
 
         private static void BindButtonByText(Transform root, string label, UnityEngine.Events.UnityAction action)

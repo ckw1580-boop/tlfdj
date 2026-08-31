@@ -367,6 +367,7 @@ namespace ElectricalSim
 
     public sealed class ElectricalWireView : MonoBehaviour
     {
+        private const int CurveSamplesPerSpan = 10;
         private LineRenderer line;
         private WireConnection wire;
         private Func<string, Vector3> resolvePort;
@@ -376,30 +377,143 @@ namespace ElectricalSim
             wire = connection;
             resolvePort = portResolver;
             line = gameObject.AddComponent<LineRenderer>();
-            if (material != null) line.sharedMaterial = material;
-            else
-            {
-                var shader = Shader.Find("Sprites/Default");
-                if (shader != null) line.material = new Material(shader);
-            }
-            line.startColor = wire.Color;
-            line.endColor = wire.Color;
-            line.startWidth = Mathf.Clamp(wire.Area * 2.5f, 0.009f, 0.028f);
-            line.endWidth = line.startWidth;
-            line.numCornerVertices = 4;
-            line.numCapVertices = 4;
-            line.useWorldSpace = true;
+            ConfigureLine(line, material, wire.Color, wire.Area);
             Refresh();
         }
 
         public void Refresh()
         {
             if (line == null || wire == null) return;
-            var count = wire.Points.Count + 2;
-            line.positionCount = count;
-            line.SetPosition(0, resolvePort(wire.StartPort));
-            for (var i = 0; i < wire.Points.Count; i++) line.SetPosition(i + 1, wire.Points[i]);
-            line.SetPosition(count - 1, resolvePort(wire.EndPort));
+            var anchors = new List<Vector3>(wire.Points.Count + 2)
+            {
+                resolvePort(wire.StartPort)
+            };
+            anchors.AddRange(wire.Points);
+            anchors.Add(resolvePort(wire.EndPort));
+            ApplyPath(line, anchors);
+        }
+
+        public static float WidthForArea(float area)
+        {
+            // The reference application's cable is visibly narrower than its
+            // green terminal marker (roughly one third to one half as wide).
+            return Mathf.Clamp(area * 0.35f, 0.0025f, 0.025f);
+        }
+
+        public static Vector3[] BuildSmoothedPath(IReadOnlyList<Vector3> anchors, int samplesPerSpan = CurveSamplesPerSpan)
+        {
+            if (anchors == null || anchors.Count == 0) return Array.Empty<Vector3>();
+            if (anchors.Count <= 2)
+            {
+                var direct = new Vector3[anchors.Count];
+                for (var i = 0; i < anchors.Count; i++) direct[i] = anchors[i];
+                return direct;
+            }
+
+            samplesPerSpan = Mathf.Max(1, samplesPerSpan);
+            var points = new List<Vector3>((anchors.Count - 1) * samplesPerSpan + 1);
+            for (var span = 0; span < anchors.Count - 1; span++)
+            {
+                var p0 = anchors[Mathf.Max(0, span - 1)];
+                var p1 = anchors[span];
+                var p2 = anchors[span + 1];
+                var p3 = anchors[Mathf.Min(anchors.Count - 1, span + 2)];
+                for (var sample = 0; sample < samplesPerSpan; sample++)
+                {
+                    var t = sample / (float)samplesPerSpan;
+                    var t2 = t * t;
+                    var t3 = t2 * t;
+                    points.Add(0.5f * ((2f * p1) +
+                                       (-p0 + p2) * t +
+                                       (2f * p0 - 5f * p1 + 4f * p2 - p3) * t2 +
+                                       (-p0 + 3f * p1 - 3f * p2 + p3) * t3));
+                }
+            }
+            points.Add(anchors[anchors.Count - 1]);
+            return points.ToArray();
+        }
+
+        public static Vector3[] BuildVisiblePath(
+            IReadOnlyList<Vector3> anchors,
+            Camera camera,
+            float surfaceOffset,
+            int samplesPerSpan = CurveSamplesPerSpan)
+        {
+            if (anchors == null || anchors.Count == 0) return Array.Empty<Vector3>();
+            if (camera == null) return BuildSmoothedPath(anchors, samplesPerSpan);
+
+            var viewportAnchors = new Vector3[anchors.Count];
+            var nearestDepth = float.PositiveInfinity;
+            for (var i = 0; i < anchors.Count; i++)
+            {
+                viewportAnchors[i] = camera.WorldToViewportPoint(anchors[i]);
+                if (viewportAnchors[i].z > camera.nearClipPlane)
+                    nearestDepth = Mathf.Min(nearestDepth, viewportAnchors[i].z);
+            }
+
+            if (float.IsInfinity(nearestDepth)) return BuildSmoothedPath(anchors, samplesPerSpan);
+
+            var visibleDepth = Mathf.Max(
+                camera.nearClipPlane + 0.001f,
+                nearestDepth - Mathf.Max(0f, surfaceOffset));
+            var visibleAnchors = new Vector3[anchors.Count];
+            for (var i = 0; i < viewportAnchors.Length; i++)
+            {
+                viewportAnchors[i].z = visibleDepth;
+                visibleAnchors[i] = camera.ViewportToWorldPoint(viewportAnchors[i]);
+            }
+
+            return BuildSmoothedPath(visibleAnchors, samplesPerSpan);
+        }
+
+        internal static void ConfigureLine(LineRenderer renderer, Material material, Color color, float area)
+        {
+            if (material != null) renderer.sharedMaterial = material;
+            else
+            {
+                var shader = Shader.Find("Sprites/Default");
+                if (shader != null) renderer.material = new Material(shader);
+            }
+            renderer.startColor = color;
+            renderer.endColor = color;
+            renderer.startWidth = WidthForArea(area);
+            renderer.endWidth = renderer.startWidth;
+            renderer.numCornerVertices = 6;
+            renderer.numCapVertices = 8;
+            renderer.useWorldSpace = true;
+            renderer.alignment = LineAlignment.View;
+        }
+
+        internal static void ApplyPath(LineRenderer renderer, IReadOnlyList<Vector3> anchors)
+        {
+            var points = BuildVisiblePath(anchors, Camera.main, Mathf.Max(renderer.startWidth, 0.001f));
+            renderer.positionCount = points.Length;
+            renderer.SetPositions(points);
+        }
+    }
+
+    public sealed class ElectricalWireDraftView : MonoBehaviour
+    {
+        private readonly List<Vector3> anchors = new List<Vector3>();
+        private LineRenderer line;
+        private Func<Vector3> resolveStart;
+
+        public void Initialize(Func<Vector3> startResolver, Material material, Color color, float area)
+        {
+            resolveStart = startResolver;
+            line = gameObject.AddComponent<LineRenderer>();
+            ElectricalWireView.ConfigureLine(line, material, color, area);
+        }
+
+        public void Refresh(IReadOnlyList<Vector3> bendPoints, Vector3 cursorPosition)
+        {
+            if (line == null || resolveStart == null) return;
+            anchors.Clear();
+            anchors.Add(resolveStart());
+            if (bendPoints != null)
+                for (var i = 0; i < bendPoints.Count; i++) anchors.Add(bendPoints[i]);
+            anchors.Add(cursorPosition);
+            ElectricalWireView.ApplyPath(line, anchors);
         }
     }
 }
