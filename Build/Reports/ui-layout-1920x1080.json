@@ -19341,6 +19341,1245 @@
     ]
   },
   {
+    "Id": "Inverter/",
+    "rect": [
+      -317.0,
+      0.0,
+      450.0,
+      750.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style",
+    "rect": [
+      0.0,
+      0.0,
+      450.0,
+      750.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style/Image (3)",
+    "rect": [
+      0.0,
+      336.1,
+      100.0,
+      10.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style/Image (3)/Image",
+    "rect": [
+      0.0,
+      0.0,
+      88.0,
+      2.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style/Image (2)",
+    "rect": [
+      0.0,
+      312.4,
+      350.0,
+      2.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style/Image (4)",
+    "rect": [
+      0.0,
+      276.6,
+      150.0,
+      40.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style/Image (4)/Text",
+    "rect": [
+      0.0,
+      0.0,
+      130.0,
+      40.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/style/btn_close",
+    "rect": [
+      0.0,
+      0.0,
+      22.00003,
+      22.0
+    ],
+    "anchorMin": [
+      0.9288889,
+      0.9573333
+    ],
+    "anchorMax": [
+      0.977777839,
+      0.9866667
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show",
+    "rect": [
+      0.0,
+      0.0,
+      370.0,
+      160.000031
+    ],
+    "anchorMin": [
+      0.08888888,
+      0.567999959
+    ],
+    "anchorMax": [
+      0.9111111,
+      0.7813333
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title",
+    "rect": [
+      0.0,
+      0.0,
+      370.0,
+      160.000031
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title/1",
+    "rect": [
+      0.0,
+      0.0,
+      129.864868,
+      40.0000153
+    ],
+    "anchorMin": [
+      -0.001972258,
+      0.960469
+    ],
+    "anchorMax": [
+      0.349013865,
+      1.210469
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title/2",
+    "rect": [
+      0.0,
+      0.0,
+      130.864868,
+      40.0000153
+    ],
+    "anchorMin": [
+      0.323155582,
+      0.960469
+    ],
+    "anchorMax": [
+      0.6768444,
+      1.210469
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title/3",
+    "rect": [
+      0.0,
+      0.0,
+      129.8649,
+      40.0000153
+    ],
+    "anchorMin": [
+      0.6470417,
+      0.960469
+    ],
+    "anchorMax": [
+      0.9980279,
+      1.210469
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title/4",
+    "rect": [
+      0.0,
+      0.0,
+      129.864868,
+      40.0
+    ],
+    "anchorMin": [
+      -0.001972258,
+      -0.199999839
+    ],
+    "anchorMax": [
+      0.349013865,
+      0.05000011
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title/5",
+    "rect": [
+      0.0,
+      0.0,
+      130.864868,
+      40.0
+    ],
+    "anchorMin": [
+      0.323155582,
+      -0.199999839
+    ],
+    "anchorMax": [
+      0.6768444,
+      0.05000011
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/title/6",
+    "rect": [
+      0.0,
+      0.0,
+      129.8649,
+      40.0
+    ],
+    "anchorMin": [
+      0.6470417,
+      -0.199999839
+    ],
+    "anchorMax": [
+      0.9980279,
+      0.05000011
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/txt_up",
+    "rect": [
+      -8.0,
+      25.0,
+      176.0,
+      50.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/txt_down",
+    "rect": [
+      -8.0,
+      -32.6,
+      176.0,
+      50.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/txt_upUnit",
+    "rect": [
+      150.0,
+      25.0,
+      50.0,
+      30.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/txt_downUnit",
+    "rect": [
+      150.0,
+      -33.4,
+      50.0,
+      30.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/img_jog",
+    "rect": [
+      -163.1,
+      -32.6,
+      50.0,
+      50.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/img_run",
+    "rect": [
+      -167.2,
+      28.2,
+      50.0,
+      50.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/img_error",
+    "rect": [
+      -121.4,
+      -32.6,
+      50.0,
+      50.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/img_hand",
+    "rect": [
+      -121.0,
+      28.2,
+      50.0,
+      50.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/MONITORING",
+    "rect": [
+      0.0,
+      0.0,
+      80.0,
+      13.0
+    ],
+    "anchorMin": [
+      0.02432432,
+      0.89062494
+    ],
+    "anchorMax": [
+      0.240540534,
+      0.9718749
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/CONTROL",
+    "rect": [
+      0.0,
+      0.0,
+      80.0,
+      13.0
+    ],
+    "anchorMin": [
+      0.3918919,
+      0.89062494
+    ],
+    "anchorMax": [
+      0.6081081,
+      0.9718749
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/DIAGNOSTICS",
+    "rect": [
+      0.0,
+      0.0,
+      80.0,
+      13.0
+    ],
+    "anchorMin": [
+      0.759459436,
+      0.89062494
+    ],
+    "anchorMax": [
+      0.975675642,
+      0.9718749
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/PARAMETER",
+    "rect": [
+      0.0,
+      0.0,
+      80.0,
+      13.0
+    ],
+    "anchorMin": [
+      0.02432432,
+      0.0281250924
+    ],
+    "anchorMax": [
+      0.240540534,
+      0.109375075
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/SETUP",
+    "rect": [
+      0.0,
+      0.0,
+      80.0,
+      13.0
+    ],
+    "anchorMin": [
+      0.3918919,
+      0.0281250924
+    ],
+    "anchorMax": [
+      0.6081081,
+      0.109375075
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/show/EXTRAS",
+    "rect": [
+      0.0,
+      0.0,
+      80.0,
+      13.0
+    ],
+    "anchorMin": [
+      0.759459436,
+      0.0281250924
+    ],
+    "anchorMax": [
+      0.975675642,
+      0.109375075
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control",
+    "rect": [
+      0.0,
+      0.0,
+      388.125,
+      407.142883
+    ],
+    "anchorMin": [
+      0.07500002,
+      -0.04271424
+    ],
+    "anchorMax": [
+      0.9375,
+      0.500142932
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/ESC",
+    "rect": [
+      -123.0,
+      94.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/ESC/btn_esc",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/ESC/btn_esc/Text",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/UP",
+    "rect": [
+      0.0,
+      150.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/UP/btn_up",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/UP/btn_up/Image (1)",
+    "rect": [
+      0.0,
+      0.0,
+      40.0,
+      40.0
+    ],
+    "anchorMin": [
+      0.192307681,
+      0.249230951
+    ],
+    "anchorMax": [
+      0.8076923,
+      0.86461556
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/DOWN",
+    "rect": [
+      0.0,
+      56.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/DOWN/btn_down",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/DOWN/btn_down/Image",
+    "rect": [
+      0.0,
+      0.0,
+      40.0,
+      40.0
+    ],
+    "anchorMin": [
+      0.192307681,
+      0.153846145
+    ],
+    "anchorMax": [
+      0.8076923,
+      0.7692308
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/OK",
+    "rect": [
+      123.0,
+      94.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/OK/btn_ok",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/OK/btn_ok/Text",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/I",
+    "rect": [
+      104.0,
+      -79.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/I/btn_i",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/I/btn_i/Text (1)",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/O",
+    "rect": [
+      -106.0,
+      -79.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/O/btn_o",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/O/btn_o/Text (2)",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/HAND_AUTO",
+    "rect": [
+      0.0,
+      -78.0,
+      80.0,
+      80.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/HAND_AUTO/btn_handAuto",
+    "rect": [
+      0.0,
+      0.0,
+      65.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/HAND_AUTO/btn_handAuto/Text (1)",
+    "rect": [
+      0.0,
+      0.0,
+      55.0,
+      65.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      1.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/control/img_mask",
+    "rect": [
+      -2.42578125,
+      110.452026,
+      388.125,
+      407.142883
+    ],
+    "anchorMin": [
+      0.07500002,
+      -0.04271424
+    ],
+    "anchorMax": [
+      0.9375,
+      0.500142932
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/tipsCtr",
+    "rect": [
+      -252.400024,
+      0.0,
+      253.0,
+      0.0
+    ],
+    "anchorMin": [
+      0.0,
+      1.0
+    ],
+    "anchorMax": [
+      0.0,
+      1.0
+    ],
+    "pivot": [
+      0.0,
+      1.0
+    ]
+  },
+  {
+    "Id": "Inverter/tipsCtr/one_tip",
+    "rect": [
+      130.0,
+      0.0,
+      220.0,
+      0.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      0.0,
+      0.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/tipsCtr/two_tip",
+    "rect": [
+      130.0,
+      0.0,
+      220.0,
+      0.0
+    ],
+    "anchorMin": [
+      0.0,
+      0.0
+    ],
+    "anchorMax": [
+      0.0,
+      0.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/tipsCtr/three_tip",
+    "rect": [
+      130.0,
+      -267.0,
+      220.0,
+      42.0
+    ],
+    "anchorMin": [
+      0.0,
+      1.0
+    ],
+    "anchorMax": [
+      0.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/tipsCtr/four_tip",
+    "rect": [
+      130.0,
+      -267.0,
+      220.0,
+      42.0
+    ],
+    "anchorMin": [
+      0.0,
+      1.0
+    ],
+    "anchorMax": [
+      0.0,
+      1.0
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
+    "Id": "Inverter/tip_image",
+    "rect": [
+      748.7,
+      -1.2,
+      1042.4,
+      564.0
+    ],
+    "anchorMin": [
+      0.5,
+      0.5
+    ],
+    "anchorMax": [
+      0.5,
+      0.5
+    ],
+    "pivot": [
+      0.5,
+      0.5
+    ]
+  },
+  {
     "Id": "ExamList/",
     "rect": [
       87.219574,

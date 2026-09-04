@@ -30,6 +30,96 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator InverterPanelOpensOnlyFromItsModelInDragModeAndCanBeClosed()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var panel = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "OriginalUI_Inverter").gameObject;
+            var inverter = controller.InverterModel;
+            Assert.That(inverter, Is.Not.Null);
+            Assert.That(HierarchyPath(inverter), Does.EndWith("/50/Inverte"));
+
+            var picker = inverter.Find("picker");
+            Assert.That(picker, Is.Not.Null);
+            Assert.That(picker.GetComponent<Collider>(), Is.Not.Null.And.Property("enabled").True);
+            Assert.That(panel.GetComponentsInChildren<Text>(true).Select(item => item.text),
+                Does.Contain("SIEMENS").And.Contain("MONITORING").And.Contain("CONTROL"));
+            Assert.That(panel.activeSelf, Is.False);
+            var inverterPanel = controller.InverterPanel;
+            Assert.That(inverterPanel, Is.Not.Null);
+            Assert.That(controller.InverterPanel, Is.SameAs(inverterPanel));
+            Assert.That(inverterPanel.CurrentMode, Is.EqualTo(InverterPanelController.MenuMode.Monitor));
+            Assert.That(inverterPanel.GetParameterText("P1003"), Is.EqualTo("300"));
+            Assert.That(inverterPanel.GetParameterText("P1004"), Is.EqualTo("400"));
+
+            Assert.That(controller.TryOpenInverterPanel(picker), Is.False,
+                "The inverter panel must ignore model clicks outside drag mode");
+            Assert.That(panel.activeSelf, Is.False);
+
+            controller.SetMode(SimulationMode.Drag);
+            Assert.That(controller.TryOpenInverterPanel(GameObject.Find("OriginalLabEnvironment").transform), Is.False,
+                "Unrelated scene objects must not open the inverter panel");
+            Assert.That(controller.TryOpenInverterPanel(picker), Is.True);
+            Assert.That(panel.activeSelf, Is.True);
+
+            var closeButton = panel.GetComponentsInChildren<Button>(true).Single(item => item.name == "btn_close");
+            closeButton.onClick.Invoke();
+            Assert.That(panel.activeSelf, Is.False);
+
+            Assert.That(controller.TryOpenInverterPanel(picker), Is.True);
+            controller.SetMode(SimulationMode.Wiring);
+            Assert.That(panel.activeSelf, Is.False,
+                "Leaving drag mode must close the inverter panel");
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator InverterPanelSupportsParametersManualRunJogReverseAndRamp()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var inverter = controller.InverterPanel;
+            Assert.That(inverter, Is.Not.Null);
+            Assert.That(inverter.TrySetParameter("SP", 600f), Is.True);
+            Assert.That(inverter.TrySetParameter("P1120", 1f), Is.True);
+            Assert.That(inverter.TrySetParameter("P1121", 1f), Is.True);
+            Assert.That(inverter.TrySetParameter("P1082", 1000f), Is.True);
+            Assert.That(inverter.TrySetParameter("UNKNOWN", 1f), Is.False);
+
+            var panel = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "OriginalUI_Inverter").gameObject;
+            var buttons = panel.GetComponentsInChildren<Button>(true).ToDictionary(item => item.name);
+            buttons["btn_handAuto"].onClick.Invoke();
+            Assert.That(inverter.IsManualMode, Is.True);
+            Assert.That(inverter.CurrentMode, Is.EqualTo(InverterPanelController.MenuMode.Control));
+            var runButton = buttons["btn_i"].GetComponent<InverterMomentaryButton>();
+            Assert.That(runButton, Is.Not.Null);
+            runButton.OnPointerDown(null);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.GreaterThan(0f));
+            Assert.That(inverter.ActualSpeedRpm, Is.LessThanOrEqualTo(600f));
+
+            inverter.SetControlOptions(true, true);
+            Assert.That(inverter.IsJogMode, Is.True);
+            Assert.That(inverter.IsReverse, Is.True);
+            runButton.OnPointerDown(null);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.LessThan(600f));
+            runButton.OnPointerUp(null);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.LessThan(600f));
+
+            buttons["btn_o"].onClick.Invoke();
+            for (var index = 0; index < 5; index++) yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.LessThan(600f));
+
+            inverter.ResetFactorySettings();
+            Assert.That(inverter.GetParameterText("P1003"), Is.EqualTo("300"));
+            Assert.That(inverter.GetParameterText("P1004"), Is.EqualTo("400"));
+            Assert.That(inverter.IsJogMode, Is.False);
+            Assert.That(inverter.IsReverse, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator CabinetBreakersAnimateAndGateTheMainBreaker()
         {
             var controller = Object.FindObjectOfType<SimulationController>();

@@ -2094,6 +2094,7 @@ namespace ElectricalSim
 
             var lineForm = InstantiateUi("LineForm", ui.Canvas.transform);
             var lineParam = InstantiateUi("LineParam", ui.Canvas.transform);
+            var inverterPanel = InstantiateUi("Inverter", ui.Canvas.transform);
             if (lineForm != null)
             {
                 PositionLineFormBelowToolbar(lineForm, toolbar);
@@ -2101,6 +2102,28 @@ namespace ElectricalSim
                 lineForm.SetActive(false);
             }
             if (lineParam != null) lineParam.SetActive(false);
+            if (inverterPanel != null)
+            {
+                inverterPanel.SetActive(false);
+                var inverterControl = ui.Canvas.gameObject.AddComponent<InverterPanelController>();
+                inverterControl.Initialize(inverterPanel, () => inverterPanel.SetActive(false));
+
+                var inverterModel = originalEnvironmentTransforms?.FirstOrDefault(item =>
+                    string.Equals(item.name, "Inverte", StringComparison.Ordinal) &&
+                    item.gameObject.activeInHierarchy);
+                if (inverterModel != null)
+                {
+                    controller.RegisterInverterPanel(inverterModel, inverterControl, visible =>
+                    {
+                        inverterPanel.SetActive(visible);
+                        if (visible) inverterPanel.transform.SetAsLastSibling();
+                    });
+                }
+                else
+                {
+                    Debug.LogWarning("[OfflineBootstrap] Original inverter model is missing; its control panel cannot be opened.");
+                }
+            }
             controller.ModeChanged += mode =>
             {
                 if (lineForm != null) lineForm.SetActive(mode == SimulationMode.Wiring);

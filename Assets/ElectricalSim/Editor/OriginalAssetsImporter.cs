@@ -49,6 +49,7 @@ namespace ElectricalSim.Editor
             "App/Src/UI/UIExperimentLineMap.prefab",
             "App/Src/UI/UIMultimeterForm.prefab",
             "App/Src/UI/UIExperimentShiBoQi.prefab",
+            "App/Src/UI/UIExperimentInverte.prefab",
             "App/Src/UI/UIPaiGu.prefab",
             "App/Src/UI/NewUI/UITopBar.prefab"
         };
@@ -67,6 +68,7 @@ namespace ElectricalSim.Editor
             { "FaultSet", "App/Src/UI/UIExperimentFaultSet.prefab" },
             { "Multimeter", "App/Src/UI/UIMultimeterForm.prefab" },
             { "Oscilloscope", "App/Src/UI/UIExperimentShiBoQi.prefab" },
+            { "Inverter", "App/Src/UI/UIExperimentInverte.prefab" },
             { "ExamList", "App/Src/UI/UIExamList.prefab" },
             { "ExamConfig", "App/Src/UI/NewUI/UIExamConf.prefab" },
             { "ExamResult", "App/Src/UI/NewUI/UIExamResult.prefab" },

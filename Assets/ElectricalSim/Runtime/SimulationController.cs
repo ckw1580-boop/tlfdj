@@ -26,6 +26,9 @@ namespace ElectricalSim
         private ElectricalDeviceView draggedDevice;
         private Plane dragPlane;
         private Vector3 dragOffset;
+        private Transform inverterModel;
+        private Action<bool> setInverterPanelVisible;
+        private InverterPanelController inverterPanel;
         private Cc3dDocument loadedDocument;
         private SimulationSnapshot lastSnapshot;
         private InstrumentKind instrumentKind = InstrumentKind.Multimeter;
@@ -56,6 +59,8 @@ namespace ElectricalSim
         public Color CurrentWireColor => currentWireColor;
         public float CurrentWireArea => currentWireArea;
         public string CurrentLineType => currentLineType;
+        public Transform InverterModel => inverterModel;
+        public InverterPanelController InverterPanel => inverterPanel;
         public event Action<SimulationMode> ModeChanged;
 
         public void Initialize(
@@ -128,6 +133,28 @@ namespace ElectricalSim
             return true;
         }
 
+        public void RegisterInverterPanel(
+            Transform model,
+            InverterPanelController panel,
+            Action<bool> setVisible)
+        {
+            inverterModel = model;
+            inverterPanel = panel;
+            setInverterPanelVisible = setVisible;
+            setInverterPanelVisible?.Invoke(false);
+        }
+
+        public bool TryOpenInverterPanel(Transform clickedTransform)
+        {
+            if (Mode != SimulationMode.Drag || inverterModel == null || clickedTransform == null ||
+                setInverterPanelVisible == null)
+                return false;
+            if (clickedTransform != inverterModel && !clickedTransform.IsChildOf(inverterModel)) return false;
+
+            setInverterPanelVisible(true);
+            return true;
+        }
+
         private void Update()
         {
             HandleHotkeys();
@@ -144,6 +171,7 @@ namespace ElectricalSim
         public void SetMode(SimulationMode mode)
         {
             Mode = mode;
+            if (mode != SimulationMode.Drag) setInverterPanelVisible?.Invoke(false);
             foreach (var breaker in cabinetBreakers)
                 if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
             ClearSelection();
@@ -468,6 +496,12 @@ namespace ElectricalSim
             {
                 var cabinetBreaker = hit.collider.GetComponentInParent<CabinetBreakerInteractable>();
                 if (TryToggleCabinetBreaker(cabinetBreaker))
+                {
+                    draggedDevice = null;
+                    return;
+                }
+
+                if (TryOpenInverterPanel(hit.transform))
                 {
                     draggedDevice = null;
                     return;
