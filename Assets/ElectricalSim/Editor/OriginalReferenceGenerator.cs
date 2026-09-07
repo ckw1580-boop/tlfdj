@@ -45,6 +45,55 @@ namespace ElectricalSim.Editor
             }
         }
 
+        public static void ReportCabinetSurfaceGeometry()
+        {
+            var registry = AssetDatabase.LoadAssetAtPath<OriginalVisualRegistry>(RegistryPath);
+            var root = PrefabUtility.LoadPrefabContents(AssetDatabase.GetAssetPath(registry.EnvironmentPrefab));
+            try
+            {
+                var records = root.GetComponentsInChildren<MeshFilter>(true)
+                    .Where(item => item.name.StartsWith("DQG", StringComparison.Ordinal) && item.sharedMesh != null)
+                    .Select(item => new
+                    {
+                        item.name,
+                        path = AnimationUtility.CalculateTransformPath(item.transform, root.transform),
+                        min = ToArray(item.GetComponent<Renderer>().bounds.min),
+                        max = ToArray(item.GetComponent<Renderer>().bounds.max),
+                        forward = ToArray(item.transform.forward),
+                        up = ToArray(item.transform.up),
+                        right = ToArray(item.transform.right),
+                        planes = ReportMeshPlanes(item),
+                        vertexDepths = item.sharedMesh.vertices.Select(v => item.transform.TransformPoint(v))
+                            .GroupBy(v => Mathf.Round(v.z * 10000f) / 10000f)
+                            .OrderByDescending(group => group.Count()).Take(12)
+                            .Select(group => new { z = group.Key, count = group.Count(), minX = group.Min(v => v.x), maxX = group.Max(v => v.x), minY = group.Min(v => v.y), maxY = group.Max(v => v.y) }).ToArray()
+                    }).ToArray();
+                WriteReport("cabinet-surface-geometry.json", records);
+            }
+            finally { PrefabUtility.UnloadPrefabContents(root); }
+        }
+
+        private static float[] ToArray(Vector3 value) => new[] { value.x, value.y, value.z };
+
+        private static object ReportMeshPlanes(MeshFilter item)
+        {
+            var vertices = item.sharedMesh.vertices.Select(item.transform.TransformPoint).ToArray();
+            var indices = item.sharedMesh.triangles;
+            return Enumerable.Range(0, indices.Length / 3).Select(index =>
+            {
+                var a = vertices[indices[index * 3]];
+                var b = vertices[indices[index * 3 + 1]];
+                var c = vertices[indices[index * 3 + 2]];
+                var cross = Vector3.Cross(b - a, c - a);
+                var n = cross.normalized;
+                if (n.z > 0) n = -n;
+                var d = Vector3.Dot(n, a);
+                return new { n, d, area = cross.magnitude * 0.5f, key = $"{n.x:F3},{n.y:F3},{n.z:F3},{d:F3}" };
+            }).Where(p => p.area > 0.00001f && Mathf.Abs(p.n.y) < 0.01f)
+                .GroupBy(p => p.key).OrderByDescending(g => g.Sum(p => p.area)).Take(4)
+                .Select(g => new { normal = ToArray(g.First().n), distance = g.First().d, area = g.Sum(p => p.area) }).ToArray();
+        }
+
         public static void ReportEnvironmentTerminals()
         {
             var registry = AssetDatabase.LoadAssetAtPath<OriginalVisualRegistry>(RegistryPath);

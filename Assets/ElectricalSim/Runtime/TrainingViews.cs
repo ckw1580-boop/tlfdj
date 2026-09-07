@@ -34,6 +34,8 @@ namespace ElectricalSim
         public bool UsesJumperAnchor { get; private set; }
         public Transform CurrentAnchor { get; private set; }
         public Vector3 CurrentAnchorPosition => CurrentAnchor != null ? CurrentAnchor.position : transform.position;
+        public WireBodyGeometry RearWireBody { get; private set; }
+        public void ConfigureRearWireBody(WireBodyGeometry body) => RearWireBody = body;
 
         public void Initialize(string deviceId, string portName, Color color)
         {
@@ -93,15 +95,19 @@ namespace ElectricalSim
 
         public void ApplyOriginalAnchor(TrainingViewPreset preset, bool jumper)
         {
-            Transform anchor;
-            if (preset == TrainingViewPreset.FaultBack)
-                anchor = jumper ? backJumperAnchor : backElectricalAnchor;
-            else
-                anchor = jumper ? frontJumperAnchor : frontElectricalAnchor;
+            var anchor = GetOriginalAnchor(preset, jumper);
             UsesJumperAnchor = jumper && anchor != null;
             CurrentAnchor = anchor;
             if (anchor != null) transform.position = anchor.position;
             RefreshVisibility();
+        }
+
+        public Transform GetOriginalAnchor(TrainingViewPreset preset, bool jumper)
+        {
+            if (!hasOriginalAnchorConfiguration) return transform;
+            return preset == TrainingViewPreset.FaultBack
+                ? (jumper ? backJumperAnchor : backElectricalAnchor)
+                : (jumper ? frontJumperAnchor : frontElectricalAnchor);
         }
 
         public void SetHighlighted(bool highlighted)
@@ -139,6 +145,7 @@ namespace ElectricalSim
 
     public sealed class ElectricalDeviceView : MonoBehaviour
     {
+        public string DisplayName { get; private set; }
         private Renderer[] visualRenderers = Array.Empty<Renderer>();
         private Color[] baseColors = Array.Empty<Color>();
         private Transform rotor;
@@ -149,6 +156,7 @@ namespace ElectricalSim
 
         public void Initialize(ElectricalDeviceRuntime runtime, string displayName)
         {
+            DisplayName = displayName;
             Runtime = runtime;
             gameObject.name = runtime.DeviceId + "_" + displayName;
             visualRenderers = GetComponentsInChildren<Renderer>(true);
@@ -365,32 +373,228 @@ namespace ElectricalSim
         }
     }
 
+    public readonly struct WireSurfacePlane
+    {
+        public WireSurfacePlane(Vector3 surfacePoint, Vector3 normal, float offset, Bounds? bounds = null)
+        {
+            Normal = normal.sqrMagnitude > 0.000001f ? normal.normalized : Vector3.forward;
+            SurfacePoint = surfacePoint;
+            SurfaceOffset = Mathf.Max(0f, offset);
+            Origin = SurfacePoint + Normal * SurfaceOffset;
+            var up = Mathf.Abs(Vector3.Dot(Normal, Vector3.up)) > 0.98f ? Vector3.forward : Vector3.up;
+            Rotation = Quaternion.LookRotation(Normal, up);
+            SurfaceBounds = bounds;
+        }
+
+        public Vector3 SurfacePoint { get; }
+        public float SurfaceOffset { get; }
+        public Vector3 Origin { get; }
+        public Vector3 Normal { get; }
+        public Quaternion Rotation { get; }
+        public Bounds? SurfaceBounds { get; }
+
+        public Vector3 Project(Vector3 point)
+        {
+            var projected = point - Normal * Vector3.Dot(point - Origin, Normal);
+            if (!SurfaceBounds.HasValue) return projected;
+            var bounds = SurfaceBounds.Value;
+            var right = Rotation * Vector3.right;
+            var up = Rotation * Vector3.up;
+            var center = bounds.center - Normal * Vector3.Dot(bounds.center - Origin, Normal);
+            var delta = projected - center;
+            return center + right * Mathf.Clamp(Vector3.Dot(delta, right), -Extent(bounds, right), Extent(bounds, right)) +
+                   up * Mathf.Clamp(Vector3.Dot(delta, up), -Extent(bounds, up), Extent(bounds, up));
+        }
+
+        private static float Extent(Bounds bounds, Vector3 axis) =>
+            Vector3.Dot(bounds.extents, new Vector3(Mathf.Abs(axis.x), Mathf.Abs(axis.y), Mathf.Abs(axis.z)));
+
+        public float SignedDistance(Vector3 point)
+        {
+            return Vector3.Dot(point - Origin, Normal);
+        }
+
+        public bool Raycast(Ray ray, out Vector3 point)
+        {
+            var plane = new Plane(Normal, Origin);
+            if (Mathf.Abs(Vector3.Dot(ray.direction.normalized, Normal)) > 0.02f &&
+                plane.Raycast(ray, out var distance) && distance >= 0f)
+            {
+                point = ray.GetPoint(distance);
+                return Vector3.Distance(point, Project(point)) < 0.0001f;
+            }
+
+            point = Vector3.zero;
+            return false;
+        }
+    }
+
     public sealed class ElectricalWireView : MonoBehaviour
     {
         private const int CurveSamplesPerSpan = 10;
+        private const float SelectionWidthMultiplier = 2.2f;
+        private const float HandleSize = 0.014f;
         private LineRenderer line;
+        private LineRenderer highlightLine;
         private WireConnection wire;
         private Func<string, Vector3> resolvePort;
+        private Func<string, WireEndpointGeometry> resolveEndpoint;
+        private WireRenderPath renderPath;
+        private WireLeadMesh leadMesh;
+        private WireLeadMesh leadHighlight;
+        private WireSurfacePlane wireSurface;
+        private Material wireMaterial;
+        private Vector3[] renderedPoints = Array.Empty<Vector3>();
+        private readonly List<GameObject> nodeHandles = new List<GameObject>();
+        private bool selected;
+        private int selectedPointIndex = -1;
 
-        public void Initialize(WireConnection connection, Func<string, Vector3> portResolver, Material material)
+        public WireConnection Connection => wire;
+        public bool IsSelected => selected;
+        public LineRenderer LineRenderer => line;
+        public LineRenderer HighlightRenderer => highlightLine;
+        public IReadOnlyList<Vector3> RenderedPoints => renderedPoints;
+        public WireSurfacePlane Surface => wireSurface;
+        public WireRenderPath RenderPath => renderPath;
+
+        public void Initialize(
+            WireConnection connection,
+            Func<string, Vector3> portResolver,
+            Material material,
+            WireSurfacePlane surface,
+            Func<string, WireEndpointGeometry> endpointResolver = null)
         {
             wire = connection;
             resolvePort = portResolver;
+            resolveEndpoint = endpointResolver;
+            wireSurface = surface;
+            wireMaterial = material;
+            transform.rotation = wireSurface.Rotation;
             line = gameObject.AddComponent<LineRenderer>();
             ConfigureLine(line, material, wire.Color, wire.Area);
+            line.sortingOrder = 201;
+
+            var highlightObject = new GameObject("WireSelectionOutline");
+            highlightObject.transform.SetParent(transform, false);
+            highlightLine = highlightObject.AddComponent<LineRenderer>();
+            ConfigureLine(highlightLine, material, new Color(1f, 0.86f, 0.05f, 1f), wire.Area);
+            highlightLine.startWidth *= SelectionWidthMultiplier;
+            highlightLine.endWidth = highlightLine.startWidth;
+            highlightLine.sortingOrder = 200;
+            highlightLine.enabled = false;
             Refresh();
         }
 
         public void Refresh()
         {
             if (line == null || wire == null) return;
-            var anchors = new List<Vector3>(wire.Points.Count + 2)
+            renderPath = WireRenderPath.Build(
+                resolveEndpoint != null ? resolveEndpoint(wire.StartPort) : new WireEndpointGeometry(resolvePort(wire.StartPort)),
+                resolveEndpoint != null ? resolveEndpoint(wire.EndPort) : new WireEndpointGeometry(resolvePort(wire.EndPort)),
+                wire.Points, wireSurface, WireRenderPath.IsMotorJumper(wire.StartPort, wire.EndPort, wire.LineType));
+            renderedPoints = renderPath.Points;
+            var linePoints = renderPath.HasSpatialLeads ? renderPath.Trunk : renderedPoints;
+            ApplyPositions(line, linePoints);
+            ApplyPositions(highlightLine, linePoints);
+            if (renderPath.HasSpatialLeads)
             {
-                resolvePort(wire.StartPort)
-            };
-            anchors.AddRange(wire.Points);
-            anchors.Add(resolvePort(wire.EndPort));
-            ApplyPath(line, anchors);
+                if (leadMesh == null) leadMesh = CreateLeadMesh("WireEndpointLeads", 201);
+                if (leadHighlight == null) leadHighlight = CreateLeadMesh("WireEndpointLeadHighlight", 200);
+                leadMesh.Refresh(renderPath, WidthForArea(wire.Area), wire.Color);
+                leadHighlight.Refresh(renderPath, WidthForArea(wire.Area) * SelectionWidthMultiplier, new Color(1f, 0.86f, 0.05f, 1f));
+            }
+            if (leadMesh != null) leadMesh.Renderer.enabled = renderPath.HasSpatialLeads;
+            if (leadHighlight != null) leadHighlight.Renderer.enabled = selected && renderPath.HasSpatialLeads;
+            RefreshNodeHandles();
+        }
+
+        private WireLeadMesh CreateLeadMesh(string objectName, int order)
+        {
+            var child = new GameObject(objectName);
+            child.transform.SetParent(transform, false);
+            child.layer = gameObject.layer;
+            var result = child.AddComponent<WireLeadMesh>();
+            result.Initialize(line.sharedMaterial, order);
+            return result;
+        }
+
+        public void SetSurface(WireSurfacePlane surface)
+        {
+            wireSurface = surface;
+            transform.rotation = wireSurface.Rotation;
+            Refresh();
+        }
+
+        public void SetSelected(bool value, int pointIndex = -1)
+        {
+            selected = value;
+            selectedPointIndex = value && wire != null
+                ? Mathf.Clamp(pointIndex, -1, wire.Points.Count - 1)
+                : -1;
+            if (highlightLine != null) highlightLine.enabled = selected;
+            if (leadHighlight != null) leadHighlight.Renderer.enabled = selected && renderPath.HasSpatialLeads;
+            RefreshNodeHandles();
+        }
+
+        public void SetSelectedPoint(int pointIndex)
+        {
+            if (!selected || wire == null) return;
+            selectedPointIndex = Mathf.Clamp(pointIndex, -1, wire.Points.Count - 1);
+            RefreshNodeHandles();
+        }
+
+        public bool TryHitNode(Camera camera, Vector2 screenPosition, float maximumDistance, out int pointIndex)
+        {
+            pointIndex = -1;
+            if (!selected || wire == null || camera == null || renderPath.IsSoftJumper) return false;
+
+            var bestDistance = maximumDistance;
+            for (var i = 0; i < wire.Points.Count; i++)
+            {
+                var screenPoint = camera.WorldToScreenPoint(wireSurface.Project(wire.Points[i]));
+                if (screenPoint.z <= 0f) continue;
+                var distance = Vector2.Distance(screenPosition, screenPoint);
+                if (distance > bestDistance) continue;
+                bestDistance = distance;
+                pointIndex = i;
+            }
+
+            return pointIndex >= 0;
+        }
+
+        public bool TryHitLine(
+            Camera camera,
+            Vector2 screenPosition,
+            float maximumDistance,
+            out float screenDistance,
+            out int insertionIndex,
+            out Vector3 surfacePoint)
+        {
+            screenDistance = float.PositiveInfinity;
+            insertionIndex = -1;
+            surfacePoint = Vector3.zero;
+            if (camera == null || renderedPoints == null || renderedPoints.Length < 2) return false;
+
+            var closestSegment = -1;
+            for (var i = 0; i < renderedPoints.Length - 1; i++)
+            {
+                var start = camera.WorldToScreenPoint(renderedPoints[i]);
+                var end = camera.WorldToScreenPoint(renderedPoints[i + 1]);
+                if (start.z <= 0f || end.z <= 0f) continue;
+                var distance = DistanceToScreenSegment(screenPosition, start, end);
+                if (distance >= screenDistance) continue;
+                screenDistance = distance;
+                closestSegment = i;
+            }
+
+            if (closestSegment < 0 || screenDistance > maximumDistance)
+                return false;
+
+            insertionIndex = renderPath.InsertionIndices[closestSegment];
+            if (!wireSurface.Raycast(camera.ScreenPointToRay(screenPosition), out surfacePoint))
+                surfacePoint = wireSurface.Project((renderedPoints[closestSegment] + renderedPoints[closestSegment + 1]) * 0.5f);
+            surfacePoint = wireSurface.Project(surfacePoint);
+            return true;
         }
 
         public static float WidthForArea(float area)
@@ -433,37 +637,25 @@ namespace ElectricalSim
             return points.ToArray();
         }
 
-        public static Vector3[] BuildVisiblePath(
+        public static Vector3[] BuildPlanarPath(
             IReadOnlyList<Vector3> anchors,
-            Camera camera,
-            float surfaceOffset,
+            WireSurfacePlane surface,
             int samplesPerSpan = CurveSamplesPerSpan)
         {
             if (anchors == null || anchors.Count == 0) return Array.Empty<Vector3>();
-            if (camera == null) return BuildSmoothedPath(anchors, samplesPerSpan);
-
-            var viewportAnchors = new Vector3[anchors.Count];
-            var nearestDepth = float.PositiveInfinity;
+            var routedAnchors = new Vector3[anchors.Count];
             for (var i = 0; i < anchors.Count; i++)
             {
-                viewportAnchors[i] = camera.WorldToViewportPoint(anchors[i]);
-                if (viewportAnchors[i].z > camera.nearClipPlane)
-                    nearestDepth = Mathf.Min(nearestDepth, viewportAnchors[i].z);
+                routedAnchors[i] = surface.Project(anchors[i]);
             }
-
-            if (float.IsInfinity(nearestDepth)) return BuildSmoothedPath(anchors, samplesPerSpan);
-
-            var visibleDepth = Mathf.Max(
-                camera.nearClipPlane + 0.001f,
-                nearestDepth - Mathf.Max(0f, surfaceOffset));
-            var visibleAnchors = new Vector3[anchors.Count];
-            for (var i = 0; i < viewportAnchors.Length; i++)
-            {
-                viewportAnchors[i].z = visibleDepth;
-                visibleAnchors[i] = camera.ViewportToWorldPoint(viewportAnchors[i]);
-            }
-
-            return BuildSmoothedPath(visibleAnchors, samplesPerSpan);
+            var planarPath = BuildSmoothedPath(routedAnchors, samplesPerSpan);
+            // Keep the trunk on the cabinet face, with short normal leads to the
+            // physical terminals. Terminal depth must not bend the trunk into space.
+            var result = new Vector3[planarPath.Length + 2];
+            result[0] = anchors[0];
+            for (var i = 0; i < planarPath.Length; i++) result[i + 1] = surface.Project(planarPath[i]);
+            result[result.Length - 1] = anchors[anchors.Count - 1];
+            return result;
         }
 
         internal static void ConfigureLine(LineRenderer renderer, Material material, Color color, float area)
@@ -481,39 +673,153 @@ namespace ElectricalSim
             renderer.numCornerVertices = 6;
             renderer.numCapVertices = 8;
             renderer.useWorldSpace = true;
-            renderer.alignment = LineAlignment.View;
+            renderer.alignment = LineAlignment.TransformZ;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
         }
 
-        internal static void ApplyPath(LineRenderer renderer, IReadOnlyList<Vector3> anchors)
+        internal static void ApplyPath(
+            LineRenderer renderer,
+            IReadOnlyList<Vector3> anchors,
+            WireSurfacePlane surface)
         {
-            var points = BuildVisiblePath(anchors, Camera.main, Mathf.Max(renderer.startWidth, 0.001f));
-            renderer.positionCount = points.Length;
-            renderer.SetPositions(points);
+            var points = BuildPlanarPath(anchors, surface);
+            ApplyPositions(renderer, points);
+        }
+
+        private static void ApplyPositions(LineRenderer renderer, IReadOnlyList<Vector3> points)
+        {
+            if (renderer == null) return;
+            renderer.positionCount = points.Count;
+            for (var i = 0; i < points.Count; i++) renderer.SetPosition(i, points[i]);
+        }
+
+        private void RefreshNodeHandles()
+        {
+            var required = selected && wire != null && !renderPath.IsSoftJumper ? wire.Points.Count : 0;
+            while (nodeHandles.Count < required) nodeHandles.Add(CreateNodeHandle(nodeHandles.Count));
+
+            for (var i = 0; i < nodeHandles.Count; i++)
+            {
+                var handle = nodeHandles[i];
+                var active = i < required;
+                handle.SetActive(active);
+                if (!active) continue;
+                handle.name = $"WireNode_{i}";
+                handle.transform.SetPositionAndRotation(
+                    wireSurface.Project(wire.Points[i]) + wireSurface.Normal * 0.0003f,
+                    wireSurface.Rotation);
+                var renderer = handle.GetComponent<MeshRenderer>();
+                if (renderer == null) continue;
+                var block = new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(block);
+                block.SetColor("_Color", i == selectedPointIndex ? Color.white : new Color(1f, 0.86f, 0.05f, 1f));
+                renderer.SetPropertyBlock(block);
+            }
+        }
+
+        private GameObject CreateNodeHandle(int index)
+        {
+            var handle = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            handle.name = $"WireNode_{index}";
+            handle.layer = 2;
+            handle.transform.SetParent(transform, true);
+            handle.transform.localScale = Vector3.one * HandleSize;
+            var collider = handle.GetComponent<Collider>();
+            if (collider != null)
+            {
+                collider.enabled = false;
+                if (Application.isPlaying) Destroy(collider);
+                else DestroyImmediate(collider);
+            }
+
+            var renderer = handle.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                if (wireMaterial != null) renderer.sharedMaterial = wireMaterial;
+                renderer.sortingOrder = 202;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+                renderer.lightProbeUsage = UnityEngine.Rendering.LightProbeUsage.Off;
+                renderer.reflectionProbeUsage = UnityEngine.Rendering.ReflectionProbeUsage.Off;
+            }
+            return handle;
+        }
+
+        private static float DistanceToScreenSegment(Vector2 point, Vector2 start, Vector2 end)
+        {
+            var segment = end - start;
+            if (segment.sqrMagnitude < 0.0001f) return Vector2.Distance(point, start);
+            var t = Mathf.Clamp01(Vector2.Dot(point - start, segment) / segment.sqrMagnitude);
+            return Vector2.Distance(point, start + segment * t);
         }
     }
 
     public sealed class ElectricalWireDraftView : MonoBehaviour
     {
-        private readonly List<Vector3> anchors = new List<Vector3>();
         private LineRenderer line;
         private Func<Vector3> resolveStart;
+        private WireSurfacePlane wireSurface;
+        private Func<WireEndpointGeometry> resolveEndpoint;
+        private WireLeadMesh leadMesh;
+        private Color color;
+        private float area;
+        public WireRenderPath RenderPath { get; private set; }
 
-        public void Initialize(Func<Vector3> startResolver, Material material, Color color, float area)
+        public void Initialize(
+            Func<Vector3> startResolver,
+            Material material,
+            Color color,
+            float area,
+            WireSurfacePlane surface,
+            Func<WireEndpointGeometry> endpointResolver = null)
         {
             resolveStart = startResolver;
+            resolveEndpoint = endpointResolver;
+            this.color = color;
+            this.area = area;
+            wireSurface = surface;
+            transform.rotation = wireSurface.Rotation;
             line = gameObject.AddComponent<LineRenderer>();
             ElectricalWireView.ConfigureLine(line, material, color, area);
+            line.sortingOrder = 201;
         }
 
-        public void Refresh(IReadOnlyList<Vector3> bendPoints, Vector3 cursorPosition)
+        public void Refresh(IReadOnlyList<Vector3> bendPoints, Vector3 cursorPosition, WireEndpointGeometry? endGeometry = null,
+            bool softJumper = false)
         {
             if (line == null || resolveStart == null) return;
-            anchors.Clear();
-            anchors.Add(resolveStart());
-            if (bendPoints != null)
-                for (var i = 0; i < bendPoints.Count; i++) anchors.Add(bendPoints[i]);
-            anchors.Add(cursorPosition);
-            ElectricalWireView.ApplyPath(line, anchors);
+            RenderPath = WireRenderPath.Build(resolveEndpoint != null ? resolveEndpoint() : new WireEndpointGeometry(resolveStart()),
+                endGeometry ?? new WireEndpointGeometry(cursorPosition), bendPoints, wireSurface, softJumper);
+            var points = RenderPath.HasSpatialLeads ? RenderPath.Trunk : RenderPath.Points;
+            line.positionCount = points.Length;
+            line.SetPositions(points);
+            if (RenderPath.HasSpatialLeads)
+            {
+                if (leadMesh == null)
+                {
+                    var child = new GameObject("WireDraftEndpointLeads");
+                    child.transform.SetParent(transform, false);
+                    leadMesh = child.AddComponent<WireLeadMesh>();
+                    leadMesh.Initialize(line.sharedMaterial, 201);
+                }
+                leadMesh.Refresh(RenderPath, ElectricalWireView.WidthForArea(area), color);
+            }
+            if (leadMesh != null) leadMesh.Renderer.enabled = line.enabled && RenderPath.HasSpatialLeads;
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (line != null) line.enabled = visible;
+            if (leadMesh != null) leadMesh.Renderer.enabled = visible && RenderPath != null && RenderPath.HasSpatialLeads;
+        }
+
+        public void SetSurface(WireSurfacePlane surface)
+        {
+            wireSurface = surface;
+            transform.rotation = wireSurface.Rotation;
         }
     }
 }

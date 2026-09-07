@@ -92,7 +92,24 @@ namespace ElectricalSim
             controller = gameObject.AddComponent<SimulationController>();
             examController = gameObject.AddComponent<OfflineExamController>();
             captureRecorder = gameObject.AddComponent<LocalCaptureRecorder>();
-            controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, originalVisuals, ui.PortHover);
+            var frontWireSurface = ResolveWireSurface(cameraController.transform);
+            var faultWireSurface = ResolveFaultWireSurface(frontWireSurface);
+            var cabinetBounds = originalEnvironment != null
+                ? originalEnvironment.GetComponentsInChildren<Renderer>(true)
+                    .FirstOrDefault(item => string.Equals(item.name, "DQG01", StringComparison.OrdinalIgnoreCase))
+                : null;
+            if (cabinetBounds != null)
+            {
+                frontWireSurface = new WireSurfacePlane(frontWireSurface.SurfacePoint, frontWireSurface.Normal,
+                    frontWireSurface.SurfaceOffset, cabinetBounds.bounds);
+                faultWireSurface = new WireSurfacePlane(faultWireSurface.SurfacePoint, faultWireSurface.Normal,
+                    faultWireSurface.SurfaceOffset, cabinetBounds.bounds);
+            }
+            controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, originalVisuals, ui.PortHover);
+            ui.Status.transform.parent.gameObject.AddComponent<WirePropertiesPresenter>().Initialize(controller, ui.Status, () =>
+            {
+                if (statusPanelSlide.IsCollapsed) ToggleSlidePanel(statusPanelSlide);
+            });
             controller.ModeChanged += SetCabinetWireDuctCoversForMode;
             SetCabinetWireDuctCoversForMode(controller.Mode);
             controller.RegisterCabinetBreakers(CreateCabinetBreakerInteractions());
@@ -100,6 +117,98 @@ namespace ElectricalSim
             BindOriginalUi(ui);
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
             Debug.Log("[OfflineBootstrap] Build complete.");
+        }
+
+        private WireSurfacePlane ResolveWireSurface(Transform viewingCamera)
+        {
+            const float annotationOffset = 0.0025f;
+            const float wireOffset = 0.003f;
+            var annotation = originalEnvironment != null
+                ? originalEnvironment.Find("Terminal Board Annotations/Terminal Annotation - Three Phase Power")
+                : null;
+            if (annotation != null)
+            {
+                var normal = -annotation.forward;
+                if (viewingCamera != null && Vector3.Dot(normal, viewingCamera.position - annotation.position) < 0f)
+                    normal = -normal;
+                var board = originalEnvironment.Find(OriginalTerminalBoardMap.BoardTransformPath);
+                var pointRoot = board != null ? board.Find("point") : null;
+                var electricalAnchors = pointRoot != null
+                    ? pointRoot.Cast<Transform>()
+                        .Where(item => item.name.Length > 1 && item.name[0] == 'a' &&
+                                       int.TryParse(item.name.Substring(1), out _))
+                        .ToArray()
+                    : Array.Empty<Transform>();
+                var surfacePoint = electricalAnchors.Length > 0
+                    ? electricalAnchors.Aggregate(Vector3.zero, (sum, item) => sum + item.position) /
+                      electricalAnchors.Length
+                    : annotation.position - normal * annotationOffset;
+                return new WireSurfacePlane(surfacePoint, normal, wireOffset);
+            }
+
+            var cabinetRenderer = originalEnvironment != null
+                ? originalEnvironment.GetComponentsInChildren<Renderer>(true)
+                    .FirstOrDefault(item => string.Equals(item.name, "DQG01", StringComparison.OrdinalIgnoreCase))
+                : null;
+            if (cabinetRenderer != null)
+            {
+                var normal = Vector3.forward;
+                if (viewingCamera != null &&
+                    Vector3.Dot(normal, viewingCamera.position - cabinetRenderer.bounds.center) < 0f)
+                    normal = -normal;
+                var extents = cabinetRenderer.bounds.extents;
+                var surfaceDistance = Mathf.Abs(normal.x) * extents.x +
+                                      Mathf.Abs(normal.y) * extents.y +
+                                      Mathf.Abs(normal.z) * extents.z;
+                return new WireSurfacePlane(
+                    cabinetRenderer.bounds.center + normal * surfaceDistance,
+                    normal,
+                    wireOffset);
+            }
+
+            var fallbackNormal = Vector3.forward;
+            var fallbackCenter = new Vector3(0f, 1.65f, 0.41f);
+            if (viewingCamera != null && Vector3.Dot(fallbackNormal, viewingCamera.position - fallbackCenter) < 0f)
+                fallbackNormal = -fallbackNormal;
+            return new WireSurfacePlane(fallbackCenter, fallbackNormal, wireOffset);
+        }
+
+        private WireSurfacePlane ResolveFaultWireSurface(WireSurfacePlane frontSurface)
+        {
+            const float wireOffset = 0.003f;
+            // DQG11 is the rear mounting plate. DQG01's world AABB also includes
+            // the rotated frame/base: its support point is ~0.59 m off this plate.
+            var rearPlate = originalEnvironment != null
+                ? originalEnvironment.Find("Bench/ElectricBench/mesh/model/DQG/DQG11")?.GetComponent<MeshFilter>()
+                : null;
+            if (rearPlate != null && rearPlate.sharedMesh != null)
+            {
+                var rearNormal = -rearPlate.transform.up.normalized;
+                var vertices = rearPlate.sharedMesh.vertices;
+                var rearDepth = vertices.Max(vertex => Vector3.Dot(rearPlate.transform.TransformPoint(vertex), rearNormal));
+                var center = rearPlate.GetComponent<Renderer>().bounds.center;
+                var rearPoint = center + rearNormal * (rearDepth - Vector3.Dot(center, rearNormal));
+                return new WireSurfacePlane(rearPoint, rearNormal, wireOffset);
+            }
+            var normal = -frontSurface.Normal;
+            var cabinetRenderer = originalEnvironment != null
+                ? originalEnvironment.GetComponentsInChildren<Renderer>(true)
+                    .FirstOrDefault(item => string.Equals(item.name, "DQG01", StringComparison.OrdinalIgnoreCase))
+                : null;
+            if (cabinetRenderer != null)
+            {
+                var extents = cabinetRenderer.bounds.extents;
+                var surfaceDistance = Mathf.Abs(normal.x) * extents.x +
+                                      Mathf.Abs(normal.y) * extents.y +
+                                      Mathf.Abs(normal.z) * extents.z;
+                return new WireSurfacePlane(
+                    cabinetRenderer.bounds.center + normal * surfaceDistance,
+                    normal,
+                    wireOffset);
+            }
+
+            // Deterministic rear face when the imported cabinet shell is unavailable.
+            return new WireSurfacePlane(frontSurface.SurfacePoint - frontSurface.Normal * 0.08f, normal, wireOffset);
         }
 
         private void OnDestroy()
@@ -888,6 +997,7 @@ namespace ElectricalSim
                 !ShouldExposeThermalRelayBodyPorts(view.Runtime)) return;
 
             var list = ports.ToList();
+            WireBodyGeometry rearWireBody = null;
             var columns = Mathf.Min(6, Mathf.Max(2, Mathf.CeilToInt(list.Count / 2f)));
             for (var index = 0; index < list.Count; index++)
             {
@@ -955,6 +1065,16 @@ namespace ElectricalSim
                 var portObject = CreatePrimitive(PrimitiveType.Sphere, "Port", parent, localPosition, Vector3.one * markerSize, new Color(0.08f, 1f, 0.32f));
                 var port = portObject.AddComponent<ElectricalPortView>();
                 port.Initialize(view.Runtime.DeviceId, list[index], new Color(0.12f, 0.86f, 0.36f));
+                if (faultBodyPorts)
+                {
+                    if (rearWireBody == null)
+                    {
+                        var bodyRoot = backElectrical;
+                        while (bodyRoot != null && bodyRoot.name != BackDeviceNut(view.Runtime.DeviceId)) bodyRoot = bodyRoot.parent;
+                        if (bodyRoot != null) rearWireBody = new WireBodyGeometry(bodyRoot);
+                    }
+                    port.ConfigureRearWireBody(rearWireBody);
+                }
                 if (ShouldExposeContactorBodyPorts(view.Runtime))
                     port.ConfigureHover(GetContactorHoverLabel(list[index]), list[index]);
                 else if (ShouldExposeThermalRelayBodyPorts(view.Runtime))

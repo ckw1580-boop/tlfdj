@@ -69,13 +69,15 @@ namespace ElectricalSim
         private static readonly ParameterDefinition[] Definitions =
         {
             Numeric("SP", "手动速度设定", "0", "1/min", -1425f, 1425f),
-            Option("P15", "宏程序选择", "7", "1", "2", "3", "7", "8", "9", "12", "13", "17"),
+            Option("P0010", "调试参数过滤器", "0", "0", "1"),
+            Option("P0015", "宏程序选择", "7", "1", "2", "3", "4", "5", "6", "7", "8", "9", "12", "13", "14", "15", "17", "18", "19", "20", "21"),
             Option("P100", "电机标准 IEC/NEMA", "0", "0", "1", "2"),
             Numeric("P304", "电机额定电压", "400", "V", 0f, 20000f),
             Numeric("P305", "电机额定电流", "3.1", "A", 0f, 10000f, 0.1f),
             Numeric("P307", "电机额定功率", "1.1", "kW", 0f, 100000f, 0.1f),
             Numeric("P310", "电机额定频率", "50", "Hz", 0f, 1000f, 0.1f),
             Numeric("P311", "电机额定转速", "1425", "1/min", 0f, 210000f),
+            Option("P756.0", "模拟输入 AI0 类型", "4", "0", "1", "2", "3", "4"),
             Numeric("P757.0", "模拟输入曲线 X1", "0", "V", -50f, 160f),
             Numeric("P758.0", "模拟输入曲线 Y1", "0", "%", -1000f, 1000f),
             Numeric("P759.0", "模拟输入曲线 X2", "10", "V", -50f, 160f),
@@ -85,25 +87,35 @@ namespace ElectricalSim
             Numeric("P1003", "固定转速 3", "300", "1/min", -210000f, 210000f),
             Numeric("P1004", "固定转速 4", "400", "1/min", -210000f, 210000f),
             Numeric("P1058", "JOG1 正向点动速度", "150", "1/min", -210000f, 210000f),
-            Numeric("P1059", "JOG2 反向点动速度", "150", "1/min", -210000f, 210000f),
+            Numeric("P1059", "JOG2 反向点动速度", "-150", "1/min", -210000f, 210000f),
+            Numeric("P1037", "MOP 正向最大转速", "1500", "1/min", 0f, 210000f),
+            Numeric("P1038", "MOP 反向最大转速", "-1500", "1/min", -210000f, 0f),
+            Numeric("P1040", "MOP 初始转速", "0", "1/min", -210000f, 210000f),
             Numeric("P1080", "最小转速", "0", "1/min", 0f, 19500f),
             Numeric("P1082", "最大转速", "1500", "1/min", 0f, 210000f),
             Numeric("P1120", "斜坡上升时间", "10", "s", 0f, 999999f),
-            Numeric("P1121", "斜坡下降时间", "30", "s", 0f, 999999f)
+            Numeric("P1121", "斜坡下降时间", "30", "s", 0f, 999999f),
+            Option("P922", "PROFIBUS 报文类型", "1", "1", "20", "352"),
+            Numeric("P2020", "USS 通讯速率", "8", "", 0f, 12f),
+            Numeric("P2021", "USS 通讯站地址", "0", "", 0f, 31f),
+            Numeric("P2022", "USS 通讯 PZD 长度", "2", "", 0f, 8f),
+            Numeric("P2023", "USS 通讯 PKW 长度", "127", "", 0f, 127f),
+            Numeric("P2040", "总线接口监控时间", "100", "ms", 0f, 999999f)
         };
 
         private static readonly string[] ModeNames =
             { "MONiTOR", "CONTROL", "DiAGNOS", "PARAMS", "SETUP", "EXTRAS" };
 
         private static readonly string[] ControlItems = { "SETPOiNT", "JOG", "REVERSE" };
-        private static readonly string[] DiagnosticItems = { "ACKN ALL", "FAULTS", "HiSTORy", "STATUS" };
+        private static readonly string[] DiagnosticItems = { "ACKN ALL", "FAULTS", "STATUS", "CTRL WORD", "STAT WORD", "MACRO" };
         private static readonly string[] FilterItems = { "STANDARD", "EXPERT" };
         private static readonly string[] SetupItems =
-            { "RESET", "P100", "P304", "P305", "P307", "P310", "P311", "P15", "P1080", "P1082", "P1120", "P1121", "FiNiSH" };
+            { "RESET", "P0010", "P0015", "P100", "P304", "P305", "P307", "P310", "P311", "P1080", "P1082", "P1120", "P1121", "FiNiSH" };
         private static readonly string[] ExtraItems = { "DRVRESET", "RAM->ROM", "TO BOP", "FROM BOP", "TO CRD", "FROM CRD" };
 
         private readonly Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         private readonly bool[] digitalInputs = new bool[6];
+        private readonly bool[] digitalInputWritten = new bool[6];
 
         private GameObject panelRoot;
         private Text upperText;
@@ -131,6 +143,15 @@ namespace ElectricalSim
         private bool runCommand;
         private float requestedSpeedRpm;
         private float lastPublishedSpeed = float.NaN;
+        private float analogInputNormalized;
+        private float motorizedPotentiometerRpm;
+        private ushort fieldbusControlWord = 0x047E;
+        private float fieldbusSetpointRpm;
+        private int latchedDirection = 1;
+        private bool threeWireRunning;
+        private bool hasAlarm;
+        private int faultNumber;
+        private int alarmNumber;
 
         public MenuMode CurrentMode { get; private set; } = MenuMode.Monitor;
         public MenuDepth CurrentDepth { get; private set; } = MenuDepth.List;
@@ -143,7 +164,22 @@ namespace ElectricalSim
         public float OutputSpeedRpm { get; private set; }
         public float SetpointRpm => GetNumericValue("SP");
         public float ActualSpeedRpm => OutputSpeedRpm;
-        public int Macro => Mathf.RoundToInt(GetNumericOrOptionValue("P15"));
+        public int Macro => Mathf.RoundToInt(GetNumericOrOptionValue("P0015"));
+        public string ActiveMacroName => G120MacroCatalog.Get(Macro).Name;
+        public IReadOnlyList<string> ActiveMacroParameterMappings => G120MacroCatalog.Get(Macro).AutomaticSettings;
+        public IReadOnlyList<int> SupportedMacros => G120MacroCatalog.SupportedNumbers;
+        public int TelegramType => Mathf.RoundToInt(GetNumericOrOptionValue("P922"));
+        public ushort FieldbusControlWord => fieldbusControlWord;
+        public ushort FieldbusStatusWord { get; private set; }
+        public float FieldbusSetpointRpm => fieldbusSetpointRpm;
+        public float AnalogInputNormalized => analogInputNormalized;
+        public float MotorizedPotentiometerRpm => motorizedPotentiometerRpm;
+        public bool HasAlarm => hasAlarm;
+        public int FaultNumber => faultNumber;
+        public int AlarmNumber => alarmNumber;
+        public bool IsLocalControl => Macro == 7 ? digitalInputs[3] :
+            Macro == 14 ? (fieldbusControlWord & 0x8000) != 0 :
+            Macro == 15 && digitalInputs[3];
         public IReadOnlyList<string> ParameterKeys => Definitions.Select(item => item.Key).ToArray();
         public event Action<float> OutputSpeedChanged;
 
@@ -153,6 +189,7 @@ namespace ElectricalSim
             closeRequested = onClose;
             values.Clear();
             foreach (var definition in Definitions) values[definition.Key] = definition.DefaultValue;
+            ApplyMacroSettings(Macro);
 
             upperText = Find<Text>("txt_up");
             lowerText = Find<Text>("txt_down");
@@ -196,19 +233,25 @@ namespace ElectricalSim
         public bool TryGetParameter(string key, out float value)
         {
             value = 0f;
-            return values.TryGetValue(key, out var text) &&
+            return values.TryGetValue(ResolveParameterKey(key), out var text) &&
                    float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
         }
 
         public string GetParameterText(string key)
         {
-            return values.TryGetValue(key, out var value) ? value : null;
+            return values.TryGetValue(ResolveParameterKey(key), out var value) ? value : null;
         }
 
         public bool TrySetParameter(string key, float value)
         {
+            key = ResolveParameterKey(key);
             var definition = Definition(key);
-            if (definition == null || !definition.IsNumeric) return false;
+            if (definition == null) return false;
+            if (!definition.IsNumeric)
+            {
+                var option = value.ToString("0", CultureInfo.InvariantCulture);
+                return definition.Options.Contains(option) && TrySetParameter(key, option);
+            }
             values[definition.Key] = Format(Mathf.Clamp(value, definition.Min, definition.Max), definition.Step);
             if (string.Equals(definition.Key, "P1080", StringComparison.OrdinalIgnoreCase) &&
                 GetNumericValue("P1082") < GetNumericValue("P1080"))
@@ -220,6 +263,7 @@ namespace ElectricalSim
 
         public bool TrySetParameter(string key, string value)
         {
+            key = ResolveParameterKey(key);
             var definition = Definition(key);
             if (definition == null) return false;
             if (definition.IsNumeric)
@@ -228,7 +272,12 @@ namespace ElectricalSim
                        TrySetParameter(key, number);
             }
             if (!definition.Options.Contains(value)) return false;
+            if (string.Equals(definition.Key, "P0015", StringComparison.OrdinalIgnoreCase) &&
+                GetNumericValue("P0010") != 1f)
+                return false;
             values[definition.Key] = value;
+            if (string.Equals(definition.Key, "P0015", StringComparison.OrdinalIgnoreCase))
+                ApplyMacroSettings(Mathf.RoundToInt(GetNumericValue("P0015")));
             RefreshRequestedSpeed();
             RefreshDisplay();
             return true;
@@ -237,20 +286,91 @@ namespace ElectricalSim
         public void SetDigitalInput(int index, bool active)
         {
             if (index < 0 || index >= digitalInputs.Length) return;
+            var risingEdge = !digitalInputs[index] && active;
             digitalInputs[index] = active;
+            digitalInputWritten[index] = true;
+
+            if (risingEdge && IsFaultResetInput(index)) SetFault(false);
+            if (Macro == 19)
+            {
+                if (index == 0 && !active) threeWireRunning = false;
+                if (risingEdge && index == 1 && digitalInputs[0])
+                {
+                    latchedDirection = 1;
+                    threeWireRunning = true;
+                }
+                if (risingEdge && index == 2 && digitalInputs[0])
+                {
+                    latchedDirection = -1;
+                    threeWireRunning = true;
+                }
+            }
+            else if (Macro == 20)
+            {
+                if (index == 0 && !active) threeWireRunning = false;
+                if (risingEdge && index == 1 && digitalInputs[0]) threeWireRunning = true;
+            }
+
+            if ((Macro == 14 || Macro == 15) && index == 1 && !active)
+                SetFault(true, 85);
             if (!IsManualMode) RefreshAutomaticCommand();
         }
 
         public void SetAnalogInput(float normalizedValue)
         {
-            values["AI0"] = Mathf.Clamp01(normalizedValue).ToString("0.###", CultureInfo.InvariantCulture);
+            analogInputNormalized = Mathf.Clamp(normalizedValue, -1f, 1f);
             if (!IsManualMode) RefreshAutomaticCommand();
+        }
+
+        public void SetAnalogInputVolts(float volts)
+        {
+            SetAnalogInput(volts / 10f);
+        }
+
+        public void SetMotorizedPotentiometer(float speedRpm)
+        {
+            motorizedPotentiometerRpm = Mathf.Clamp(speedRpm, GetNumericValue("P1038"), GetNumericValue("P1037"));
+            if (!IsManualMode) RefreshAutomaticCommand();
+        }
+
+        public void SetFieldbusCommand(ushort controlWord, float speedSetpointRpm)
+        {
+            var resetRisingEdge = (fieldbusControlWord & 0x0080) == 0 && (controlWord & 0x0080) != 0;
+            fieldbusControlWord = controlWord;
+            fieldbusSetpointRpm = speedSetpointRpm;
+            if (resetRisingEdge) SetFault(false);
+            if (!IsManualMode) RefreshAutomaticCommand();
+            RefreshDisplay();
+        }
+
+        public void SetProfibusCommand(ushort controlWord, float speedSetpointRpm)
+        {
+            SetFieldbusCommand(controlWord, speedSetpointRpm);
+        }
+
+        public void SetUssCommand(ushort controlWord, float speedSetpointRpm)
+        {
+            SetFieldbusCommand(controlWord, speedSetpointRpm);
         }
 
         public void SetFault(bool active)
         {
+            SetFault(active, active ? 1 : 0);
+        }
+
+        public void SetFault(bool active, int number)
+        {
             HasFault = active;
+            faultNumber = active ? Mathf.Max(1, number) : 0;
             if (active) PressStop();
+            RefreshIndicators();
+            RefreshDisplay();
+        }
+
+        public void SetAlarm(bool active, int number = 1)
+        {
+            hasAlarm = active;
+            alarmNumber = active ? Mathf.Max(1, number) : 0;
             RefreshIndicators();
             RefreshDisplay();
         }
@@ -302,16 +422,30 @@ namespace ElectricalSim
         {
             foreach (var definition in Definitions) values[definition.Key] = definition.DefaultValue;
             Array.Clear(digitalInputs, 0, digitalInputs.Length);
+            Array.Clear(digitalInputWritten, 0, digitalInputWritten.Length);
             IsJogMode = false;
             IsReverse = false;
             HasFault = false;
+            hasAlarm = false;
+            faultNumber = 0;
+            alarmNumber = 0;
+            analogInputNormalized = 0f;
+            fieldbusControlWord = 0x047E;
+            fieldbusSetpointRpm = 0f;
+            latchedDirection = 1;
+            threeWireRunning = false;
+            ApplyMacroSettings(Macro);
             PressStop();
             RefreshDisplay();
         }
 
         private void Update()
         {
-            if (!IsManualMode) RefreshAutomaticCommand();
+            if (!IsManualMode)
+            {
+                UpdateMotorizedPotentiometer();
+                RefreshAutomaticCommand();
+            }
             var target = HasFault ? 0f : requestedSpeedRpm;
             var accelerating = Mathf.Abs(target) > Mathf.Abs(OutputSpeedRpm);
             var rampKey = accelerating ? "P1120" : "P1121";
@@ -329,44 +463,232 @@ namespace ElectricalSim
                 else
                     RefreshIndicators();
             }
+            UpdateStatusWord();
         }
 
         private void RefreshAutomaticCommand()
         {
             var macro = Macro;
-            var forward = false;
-            var reverse = false;
             var speed = 0f;
+            var enabled = false;
+
+            if ((macro == 14 || macro == 15) && digitalInputWritten[1] && !digitalInputs[1])
+            {
+                if (!HasFault) SetFault(true, 85);
+                requestedSpeedRpm = 0f;
+                runCommand = false;
+                return;
+            }
+
             switch (macro)
             {
                 case 1:
-                    forward = digitalInputs[0];
-                    reverse = digitalInputs[1];
+                    enabled = digitalInputs[0] ^ digitalInputs[1];
+                    if (digitalInputs[4]) speed += GetNumericValue("P1003");
+                    if (digitalInputs[5]) speed += GetNumericValue("P1004");
+                    if (digitalInputs[1]) speed = -speed;
+                    break;
+                case 2:
+                    enabled = digitalInputs[0];
+                    if (digitalInputs[0]) speed += GetNumericValue("P1001");
+                    if (digitalInputs[1]) speed += GetNumericValue("P1002");
+                    break;
+                case 3:
+                    enabled = digitalInputs[0];
+                    if (digitalInputs[0]) speed += GetNumericValue("P1001");
+                    if (digitalInputs[1]) speed += GetNumericValue("P1002");
                     if (digitalInputs[4]) speed += GetNumericValue("P1003");
                     if (digitalInputs[5]) speed += GetNumericValue("P1004");
                     break;
+                case 4:
+                case 5:
+                case 6:
+                case 21:
+                    enabled = IsFieldbusRunEnabled();
+                    speed = FieldbusCommandSpeed();
+                    break;
                 case 7:
-                    forward = digitalInputs[0] && digitalInputs[3];
-                    reverse = digitalInputs[1] && digitalInputs[3];
-                    speed = forward ? GetNumericValue("P1058") : GetNumericValue("P1059");
+                    if (digitalInputs[3])
+                    {
+                        enabled = digitalInputs[0] ^ digitalInputs[1];
+                        speed = digitalInputs[0] ? GetNumericValue("P1058") : GetNumericValue("P1059");
+                    }
+                    else
+                    {
+                        enabled = IsFieldbusRunEnabled();
+                        speed = FieldbusCommandSpeed();
+                    }
+                    break;
+                case 8:
+                case 9:
+                    enabled = digitalInputs[0];
+                    speed = motorizedPotentiometerRpm;
+                    break;
+                case 12:
+                case 13:
+                    enabled = digitalInputs[0];
+                    speed = AnalogCommandSpeed() * (digitalInputs[1] ? -1f : 1f);
+                    break;
+                case 14:
+                    if (IsLocalControl)
+                    {
+                        enabled = digitalInputs[0];
+                        speed = motorizedPotentiometerRpm;
+                    }
+                    else
+                    {
+                        enabled = IsFieldbusRunEnabled();
+                        speed = fieldbusSetpointRpm;
+                    }
                     break;
                 case 17:
-                    forward = digitalInputs[0];
-                    reverse = digitalInputs[1];
-                    var analog = values.TryGetValue("AI0", out var raw) &&
-                                 float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
-                        ? parsed
-                        : 0f;
-                    speed = analog * GetNumericValue("P311");
+                    enabled = digitalInputs[0] || digitalInputs[1];
+                    if (!runCommand && digitalInputs[0] != digitalInputs[1])
+                        latchedDirection = digitalInputs[0] ? 1 : -1;
+                    speed = Mathf.Abs(AnalogCommandSpeed()) * latchedDirection;
+                    break;
+                case 18:
+                    enabled = digitalInputs[0] ^ digitalInputs[1];
+                    if (enabled) latchedDirection = digitalInputs[0] ? 1 : -1;
+                    speed = Mathf.Abs(AnalogCommandSpeed()) * latchedDirection;
+                    break;
+                case 19:
+                    enabled = digitalInputs[0] && threeWireRunning;
+                    speed = Mathf.Abs(AnalogCommandSpeed()) * latchedDirection;
+                    break;
+                case 20:
+                    enabled = digitalInputs[0] && threeWireRunning;
+                    latchedDirection = digitalInputs[2] ? -1 : 1;
+                    speed = Mathf.Abs(AnalogCommandSpeed()) * latchedDirection;
+                    break;
+                case 15:
+                    enabled = digitalInputs[0];
+                    speed = digitalInputs[3] ? motorizedPotentiometerRpm : AnalogCommandSpeed();
                     break;
                 default:
-                    forward = digitalInputs[0];
-                    speed = GetNumericValue("P1002");
+                    enabled = false;
                     break;
             }
 
-            runCommand = forward || reverse;
-            requestedSpeedRpm = runCommand ? ClampOperatingSpeed(reverse ? -speed : speed) : 0f;
+            runCommand = enabled && !HasFault;
+            requestedSpeedRpm = runCommand ? ClampOperatingSpeed(speed) : 0f;
+        }
+
+        private void ApplyMacroSettings(int macro)
+        {
+            var definition = G120MacroCatalog.Get(macro);
+            if (values.ContainsKey("P922")) values["P922"] = definition.Telegram > 0
+                ? definition.Telegram.ToString(CultureInfo.InvariantCulture)
+                : "1";
+            motorizedPotentiometerRpm = GetNumericValue("P1040");
+            fieldbusControlWord = 0x047E;
+            fieldbusSetpointRpm = 0f;
+            threeWireRunning = false;
+            latchedDirection = 1;
+            runCommand = false;
+            requestedSpeedRpm = 0f;
+        }
+
+        private void UpdateMotorizedPotentiometer()
+        {
+            var increase = false;
+            var decrease = false;
+            if (Macro == 8 || Macro == 9)
+            {
+                increase = digitalInputs[1];
+                decrease = digitalInputs[2];
+            }
+            else if ((Macro == 14 && IsLocalControl) || (Macro == 15 && digitalInputs[3]))
+            {
+                increase = digitalInputs[4];
+                decrease = digitalInputs[5];
+            }
+            if (increase == decrease) return;
+
+            var fullRange = Mathf.Max(1f, GetNumericValue("P1037") - GetNumericValue("P1038"));
+            var ramp = Mathf.Max(0.01f, increase ? GetNumericValue("P1120") : GetNumericValue("P1121"));
+            var delta = fullRange / ramp * Time.unscaledDeltaTime * (increase ? 1f : -1f);
+            motorizedPotentiometerRpm = Mathf.Clamp(
+                motorizedPotentiometerRpm + delta, GetNumericValue("P1038"), GetNumericValue("P1037"));
+        }
+
+        private float AnalogCommandSpeed()
+        {
+            var volts = analogInputNormalized * 10f;
+            var x1 = GetNumericValue("P757.0");
+            var x2 = GetNumericValue("P759.0");
+            var y1 = GetNumericValue("P758.0");
+            var y2 = GetNumericValue("P760.0");
+            var percentage = Mathf.Abs(x2 - x1) < 0.0001f
+                ? y1
+                : y1 + (volts - x1) / (x2 - x1) * (y2 - y1);
+            var reference = Mathf.Min(GetNumericValue("P1082"), GetNumericValue("P311"));
+            return percentage * 0.01f * reference;
+        }
+
+        private bool IsFieldbusRunEnabled()
+        {
+            const ushort enableMask = 0x047F;
+            return (fieldbusControlWord & enableMask) == enableMask;
+        }
+
+        private float FieldbusCommandSpeed()
+        {
+            if (TelegramType == 20) return fieldbusSetpointRpm;
+            return (fieldbusControlWord & 0x0800) != 0
+                ? -Mathf.Abs(fieldbusSetpointRpm)
+                : Mathf.Abs(fieldbusSetpointRpm);
+        }
+
+        private bool IsFaultResetInput(int index)
+        {
+            switch (Macro)
+            {
+                case 1:
+                case 2:
+                case 3:
+                case 7:
+                case 12:
+                case 13:
+                case 14:
+                case 15:
+                case 17:
+                case 18:
+                case 21:
+                    return index == 2;
+                case 8:
+                case 9:
+                    return index == 3;
+                case 19:
+                case 20:
+                    return index == 4;
+                default:
+                    return false;
+            }
+        }
+
+        private void UpdateStatusWord()
+        {
+            ushort status = 0;
+            status |= 1 << 0;
+            if (!HasFault) status |= 1 << 1;
+            if (runCommand && !HasFault) status |= 1 << 2;
+            if (HasFault) status |= 1 << 3;
+            if ((fieldbusControlWord & 0x0002) == 0) status |= 1 << 4;
+            if ((fieldbusControlWord & 0x0004) == 0) status |= 1 << 5;
+            if ((fieldbusControlWord & 0x0001) == 0) status |= 1 << 6;
+            if (hasAlarm) status |= 1 << 7;
+            if (IsFieldbusMacro(Macro)) status |= 1 << 9;
+            if (Mathf.Abs(requestedSpeedRpm - OutputSpeedRpm) <= Mathf.Max(1f, Mathf.Abs(requestedSpeedRpm) * 0.01f))
+                status |= 1 << 10;
+            if (OutputSpeedRpm > 0.1f) status |= 1 << 14;
+            if (HasFault) status |= 1 << 15;
+            FieldbusStatusWord = status;
+        }
+
+        private static bool IsFieldbusMacro(int macro)
+        {
+            return macro == 4 || macro == 5 || macro == 6 || macro == 7 || macro == 14 || macro == 21;
         }
 
         private void RefreshRequestedSpeed()
@@ -437,6 +759,7 @@ namespace ElectricalSim
             else if (CurrentMode == MenuMode.Diagnostics && itemIndex == 0)
             {
                 SetFault(false);
+                SetAlarm(false, 0);
             }
             else if (CurrentMode == MenuMode.Extras && itemIndex == 0)
             {
@@ -572,8 +895,7 @@ namespace ElectricalSim
                     RefreshControlDisplay();
                     break;
                 case MenuMode.Diagnostics:
-                    Show(DiagnosticItems[itemIndex], HasFault ? "FAULT" : "READY", "", "",
-                        "诊断菜单：确认报警、查看故障和运行状态。");
+                    RefreshDiagnosticDisplay();
                     break;
                 case MenuMode.Parameters:
                     RefreshParameterDisplay();
@@ -584,6 +906,33 @@ namespace ElectricalSim
                 case MenuMode.Extras:
                     Show(ExtraItems[itemIndex], itemIndex == 0 ? "OK=RESET" : "AVAILABLE", "", "",
                         "附加菜单：恢复工厂设置或执行参数备份操作。");
+                    break;
+            }
+        }
+
+        private void RefreshDiagnosticDisplay()
+        {
+            switch (itemIndex)
+            {
+                case 0:
+                    Show("ACKN ALL", HasFault || hasAlarm ? "OK=RESET" : "READY", "", "", "确认全部故障与报警。");
+                    break;
+                case 1:
+                    Show("FAULTS", HasFault ? "F" + faultNumber.ToString("00000") : "NONE", "", "",
+                        "显示当前故障编号。");
+                    break;
+                case 2:
+                    Show("STATUS", runCommand ? "RUN" : HasFault ? "FAULT" : "READY", "", "",
+                        "变频器运行和就绪状态。");
+                    break;
+                case 3:
+                    Show("CTRL WORD", "0x" + fieldbusControlWord.ToString("X4"), "", "", "PROFIBUS/USS 控制字。");
+                    break;
+                case 4:
+                    Show("STAT WORD", "0x" + FieldbusStatusWord.ToString("X4"), "", "", "PROFIBUS/USS 状态字。");
+                    break;
+                default:
+                    Show("P0015 " + Macro, ActiveMacroName, "", "", "当前接口宏及其控制方式。");
                     break;
             }
         }
@@ -690,7 +1039,10 @@ namespace ElectricalSim
             {
                 var standardKeys = new HashSet<string>(new[]
                 {
-                    "P15", "P100", "P304", "P305", "P307", "P310", "P311", "P1003", "P1004", "P1080", "P1082", "P1120", "P1121"
+                    "P0010", "P0015", "P100", "P304", "P305", "P307", "P310", "P311", "P756.0",
+                    "P757.0", "P758.0", "P759.0", "P760.0", "P1001", "P1002", "P1003", "P1004",
+                    "P1037", "P1038", "P1040", "P1058", "P1059", "P1080", "P1082", "P1120", "P1121",
+                    "P922", "P2020", "P2021", "P2022", "P2023", "P2040"
                 }, StringComparer.OrdinalIgnoreCase);
                 return Definitions.Where(item => standardKeys.Contains(item.Key)).ToList();
             }
@@ -707,7 +1059,7 @@ namespace ElectricalSim
 
         private float GetNumericValue(string key)
         {
-            return values.TryGetValue(key, out var value) &&
+            return values.TryGetValue(ResolveParameterKey(key), out var value) &&
                    float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
                 ? parsed
                 : 0f;
@@ -717,7 +1069,22 @@ namespace ElectricalSim
 
         private static ParameterDefinition Definition(string key)
         {
+            key = ResolveParameterKey(key);
             return Definitions.FirstOrDefault(item => string.Equals(item.Key, key, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static string ResolveParameterKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key)) return key;
+            var normalized = key.Trim().Replace("[", ".").Replace("]", "");
+            if (string.Equals(normalized, "P15", StringComparison.OrdinalIgnoreCase)) return "P0015";
+            if (string.Equals(normalized, "P10", StringComparison.OrdinalIgnoreCase)) return "P0010";
+            if (string.Equals(normalized, "P0756.0", StringComparison.OrdinalIgnoreCase)) return "P756.0";
+            if (string.Equals(normalized, "P0757.0", StringComparison.OrdinalIgnoreCase)) return "P757.0";
+            if (string.Equals(normalized, "P0758.0", StringComparison.OrdinalIgnoreCase)) return "P758.0";
+            if (string.Equals(normalized, "P0759.0", StringComparison.OrdinalIgnoreCase)) return "P759.0";
+            if (string.Equals(normalized, "P0760.0", StringComparison.OrdinalIgnoreCase)) return "P760.0";
+            return normalized;
         }
 
         private T Find<T>(string objectName) where T : Component

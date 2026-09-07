@@ -30,6 +30,96 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator SelectedWirePropertiesShowActualColorAndPhysicalTerminalNames()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var ports = Object.FindObjectsOfType<ElectricalPortView>();
+            var start = ports.Single(p => p.QualifiedPort == "FR.T1");
+            var end = ports.Single(p => p.QualifiedPort == "M1.U");
+            typeof(SimulationController).GetMethod("BeginWireRoute", flags).Invoke(controller, new object[] { start });
+            typeof(SimulationController).GetMethod("CompleteWireRoute", flags).Invoke(controller, new object[] { end });
+            yield return null;
+            var view = Object.FindObjectOfType<ElectricalWireView>();
+            var presenter = Object.FindObjectOfType<WirePropertiesPresenter>();
+            var content = presenter.transform.Find("WireProperties").gameObject;
+            var status = presenter.transform.Find("Status").GetComponent<Text>();
+            var select = typeof(SimulationController).GetMethod("SelectWire", flags);
+            presenter.transform.Find("StatusPanelSlideHandle").GetComponent<Button>().onClick.Invoke();
+            yield return new WaitForSeconds(0.3f);
+            select.Invoke(controller, new object[] { view });
+            yield return new WaitForSeconds(0.3f);
+            Assert.That(content.activeSelf, Is.True);
+            Assert.That(status.gameObject.activeSelf, Is.False);
+            Assert.That(presenter.GetComponent<RectTransform>().anchoredPosition.x, Is.GreaterThanOrEqualTo(0f));
+            var labels = content.transform.Find("WireTerminalLabels").GetComponent<Text>();
+            Assert.That(labels.text, Does.Contain("热继电器 FR · 2T1").And.Contain("三相电机 M1 · U1"));
+            Assert.That(content.transform.Find("WireColorSwatch").GetComponent<Image>().color, Is.EqualTo(Color.red));
+            Assert.That(content.transform.Find("WireColorLabel").GetComponent<Text>().text, Does.Contain("红色"));
+            var canvas = presenter.GetComponentInParent<Canvas>();
+            var previousMode = canvas.renderMode;
+            var previousCamera = canvas.worldCamera;
+            var previousDistance = canvas.planeDistance;
+            try
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = Camera.main;
+                canvas.planeDistance = 0.5f;
+                Canvas.ForceUpdateCanvases();
+                SaveRearWireFrame("wire-properties-1280.png", 1280, 720);
+                SaveRearWireFrame("wire-properties-1920.png", 1920, 1080);
+                var savedStart = view.Connection.StartPort;
+                var savedEnd = view.Connection.EndPort;
+                view.Connection.StartPort = "DuanZiPai_7.A_u1";
+                view.Connection.EndPort = ports.First(p => p.DeviceId == "DuanZiPai_8").QualifiedPort;
+                select.Invoke(controller, new object[] { view });
+                Canvas.ForceUpdateCanvases();
+                SaveRearWireFrame("wire-properties-long-names.png", 1280, 720);
+                view.Connection.StartPort = savedStart;
+                view.Connection.EndPort = savedEnd;
+                select.Invoke(controller, new object[] { view });
+            }
+            finally
+            {
+                canvas.renderMode = previousMode;
+                canvas.worldCamera = previousCamera;
+                canvas.planeDistance = previousDistance;
+            }
+            Assert.That(controller.ResolveWireTerminalName("DuanZiPai_7.A_u1"), Does.Contain("电机端子区").And.Contain("A_u1").And.Not.Contain("M1"));
+            Assert.That(controller.ResolveWireTerminalName("missing.port"), Is.EqualTo("missing.port"));
+            Assert.That(WirePropertiesPresenter.ColorName(new Color32(12, 34, 56, 255)), Is.EqualTo("#0C2238"));
+            controller.ShowStatus("普通提示");
+            Assert.That(content.activeSelf, Is.True);
+            controller.ShowStatus("错误提示", true);
+            Assert.That(status.gameObject.activeSelf, Is.True);
+            Assert.That(status.text, Is.EqualTo("错误提示"));
+            controller.ShowStatus("最新提示");
+            Assert.That(content.activeSelf, Is.True);
+            typeof(SimulationController).GetMethod("ClearWireSelection", flags).Invoke(controller, null);
+            Assert.That(content.activeSelf, Is.False);
+            Assert.That(status.text, Is.EqualTo("最新提示"));
+            select.Invoke(controller, new object[] { view });
+            controller.UndoWiring();
+            yield return null;
+            Assert.That(content.activeSelf, Is.False);
+            controller.RedoWiring();
+            yield return null;
+            view = Object.FindObjectOfType<ElectricalWireView>();
+            view.Connection.Color = Color.cyan;
+            select.Invoke(controller, new object[] { view });
+            Assert.That(content.transform.Find("WireColorSwatch").GetComponent<Image>().color, Is.EqualTo(Color.cyan));
+            controller.SetMode(SimulationMode.View);
+            Assert.That(content.activeSelf, Is.False);
+            controller.SetMode(SimulationMode.Wiring);
+            select.Invoke(controller, new object[] { view });
+            typeof(SimulationController).GetMethod("DeleteWireSelectionOrLast", flags).Invoke(controller, null);
+            Assert.That(content.activeSelf, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator InverterPanelOpensOnlyFromItsModelInDragModeAndCanBeClosed()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
@@ -117,6 +207,104 @@ namespace ElectricalSim.Tests
             Assert.That(inverter.GetParameterText("P1004"), Is.EqualTo("400"));
             Assert.That(inverter.IsJogMode, Is.False);
             Assert.That(inverter.IsReverse, Is.False);
+        }
+
+        [UnityTest]
+        public IEnumerator G120MacroSelectionRequiresCommissioningAndExposesAllDocumentedMacros()
+        {
+            var inverter = Object.FindObjectOfType<SimulationController>().InverterPanel;
+            var expected = new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15, 17, 18, 19, 20, 21 };
+            Assert.That(inverter.SupportedMacros, Is.EqualTo(expected));
+            Assert.That(inverter.TrySetParameter("P0015", 12f), Is.False,
+                "P0015 must remain locked until P0010=1, as specified by the G120 commissioning sequence");
+            Assert.That(inverter.TrySetParameter("P0010", 1f), Is.True);
+            Assert.That(inverter.TrySetParameter("P15", 12f), Is.True, "Legacy P15 must alias the documented P0015");
+            Assert.That(inverter.Macro, Is.EqualTo(12));
+            Assert.That(inverter.GetParameterText("P0015"), Is.EqualTo("12"));
+            Assert.That(inverter.ActiveMacroName, Does.Contain("端子启动模拟量调速"));
+            Assert.That(inverter.ActiveMacroParameterMappings, Does.Contain("P840[0]=r722.0"));
+            Assert.That(inverter.ActiveMacroParameterMappings, Does.Contain("P1070[0]=r755.0"));
+            Assert.That(inverter.TrySetParameter("P0010", 0f), Is.True);
+            Assert.That(inverter.TrySetParameter("P0015", 3f), Is.False);
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator G120TerminalMacrosDriveFixedAnalogMopAndFaultResetCommands()
+        {
+            var inverter = Object.FindObjectOfType<SimulationController>().InverterPanel;
+            inverter.TrySetParameter("P0010", 1f);
+            inverter.TrySetParameter("P1120", 0.01f);
+            inverter.TrySetParameter("P1121", 0.01f);
+            inverter.TrySetParameter("P1082", 1000f);
+            inverter.TrySetParameter("P311", 1000f);
+
+            Assert.That(inverter.TrySetParameter("P0015", 3f), Is.True);
+            inverter.TrySetParameter("P1001", 100f);
+            inverter.TrySetParameter("P1002", 200f);
+            inverter.TrySetParameter("P1003", 300f);
+            inverter.SetDigitalInput(0, true);
+            inverter.SetDigitalInput(1, true);
+            inverter.SetDigitalInput(4, true);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(600f).Within(2f));
+
+            inverter.SetDigitalInput(0, false);
+            inverter.SetDigitalInput(1, false);
+            inverter.SetDigitalInput(4, false);
+            Assert.That(inverter.TrySetParameter("P0015", 12f), Is.True);
+            inverter.SetAnalogInputVolts(5f);
+            inverter.SetDigitalInput(0, true);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(500f).Within(2f));
+            inverter.SetDigitalInput(1, false);
+            inverter.SetDigitalInput(1, true);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(-500f).Within(2f));
+
+            inverter.SetFault(true, 123);
+            Assert.That(inverter.HasFault, Is.True);
+            inverter.SetDigitalInput(2, true);
+            Assert.That(inverter.HasFault, Is.False);
+
+            inverter.SetDigitalInput(0, false);
+            Assert.That(inverter.TrySetParameter("P0015", 15f), Is.True);
+            inverter.SetDigitalInput(1, true);
+            inverter.SetDigitalInput(2, false);
+            inverter.SetDigitalInput(3, true);
+            inverter.SetDigitalInput(4, false);
+            inverter.SetDigitalInput(5, false);
+            inverter.SetMotorizedPotentiometer(350f);
+            inverter.SetDigitalInput(0, true);
+            yield return null;
+            Assert.That(inverter.IsLocalControl, Is.True);
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(350f).Within(2f));
+        }
+
+        [UnityTest]
+        public IEnumerator G120ProfibusMacroUsesControlWordTelegramAndStatusWord()
+        {
+            var inverter = Object.FindObjectOfType<SimulationController>().InverterPanel;
+            inverter.TrySetParameter("P0010", 1f);
+            inverter.TrySetParameter("P1120", 0.01f);
+            inverter.TrySetParameter("P1121", 0.01f);
+            inverter.TrySetParameter("P1082", 1000f);
+            inverter.TrySetParameter("P311", 1000f);
+            Assert.That(inverter.TrySetParameter("P0015", 4f), Is.True);
+            Assert.That(inverter.TelegramType, Is.EqualTo(352));
+
+            inverter.SetProfibusCommand(0x047F, 600f);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(600f).Within(2f));
+            Assert.That((inverter.FieldbusStatusWord & (1 << 2)), Is.Not.Zero, "Status word must report operation enabled");
+            Assert.That((inverter.FieldbusStatusWord & (1 << 9)), Is.Not.Zero, "Status word must report PZD control");
+
+            inverter.SetProfibusCommand(0x0C7F, 400f);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(-400f).Within(2f));
+            inverter.SetProfibusCommand(0x047E, 400f);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f));
         }
 
         [UnityTest]
@@ -797,17 +985,569 @@ namespace ElectricalSim.Tests
             var camera = Camera.main;
             var wireViews = Object.FindObjectsOfType<ElectricalWireView>();
             Assert.That(wireViews.Length, Is.EqualTo(controller.Graph.Wires.Count));
+            var originalPaths = wireViews.ToDictionary(
+                view => view.name,
+                view => view.RenderedPoints.ToArray());
             foreach (var wireView in wireViews)
             {
                 var renderer = wireView.GetComponent<LineRenderer>();
-                var points = new Vector3[renderer.positionCount];
-                renderer.GetPositions(points);
-                var depths = points
-                    .Select(point => camera.transform.InverseTransformPoint(point).z)
-                    .ToArray();
-                Assert.That(depths.Max() - depths.Min(), Is.LessThan(0.0001f),
-                    $"{wireView.name} crosses the cabinet depth and may be partially hidden.");
+                Assert.That(renderer.alignment, Is.EqualTo(LineAlignment.TransformZ));
             }
+
+            camera.transform.position += new Vector3(0.7f, 0.3f, 0.4f);
+            camera.transform.Rotate(7f, 16f, 0f, Space.World);
+            yield return null;
+            foreach (var wireView in wireViews)
+                Assert.That(wireView.RenderedPoints, Is.EqualTo(originalPaths[wireView.name]),
+                    $"{wireView.name} must stay on its cabinet surface when the camera moves.");
+        }
+
+        [UnityTest]
+        public IEnumerator SelectedWireKeepsAttachedEndpointsAndBendHandles()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            CreatePhysicalTestWire(controller);
+            yield return null;
+
+            var wire = Object.FindObjectsOfType<ElectricalWireView>()
+                .Single(view => view.Connection.Id == controller.Graph.Wires.Last().Id);
+            wire.SetSelected(true, 0);
+            wire.Refresh();
+
+            Assert.That(wire.IsSelected, Is.True);
+            Assert.That(wire.HighlightRenderer.enabled, Is.True);
+            Assert.That(wire.HighlightRenderer.startWidth, Is.GreaterThan(wire.LineRenderer.startWidth));
+            Assert.That(wire.GetComponentsInChildren<MeshRenderer>(true).Count(item => item.gameObject.activeSelf),
+                Is.EqualTo(1));
+            AssertWireEndpointsMatchPorts(wire);
+            Assert.That(Vector3.Distance(wire.RenderedPoints[11], wire.Surface.Project(wire.Connection.Points[0])),
+                Is.LessThan(0.0001f));
+            for (var i = 0; i < wire.RenderedPoints.Count; i++)
+                Assert.That(wire.HighlightRenderer.GetPosition(i), Is.EqualTo(wire.RenderedPoints[i]));
+        }
+
+        [UnityTest]
+        public IEnumerator FaultViewKeepsWiresAttachedToPhysicalPortsAcrossViewChanges()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            CreatePhysicalTestWire(controller);
+            yield return null;
+
+            var frontViews = Object.FindObjectsOfType<ElectricalWireView>();
+            var frontNormal = frontViews[0].transform.forward;
+            var originalPaths = frontViews.ToDictionary(view => view.Connection.Id, view => view.RenderedPoints.ToArray());
+            foreach (var view in frontViews) AssertWireEndpointsMatchPorts(view);
+
+            cameraController.SetFaultView();
+            yield return null;
+            var faultViews = Object.FindObjectsOfType<ElectricalWireView>();
+            Assert.That(faultViews.Length, Is.EqualTo(frontViews.Length));
+            Assert.That(Vector3.Dot(frontNormal, faultViews[0].transform.forward), Is.GreaterThan(0.99f));
+            foreach (var view in faultViews)
+                Assert.That(view.RenderedPoints, Is.EqualTo(originalPaths[view.Connection.Id]));
+
+            var fixedFaultPaths = faultViews.ToDictionary(
+                view => view.Connection.Id,
+                view => view.RenderedPoints.ToArray());
+            cameraController.transform.position += new Vector3(0.25f, 0.1f, -0.15f);
+            cameraController.transform.Rotate(4f, -6f, 0f, Space.World);
+            yield return null;
+            foreach (var view in faultViews)
+            {
+                Assert.That(view.RenderedPoints, Is.EqualTo(fixedFaultPaths[view.Connection.Id]));
+                Assert.That(view.RenderedPoints, Is.EqualTo(originalPaths[view.Connection.Id]));
+            }
+            cameraController.SetWiringView();
+            yield return null;
+            foreach (var view in faultViews) AssertWireEndpointsMatchPorts(view);
+        }
+
+        private static void AssertWireEndpointsMatchPorts(ElectricalWireView wire)
+        {
+            var ports = Object.FindObjectsOfType<ElectricalPortView>(true)
+                .ToDictionary(port => port.QualifiedPort);
+            Assert.That(Vector3.Distance(wire.RenderedPoints[0], ports[wire.Connection.StartPort].CurrentAnchorPosition),
+                Is.LessThan(0.0005f), wire.Connection.StartPort + " wire start must remain on its terminal");
+            Assert.That(Vector3.Distance(wire.RenderedPoints.Last(), ports[wire.Connection.EndPort].CurrentAnchorPosition),
+                Is.LessThan(0.0005f), wire.Connection.EndPort + " wire end must remain on its terminal");
+        }
+
+        private static void CreatePhysicalTestWire(SimulationController controller)
+        {
+            // Reference circuits use logical nodes (e.g. POWER.N); this regression
+            // must connect the physical terminal markers used by the wiring UI.
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            var ports = Object.FindObjectsOfType<ElectricalPortView>()
+                .Where(port => port.IsVisible && port.CurrentAnchor != null)
+                .OrderBy(port => port.QualifiedPort).ToArray();
+            Assert.That(ports.Length, Is.GreaterThan(1));
+            controller.Graph.AddWire(ports.First().QualifiedPort, ports.Last().QualifiedPort, Color.red, "ElectricalWire");
+            Assert.That(controller.AddBendPointToLastWire(new Vector3(0.1f, 1.2f, 20f)), Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator CabinetWireAndSelectionAreOccludedBySolidGeometry()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("This test requires the graphics device to verify actual depth occlusion.");
+            var root = new GameObject("WireDepthTest");
+            var material = new Material(Resources.Load<Shader>("CabinetWire"));
+            var blockerMaterial = new Material(Shader.Find("Unlit/Color")) { color = Color.blue };
+            var target = new RenderTexture(128, 128, 24);
+            var pixels = new Texture2D(128, 128, TextureFormat.RGB24, false);
+            var previous = RenderTexture.active;
+            try
+            {
+                var camera = new GameObject("DepthCamera").AddComponent<Camera>();
+                camera.transform.SetParent(root.transform);
+                camera.transform.position = new Vector3(1000f, 1000f, 1000f);
+                camera.enabled = false;
+                camera.orthographic = true;
+                camera.orthographicSize = 0.5f;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Color.black;
+                camera.cullingMask = 1 << 30;
+                camera.targetTexture = target;
+                var origin = camera.transform.position + Vector3.forward * 2f;
+                var wireObject = new GameObject("OccludedWire") { layer = 30 };
+                wireObject.transform.SetParent(root.transform);
+                var wire = wireObject.AddComponent<ElectricalWireView>();
+                wire.Initialize(new WireConnection { StartPort = "A", EndPort = "B", Area = 0.1f },
+                    port => origin + (port == "A" ? Vector3.left : Vector3.right) * 0.4f,
+                    material, new WireSurfacePlane(origin, Vector3.back, 0f));
+                wire.HighlightRenderer.gameObject.layer = 30;
+                wire.SetSelected(true);
+                Color RenderCenter()
+                {
+                    camera.Render();
+                    RenderTexture.active = target;
+                    pixels.ReadPixels(new Rect(0, 0, 128, 128), 0, 0);
+                    pixels.Apply();
+                    return pixels.GetPixel(64, 64);
+                }
+                Assert.That(RenderCenter().r, Is.GreaterThan(0.5f), "wire must first render visibly");
+                var blocker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+                blocker.transform.SetParent(root.transform);
+                blocker.layer = 30;
+                blocker.transform.position = origin + Vector3.back * 0.5f;
+                blocker.transform.localScale = new Vector3(0.6f, 0.6f, 0.1f);
+                blocker.GetComponent<Renderer>().sharedMaterial = blockerMaterial;
+                var occluded = RenderCenter();
+                Assert.That(occluded.r, Is.LessThan(0.05f), "wire/highlight must not show through solid geometry");
+                Assert.That(occluded.b, Is.GreaterThan(0.5f));
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                Object.DestroyImmediate(root);
+                Object.DestroyImmediate(material);
+                Object.DestroyImmediate(blockerMaterial);
+                Object.DestroyImmediate(target);
+                Object.DestroyImmediate(pixels);
+            }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator FaultCabinetWiresConnectAtDeviceTerminalsWithDifferentDepths()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            controller.SetMode(SimulationMode.Wiring);
+            cameraController.SetFaultView();
+            yield return null;
+            var ports = Object.FindObjectsOfType<ElectricalPortView>()
+                .Where(port => port.IsVisible && port.CurrentAnchor != null)
+                .OrderBy(port => port.CurrentAnchorPosition.z).ToArray();
+            Assert.That(ports.Length, Is.GreaterThan(2));
+            var start = ports.First();
+            var end = ports.Last();
+            Assert.That(Mathf.Abs(start.CurrentAnchorPosition.z - end.CurrentAnchorPosition.z), Is.GreaterThan(0.01f));
+            var connection = controller.Graph.AddWire(start.QualifiedPort, end.QualifiedPort, Color.red, "ElectricalWire");
+            Assert.That(controller.AddBendPointToLastWire((start.CurrentAnchorPosition + end.CurrentAnchorPosition) * 0.5f), Is.True);
+            yield return null;
+            var view = Object.FindObjectsOfType<ElectricalWireView>().Single(item => item.Connection.Id == connection.Id);
+            AssertWireEndpointsMatchPorts(view);
+            Assert.That(Vector3.Distance(view.RenderPath.Trunk[10], view.Surface.Project(connection.Points[0])), Is.LessThan(0.0001f));
+            var fixedPath = view.RenderedPoints.ToArray();
+            cameraController.SetWiringView();
+            yield return null;
+            Assert.That(view.RenderedPoints, Is.EqualTo(fixedPath));
+            controller.SetWireStyle(Color.green, 0.02f, "JumperLine");
+            Assert.That(view.RenderedPoints, Is.EqualTo(fixedPath));
+            controller.AddBendPointToLastWire(Vector3.zero);
+            yield return null;
+            var rebuilt = Object.FindObjectsOfType<ElectricalWireView>().Single(item => item.Connection.Id == connection.Id);
+            Assert.That(rebuilt.RenderedPoints.First(), Is.EqualTo(fixedPath.First()));
+            Assert.That(rebuilt.RenderedPoints.Last(), Is.EqualTo(fixedPath.Last()));
+            Assert.That(rebuilt.Surface.Normal, Is.EqualTo(view.Surface.Normal));
+        }
+
+        [UnityTest]
+        public IEnumerator RearWireSurfaceMatchesRotatedCabinetMesh()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            cameraController.SetFaultView();
+            yield return null;
+            var panel = GameObject.Find("OriginalLabEnvironment/Bench/ElectricBench/mesh/model/DQG/DQG11").GetComponent<MeshFilter>();
+            var normal = -panel.transform.up.normalized;
+            var vertices = panel.sharedMesh.vertices.Select(panel.transform.TransformPoint).ToArray();
+            var rearDepth = vertices.Max(p => Vector3.Dot(p, normal));
+            var ports = Object.FindObjectsOfType<ElectricalPortView>();
+            var start = ports.First(p => p.DeviceId == "KMF" && p.PortName == "T1");
+            var end = ports.First(p => p.DeviceId == "KMR" && p.PortName == "L1");
+            var connection = controller.Graph.AddWire(start.QualifiedPort, end.QualifiedPort, Color.red, "ElectricalWire");
+            controller.AddBendPointToLastWire((start.CurrentAnchorPosition + end.CurrentAnchorPosition) * 0.5f + Vector3.down * 0.32f);
+            yield return null;
+            var wire = Object.FindObjectsOfType<ElectricalWireView>().Single(v => v.Connection.Id == connection.Id);
+            var center = (start.CurrentAnchorPosition + end.CurrentAnchorPosition) * 0.5f + Vector3.down * 0.12f;
+            Camera.main.transform.position = center + normal * 1.25f + Vector3.up * 0.3f;
+            Camera.main.transform.LookAt(center);
+            SaveRearWireFrame("rear-wire-straight.png");
+            Camera.main.transform.position += panel.transform.right * 0.7f + Vector3.up * 0.25f;
+            Camera.main.transform.LookAt(center);
+            SaveRearWireFrame("rear-wire-oblique.png");
+            Debug.Log($"Rear wire geometry: normal={wire.Surface.Normal}, actual={normal}, originDepth={Vector3.Dot(wire.Surface.Origin, normal):F5}, panelDepth={rearDepth:F5}");
+            Assert.That(Vector3.Dot(wire.Surface.Normal, normal), Is.GreaterThan(0.9999f), "routing plane must follow the rotated rear mesh, not world Z");
+            Assert.That(Vector3.Dot(wire.Surface.Origin, normal), Is.EqualTo(rearDepth + 0.003f).Within(0.0005f));
+            foreach (var point in wire.RenderPath.Trunk)
+                Assert.That(Vector3.Dot(point, normal), Is.EqualTo(rearDepth + 0.003f).Within(0.0005f));
+        }
+
+        [UnityTest]
+        public IEnumerator EveryRearBodyTerminalHasDistinctSpatialLeadsAndMatchingDraft()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            cameraController.SetFaultView();
+            yield return null;
+            var ports = Object.FindObjectsOfType<ElectricalPortView>()
+                .Where(p => new[] { "KMF", "KM1", "KMR", "FR" }.Contains(p.DeviceId))
+                .OrderBy(p => p.QualifiedPort).ToArray();
+            Assert.That(ports.Length, Is.EqualTo(64));
+            var originalPositions = ports.Select(p => p.CurrentAnchorPosition).ToArray();
+            var originalScales = ports.Select(p => p.transform.localScale).ToArray();
+            Physics.SyncTransforms();
+            var normal = -GameObject.Find("OriginalLabEnvironment/Bench/ElectricBench/mesh/model/DQG/DQG11").transform.up.normalized;
+            var right = Vector3.Cross(Vector3.up, normal).normalized;
+            for (var i = 0; i < ports.Length; i++)
+            {
+                Assert.That(ports[i].IsVisible, Is.True);
+                Assert.That(ports[i].GetComponent<Collider>().enabled, Is.True);
+                Assert.That(ports[i].RearWireBody, Is.Not.Null, ports[i].QualifiedPort);
+                var directions = new[] { normal, (normal + right).normalized, (normal - right).normalized,
+                    (normal + Vector3.up).normalized, (normal - Vector3.up).normalized };
+                Assert.That(directions.Any(direction => Physics.Raycast(new Ray(ports[i].CurrentAnchorPosition + direction * 0.3f, -direction), out var hit, 0.4f) &&
+                    hit.collider.GetComponent<ElectricalPortView>() == ports[i]), Is.True,
+                    ports[i].QualifiedPort + " must be directly clickable from a rear inspection angle");
+                controller.Graph.AddWire(ports[i].QualifiedPort, ports[(i + 1) % ports.Length].QualifiedPort, Color.red, "ElectricalWire");
+            }
+            controller.AddBendPointToLastWire(ports[0].CurrentAnchorPosition + Vector3.down * 0.2f);
+            yield return null;
+            var views = Object.FindObjectsOfType<ElectricalWireView>();
+            Assert.That(views.Length, Is.EqualTo(ports.Length));
+            var restored = new CircuitGraph();
+            var saved = Cc3dCircuitAdapter.Export(controller.Graph, new DeviceSceneState[0]);
+            Cc3dCircuitAdapter.ImportWires(Cc3dSerializer.Deserialize(Cc3dSerializer.Serialize(saved)), restored);
+            var draftObject = new GameObject("RearLeadDraftVerification");
+            var startGeometry = default(WireEndpointGeometry);
+            var draft = draftObject.AddComponent<ElectricalWireDraftView>();
+            draft.Initialize(() => startGeometry.Position, views[0].LineRenderer.sharedMaterial, Color.red, 0.01f,
+                views[0].Surface, () => startGeometry);
+            try
+            {
+                foreach (var view in views)
+                {
+                    AssertWireEndpointsMatchPorts(view);
+                    var start = ports.Single(p => p.QualifiedPort == view.Connection.StartPort);
+                    var end = ports.Single(p => p.QualifiedPort == view.Connection.EndPort);
+                    startGeometry = new WireEndpointGeometry(start.CurrentAnchorPosition, start.RearWireBody);
+                    var endGeometry = new WireEndpointGeometry(end.CurrentAnchorPosition, end.RearWireBody);
+                    var restoredWire = restored.Wires.Single(w => w.Id == view.Connection.Id);
+                    Assert.That(restoredWire.Points.Count, Is.EqualTo(view.Connection.Points.Count));
+                    Assert.That(restoredWire.FaultSide, Is.True);
+                    Assert.That(WireRenderPath.Build(startGeometry, endGeometry, restoredWire.Points, view.Surface).Points,
+                        Is.EqualTo(view.RenderedPoints));
+                    AssertSpatialLeadClearsBody(view.RenderPath.StartLead, start.RearWireBody, view.Surface);
+                    AssertSpatialLeadClearsBody(view.RenderPath.EndLead, end.RearWireBody, view.Surface);
+                    draft.Refresh(view.Connection.Points, endGeometry.Position, endGeometry);
+                    Assert.That(draft.RenderPath.Points, Is.EqualTo(view.RenderedPoints));
+                    view.SetSelected(true);
+                    Assert.That(view.GetComponentsInChildren<WireLeadMesh>().Length, Is.EqualTo(2));
+                    Assert.That(view.GetComponentsInChildren<WireLeadMesh>().All(m => m.Renderer.enabled), Is.True);
+                    view.SetSelected(false);
+                }
+                draft.SetVisible(false);
+                Assert.That(draft.GetComponentInChildren<WireLeadMesh>().Renderer.enabled, Is.False);
+                draft.SetVisible(true);
+                Assert.That(draft.GetComponentInChildren<WireLeadMesh>().Renderer.enabled, Is.True);
+            }
+            finally { Object.Destroy(draftObject); }
+            var paths = views.ToDictionary(v => v.Connection.Id, v => v.RenderedPoints.ToArray());
+            cameraController.SetWiringView();
+            yield return null;
+            foreach (var view in views) Assert.That(view.RenderedPoints, Is.EqualTo(paths[view.Connection.Id]));
+            controller.UndoWiring();
+            yield return null;
+            controller.RedoWiring();
+            yield return null;
+            foreach (var view in Object.FindObjectsOfType<ElectricalWireView>())
+                Assert.That(view.RenderedPoints, Is.EqualTo(paths[view.Connection.Id]));
+            cameraController.SetFaultView();
+            yield return null;
+            for (var i = 0; i < ports.Length; i++)
+            {
+                Assert.That(ports[i].CurrentAnchorPosition, Is.EqualTo(originalPositions[i]));
+                Assert.That(ports[i].transform.localScale, Is.EqualTo(originalScales[i]));
+            }
+        }
+
+        private static void AssertSpatialLeadClearsBody(IReadOnlyList<Vector3> lead, WireBodyGeometry body, WireSurfacePlane surface)
+        {
+            Assert.That(lead.Count, Is.EqualTo(4));
+            Assert.That(body.TryGetBounds(surface, out var bounds), Is.True);
+            var inverse = Quaternion.Inverse(surface.Rotation);
+            var raised = inverse * lead[1];
+            var exit = inverse * lead[2];
+            Assert.That(raised.z, Is.GreaterThanOrEqualTo(bounds.max.z + 0.0099f));
+            Assert.That(exit.z, Is.EqualTo(raised.z).Within(0.00001f));
+            Assert.That(exit.x <= bounds.min.x - 0.0099f || exit.x >= bounds.max.x + 0.0099f ||
+                        exit.y <= bounds.min.y - 0.0099f || exit.y >= bounds.max.y + 0.0099f, Is.True);
+            Assert.That(Mathf.Abs(surface.SignedDistance(lead[3])), Is.LessThan(0.0001f));
+        }
+
+        [UnityTest]
+        public IEnumerator RearSpatialLeadRenderViews()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
+            yield return null;
+            var ports = Object.FindObjectsOfType<ElectricalPortView>();
+            for (var i = 1; i <= 3; i++)
+                controller.Graph.AddWire("KMR.T" + i, "FR.T" + i, new[] { Color.red, Color.yellow, Color.cyan }[i - 1], "ElectricalWire");
+            controller.Graph.AddWire("KMF.L1", "KM1.L1", Color.green, "ElectricalWire");
+            controller.Graph.AddWire("KM1.T1", "KM1.T3", new Color(1f, 0.3f, 0.9f), "ElectricalWire");
+            controller.AddBendPointToLastWire(ports.First(p => p.QualifiedPort == "KM1.T1").CurrentAnchorPosition + Vector3.down * 0.07f);
+            yield return null;
+            var view = Object.FindObjectsOfType<ElectricalWireView>().First();
+            var normal = view.Surface.Normal;
+            var right = view.Surface.Rotation * Vector3.right;
+            var center = ports.Where(p => p.DeviceId == "KM1" || p.DeviceId == "FR")
+                .Aggregate(Vector3.zero, (sum, p) => sum + p.CurrentAnchorPosition) / ports.Count(p => p.DeviceId == "KM1" || p.DeviceId == "FR");
+            foreach (var angle in new[] { 0f, -0.32f, 0.32f })
+            {
+                Camera.main.transform.position = center + normal * 0.65f + right * angle + Vector3.up * 0.1f;
+                Camera.main.transform.LookAt(center);
+                SaveRearWireFrame(angle == 0f ? "spatial-leads-front.png" : angle < 0f ? "spatial-leads-left.png" : "spatial-leads-right.png");
+            }
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            Assert.That(ports.Where(p => p.DeviceId == "FR" && new[] { "T1", "T2", "T3" }.Contains(p.PortName)).All(p => p.IsVisible), Is.True);
+        }
+
+        private static void SaveRearWireFrame(string name, int width = 1280, int height = 900)
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null) return;
+            var camera = Camera.main;
+            var target = RenderTexture.GetTemporary(width, height, 24);
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            var pixels = new Texture2D(width, height, TextureFormat.RGB24, false);
+            try
+            {
+                camera.targetTexture = target;
+                camera.Render();
+                RenderTexture.active = target;
+                pixels.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                pixels.Apply();
+                System.IO.Directory.CreateDirectory("Build/Reports");
+                System.IO.File.WriteAllBytes("Build/Reports/" + name, pixels.EncodeToPNG());
+            }
+            finally
+            {
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                RenderTexture.ReleaseTemporary(target);
+                Object.DestroyImmediate(pixels);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator RearThermalRelayMotorJumpersUseSpatialPaths()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            cameraController.SetFaultView();
+            yield return null;
+            var ports = Object.FindObjectsOfType<ElectricalPortView>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var begin = typeof(SimulationController).GetMethod("BeginWireRoute", flags);
+            var complete = typeof(SimulationController).GetMethod("CompleteWireRoute", flags);
+            for (var i = 0; i < 3; i++)
+            {
+                var fr = ports.Single(p => p.QualifiedPort == "FR.T" + (i + 1));
+                var motor = ports.Single(p => p.QualifiedPort == "M1." + new[] { "U", "V", "W" }[i]);
+                Assert.That(fr.IsVisible && motor.IsVisible, Is.True);
+                controller.SetWireStyle(new[] { Color.red, Color.yellow, Color.cyan }[i], 0.01f, "JumperLine");
+                var start = i == 1 ? motor : fr;
+                var end = i == 1 ? fr : motor;
+                begin.Invoke(controller, new object[] { start });
+                var pending = (List<Vector3>)typeof(SimulationController).GetField("pendingWirePoints", flags).GetValue(controller);
+                pending.Add(start.CurrentAnchorPosition + Vector3.down * 0.2f);
+                var draft = Object.FindObjectOfType<ElectricalWireDraftView>();
+                draft.Refresh(pending, end.CurrentAnchorPosition, new WireEndpointGeometry(end.CurrentAnchorPosition, end.RearWireBody),
+                    WireRenderPath.IsMotorJumper(start.QualifiedPort, end.QualifiedPort, "JumperLine"));
+                var preview = draft.RenderPath.Points.ToArray();
+                complete.Invoke(controller, new object[] { end });
+                yield return null;
+                var view = Object.FindObjectsOfType<ElectricalWireView>().Single(v => v.Connection.StartPort == start.QualifiedPort);
+                Assert.That(view.Connection.FaultSide, Is.True);
+                Assert.That(view.RenderPath.IsSoftJumper, Is.True);
+                Assert.That(view.RenderedPoints, Is.EqualTo(preview));
+                Assert.That(Vector3.Distance(view.RenderedPoints.First(), start.CurrentAnchorPosition), Is.LessThan(0.0005f));
+                Assert.That(Vector3.Distance(view.RenderedPoints.Last(), end.CurrentAnchorPosition), Is.LessThan(0.0005f));
+                Assert.That(view.Connection.Points, Is.Empty);
+                // Old rear routes with stored cabinet bends must also render spatially.
+                view.Connection.Points.Add(Vector3.zero);
+                view.Refresh();
+                Assert.That(view.RenderedPoints, Is.EqualTo(preview));
+                view.SetSelected(true);
+                Assert.That(view.GetComponentsInChildren<WireLeadMesh>().All(m => m.Renderer.enabled), Is.True);
+                Assert.That(view.TryHitNode(Camera.main, Vector2.zero, 10000f, out _), Is.False);
+                view.SetSelected(false);
+            }
+            var views = Object.FindObjectsOfType<ElectricalWireView>();
+            var paths = views.ToDictionary(v => v.Connection.Id, v => v.RenderedPoints.ToArray());
+            cameraController.SetWiringView();
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            foreach (var view in views) Assert.That(view.RenderedPoints, Is.EqualTo(paths[view.Connection.Id]));
+            cameraController.SetFaultView();
+            yield return null;
+            var bounds = new Bounds(views[0].RenderedPoints.First(), Vector3.zero);
+            foreach (var view in views) foreach (var p in view.RenderedPoints) bounds.Encapsulate(p);
+            var normal = views[0].Surface.Normal;
+            var right = views[0].Surface.Rotation * Vector3.right;
+            foreach (var offset in new[] { 0f, -0.45f, 0.45f })
+            {
+                Camera.main.transform.position = bounds.center + normal * 1.15f + right * offset + Vector3.up * 0.1f;
+                Camera.main.transform.LookAt(bounds.center);
+                SaveRearWireFrame(offset == 0f ? "rear-motor-jumper-front.png" : offset < 0f ? "rear-motor-jumper-left.png" : "rear-motor-jumper-right.png");
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator MotorSoftJumpersConnectPreviewPersistAndRender()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            cameraController.SetWiringView();
+            yield return null;
+            var ports = Object.FindObjectsOfType<ElectricalPortView>();
+            var flags = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            var begin = typeof(SimulationController).GetMethod("BeginWireRoute", flags);
+            var complete = typeof(SimulationController).GetMethod("CompleteWireRoute", flags);
+            var pairs = new[] { new[] { "A_u1", "M1", "U" }, new[] { "A_v1", "M1", "V" },
+                new[] { "B_u1", "M_DOUBLE", "U" }, new[] { "C_u1", "M2", "U" } };
+            foreach (var pair in pairs)
+            {
+                var board = ports.Single(p => p.QualifiedPort == "DuanZiPai_7." + pair[0]);
+                var motor = ports.Single(p => p.QualifiedPort == pair[1] + "." + pair[2]);
+                Assert.That(board.IsVisible && motor.IsVisible, Is.True);
+                var start = pair[1] == "M2" ? motor : board;
+                var end = start == motor ? board : motor;
+                begin.Invoke(controller, new object[] { start });
+                // Reproduce a blank-space click before choosing the motor terminal.
+                var surfacePoint = start.CurrentAnchorPosition + Vector3.down * 0.2f;
+                var routeSurface = Object.FindObjectOfType<ElectricalWireDraftView>().transform.forward;
+                typeof(SimulationController).GetMethod("HandleWiringClick", flags).Invoke(controller,
+                    new object[] { null, new Ray(surfacePoint + routeSurface, -routeSurface) });
+                var pending = (List<Vector3>)typeof(SimulationController).GetField("pendingWirePoints", flags).GetValue(controller);
+                Assert.That(pending.Count, Is.EqualTo(1));
+                var draft = Object.FindObjectOfType<ElectricalWireDraftView>();
+                draft.Refresh(pending, end.CurrentAnchorPosition, new WireEndpointGeometry(end.CurrentAnchorPosition), true);
+                var preview = draft.RenderPath.Points.ToArray();
+                complete.Invoke(controller, new object[] { end });
+                yield return null;
+                var wire = Object.FindObjectsOfType<ElectricalWireView>().Single(w => w.Connection.StartPort == start.QualifiedPort);
+                Assert.That(wire.RenderPath.IsSoftJumper, Is.True);
+                Assert.That(wire.RenderedPoints, Is.EqualTo(preview));
+                Assert.That(wire.LineRenderer.positionCount, Is.Zero);
+                Assert.That(wire.Connection.Points, Is.Empty);
+                wire.SetSelected(true);
+                Assert.That(wire.GetComponentsInChildren<WireLeadMesh>().All(m => m.Renderer.enabled), Is.True);
+                wire.SetSelected(false);
+            }
+            var views = Object.FindObjectsOfType<ElectricalWireView>();
+            var paths = views.ToDictionary(w => w.Connection.Id, w => w.RenderedPoints.ToArray());
+            var restored = new CircuitGraph();
+            Cc3dCircuitAdapter.ImportWires(Cc3dSerializer.Deserialize(Cc3dSerializer.Serialize(
+                Cc3dCircuitAdapter.Export(controller.Graph, new DeviceSceneState[0]))), restored);
+            foreach (var wire in restored.Wires)
+            {
+                var old = paths[wire.Id];
+                Assert.That(WireRenderPath.Build(new WireEndpointGeometry(old.First()), new WireEndpointGeometry(old.Last()),
+                    wire.Points, views[0].Surface, WireRenderPath.IsMotorJumper(wire.StartPort, wire.EndPort, wire.LineType)).Points,
+                    Is.EqualTo(old));
+            }
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            cameraController.SetFaultView();
+            yield return null;
+            foreach (var wire in views)
+            {
+                Assert.That(wire.RenderedPoints, Is.EqualTo(paths[wire.Connection.Id]));
+                Assert.That(wire.GetComponentsInChildren<WireLeadMesh>().Any(m => m.Renderer.enabled), Is.True);
+            }
+            controller.UndoWiring();
+            yield return null;
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(3));
+            controller.RedoWiring();
+            yield return null;
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(4));
+            cameraController.SetWiringView();
+            yield return null;
+            var main = Object.FindObjectsOfType<ElectricalWireView>().First(w => w.Connection.EndPort == "M1.U");
+            var center = (main.RenderedPoints.First() + main.RenderedPoints.Last()) * 0.5f;
+            var normal = main.Surface.Normal;
+            foreach (var offset in new[] { 0f, -0.6f, 0.6f })
+            {
+                Camera.main.transform.position = center + normal * 1.5f + Vector3.up * 0.5f + main.Surface.Rotation * Vector3.right * offset;
+                Camera.main.transform.LookAt(center);
+                SaveRearWireFrame(offset == 0f ? "motor-jumper-front.png" : offset < 0f ? "motor-jumper-left.png" : "motor-jumper-right.png");
+            }
+            Camera.main.transform.position = center + normal * 0.8f + Vector3.up * 0.3f;
+            Camera.main.transform.LookAt(center);
+            SaveRearWireFrame("motor-jumper-close.png");
+            Assert.That(main.TryHitLine(Camera.main, Camera.main.WorldToScreenPoint(main.RenderedPoints[16]),
+                10f, out _, out var insertionIndex, out _), Is.True);
+            Assert.That(insertionIndex, Is.EqualTo(-1), "Automatic samples are selectable but never editable bend points");
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            var startPort = ports.Single(p => p.QualifiedPort == main.Connection.StartPort);
+            var endPort = ports.Single(p => p.QualifiedPort == main.Connection.EndPort);
+            var click = typeof(SimulationController).GetMethod("HandleWiringClick", flags);
+            click.Invoke(controller, new object[] { startPort, default(Ray) });
+            Assert.That(controller.IsRoutingWire, Is.True);
+            click.Invoke(controller, new object[] { startPort, default(Ray) });
+            Assert.That(controller.IsRoutingWire, Is.False);
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(4));
+            click.Invoke(controller, new object[] { endPort, default(Ray) });
+            click.Invoke(controller, new object[] { startPort, default(Ray) });
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(4), "Reverse duplicate must not add another cable");
+            yield return null;
+            typeof(SimulationController).GetMethod("DeleteWireSelectionOrLast", flags).Invoke(controller, null);
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(3));
         }
 
         [UnityTest]

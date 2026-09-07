@@ -25,6 +25,7 @@ namespace ElectricalSim
         public float Area = 0.01f;
         public string LineType = "JumperLine";
         public List<Vector3> Points = new List<Vector3>();
+        public bool? FaultSide;
     }
 
     public sealed class SimulationSnapshot
@@ -147,6 +148,7 @@ namespace ElectricalSim
                 Color = source.Color,
                 Area = source.Area,
                 LineType = source.LineType,
+                FaultSide = source.FaultSide,
                 Points = new List<Vector3>(source.Points)
             };
         }

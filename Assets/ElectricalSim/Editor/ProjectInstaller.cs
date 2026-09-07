@@ -82,7 +82,8 @@ namespace ElectricalSim.Editor
         {
             Directory.CreateDirectory(GeneratedDirectory);
             var primitive = LoadOrCreateMaterial(PrimitiveMaterialPath, "Standard");
-            var wire = LoadOrCreateMaterial(WireMaterialPath, "Sprites/Default");
+            var wire = LoadOrCreateMaterial(WireMaterialPath, "ElectricalSim/Cabinet Wire");
+            wire.shader = Shader.Find("ElectricalSim/Cabinet Wire");
             var serialized = new SerializedObject(bootstrap);
             serialized.FindProperty("primitiveMaterial").objectReferenceValue = primitive;
             serialized.FindProperty("wireMaterial").objectReferenceValue = wire;

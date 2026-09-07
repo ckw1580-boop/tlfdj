@@ -54,6 +54,7 @@ namespace ElectricalSim
     [Serializable]
     public sealed class Cc3dLine
     {
+        [JsonProperty("faultSide", NullValueHandling = NullValueHandling.Ignore)] public bool? FaultSide;
         [JsonProperty("startDeviceId")] public string StartDeviceId = string.Empty;
         [JsonProperty("startPortName")] public string StartPortName = string.Empty;
         [JsonProperty("endDeviceId")] public string EndDeviceId = string.Empty;
@@ -69,6 +70,7 @@ namespace ElectricalSim
     [Serializable]
     public sealed class Cc3dRopeLine
     {
+        [JsonProperty("faultSide", NullValueHandling = NullValueHandling.Ignore)] public bool? FaultSide;
         [JsonProperty("lineColor")] public float[] LineColor = { 1f, 0f, 0f, 1f };
         [JsonProperty("lineType")] public string LineType = "JumperLine";
         [JsonProperty("lineArea")] public float LineArea = 0.01f;
@@ -137,6 +139,7 @@ namespace ElectricalSim
                     Color = ToColor(source.Color),
                     Area = source.Area,
                     LineType = source.Type,
+                    FaultSide = source.FaultSide,
                     Points = ResolvePoints(source.Points, document.CustomPoints)
                 });
             }
@@ -151,7 +154,8 @@ namespace ElectricalSim
                     EndPort = CircuitGraph.Port(source.EndDeviceId, source.EndPortName),
                     Color = ToColor(source.LineColor),
                     Area = source.LineArea,
-                    LineType = source.LineType
+                    LineType = source.LineType,
+                    FaultSide = source.FaultSide
                 });
             }
         }
@@ -183,7 +187,7 @@ namespace ElectricalSim
             {
                 SplitPort(wire.StartPort, out var startDevice, out var startPort);
                 SplitPort(wire.EndPort, out var endDevice, out var endPort);
-                if (wire.Points.Count == 0 || string.Equals(wire.LineType, "JumperLine", StringComparison.OrdinalIgnoreCase))
+                if (wire.Points.Count == 0)
                 {
                     document.RopeLines[wire.Id] = new Cc3dRopeLine
                     {
@@ -193,7 +197,8 @@ namespace ElectricalSim
                         EndPortName = endPort,
                         LineColor = ToArray(wire.Color),
                         LineArea = wire.Area,
-                        LineType = wire.LineType
+                        LineType = wire.LineType,
+                        FaultSide = wire.FaultSide
                     };
                     continue;
                 }
@@ -219,7 +224,8 @@ namespace ElectricalSim
                     Points = pointIds,
                     Color = ToArray(wire.Color),
                     Area = wire.Area,
-                    Type = wire.LineType
+                    Type = wire.LineType,
+                    FaultSide = wire.FaultSide
                 };
             }
 

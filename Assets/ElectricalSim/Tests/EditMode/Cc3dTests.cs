@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -7,6 +8,23 @@ namespace ElectricalSim.Tests
 {
     public sealed class Cc3dTests
     {
+        [TestCase(true, true)]
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void WireCabinetSideSurvivesCloneAndFileRoundTrip(bool faultSide, bool routed)
+        {
+            var graph = new CircuitGraph();
+            var wire = graph.AddWire("QF.T1", "KM1.L1", Color.red, "ElectricalWire");
+            wire.FaultSide = faultSide;
+            if (routed) wire.Points.Add(Vector3.one);
+            Assert.That(CircuitGraph.CloneWire(wire).FaultSide, Is.EqualTo(faultSide));
+            var document = Cc3dCircuitAdapter.Export(graph, new List<DeviceSceneState>());
+            var loaded = Cc3dSerializer.Deserialize(Cc3dSerializer.Serialize(document));
+            var restored = new CircuitGraph();
+            Cc3dCircuitAdapter.ImportWires(loaded, restored);
+            Assert.That(restored.Wires.Single().FaultSide, Is.EqualTo(faultSide));
+        }
         [Test]
         public void UnknownFieldsSurviveRoundTrip()
         {
@@ -53,6 +71,23 @@ namespace ElectricalSim.Tests
             Assert.That(imported.Wires[0].Points.Count, Is.EqualTo(1));
             Assert.That(imported.Wires[0].Points[0], Is.EqualTo(new Vector3(1f, 2f, 3f)));
             Assert.That(imported.Wires[0].Area, Is.EqualTo(0.025f));
+        }
+
+        [Test]
+        public void RoutedJumperPointsSurviveAdapterRoundTrip()
+        {
+            var graph = new CircuitGraph();
+            var wire = graph.AddWire("QF.T1", "KM1.L1", Color.red, "JumperLine", 0.01f);
+            wire.Points.Add(new Vector3(0.5f, 1.25f, -1.33f));
+
+            var document = Cc3dCircuitAdapter.Export(graph, new List<DeviceSceneState>());
+
+            Assert.That(document.Lines.ContainsKey(wire.Id), Is.True);
+            Assert.That(document.RopeLines.ContainsKey(wire.Id), Is.False);
+            var imported = new CircuitGraph();
+            Cc3dCircuitAdapter.ImportWires(document, imported);
+            Assert.That(imported.Wires[0].LineType, Is.EqualTo("JumperLine"));
+            Assert.That(imported.Wires[0].Points, Is.EqualTo(wire.Points));
         }
     }
 }

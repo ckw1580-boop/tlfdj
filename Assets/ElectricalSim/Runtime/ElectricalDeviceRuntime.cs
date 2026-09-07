@@ -23,6 +23,7 @@ namespace ElectricalSim
         public string DeviceId { get; }
         public ElectricalDeviceKind Kind { get; }
         public IReadOnlyCollection<string> Ports => ports;
+        public IReadOnlyList<PortPair> FixedLinks => fixedLinks;
         public bool IsActive { get; private set; }
         public bool IsClosed { get; private set; }
         public bool IsTripped { get; private set; }
