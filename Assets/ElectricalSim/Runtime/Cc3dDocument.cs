@@ -95,7 +95,16 @@ namespace ElectricalSim
         public static Cc3dDocument Deserialize(string json)
         {
             if (string.IsNullOrWhiteSpace(json)) throw new InvalidDataException("The CC3D document is empty.");
-            var document = JsonConvert.DeserializeObject<Cc3dDocument>(json, Settings);
+            var root = JObject.Parse(json, new JsonLoadSettings { DuplicatePropertyNameHandling = DuplicatePropertyNameHandling.Error });
+            var recognized = false;
+            foreach (var key in new[] { "element", "customPoints", "line", "ropeLine" })
+            {
+                if (root[key] == null) continue;
+                if (root[key].Type != JTokenType.Object) throw new InvalidDataException(key + " 必须是对象。");
+                recognized = true;
+            }
+            if (!recognized) throw new InvalidDataException("文件中没有 CC3D 接线数据。");
+            var document = root.ToObject<Cc3dDocument>(JsonSerializer.Create(Settings));
             if (document == null) throw new InvalidDataException("The CC3D document could not be parsed.");
             document.Elements ??= new Dictionary<string, Cc3dElement>();
             document.CustomPoints ??= new Dictionary<string, Cc3dPoint>();
@@ -117,9 +126,28 @@ namespace ElectricalSim
 
         public static void Save(string path, Cc3dDocument document)
         {
+            // Serialize before touching the destination. A failed write must leave
+            // the last good project intact, including when overwriting a file.
+            var json = Serialize(document);
+            path = Path.GetFullPath(path);
             var directory = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-            File.WriteAllText(path, Serialize(document), new System.Text.UTF8Encoding(false));
+            var temporary = Path.Combine(directory, "." + Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
+            try
+            {
+                using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    var bytes = new System.Text.UTF8Encoding(false).GetBytes(json);
+                    stream.Write(bytes, 0, bytes.Length);
+                    stream.Flush(true);
+                }
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
     }
 
@@ -127,11 +155,21 @@ namespace ElectricalSim
     {
         public static void ImportWires(Cc3dDocument document, CircuitGraph graph)
         {
-            graph.ClearWires();
+            graph.ReplaceWires(ReadWires(document));
+        }
+
+        public static List<WireConnection> ReadWires(Cc3dDocument document)
+        {
+            if (document == null) throw new ArgumentNullException(nameof(document));
+            var result = new List<WireConnection>();
+            var identities = new HashSet<string>(StringComparer.Ordinal);
             foreach (var entry in document.Lines)
             {
                 var source = entry.Value;
-                graph.AddWire(new WireConnection
+                if (source == null) throw new InvalidDataException("导线为空：" + entry.Key);
+                ValidateWire(entry.Key, identities, source.StartDeviceId, source.StartPortName,
+                    source.EndDeviceId, source.EndPortName, source.Color, source.Area, source.Type);
+                result.Add(new WireConnection
                 {
                     Id = entry.Key,
                     StartPort = CircuitGraph.Port(source.StartDeviceId, source.StartPortName),
@@ -147,7 +185,10 @@ namespace ElectricalSim
             foreach (var entry in document.RopeLines)
             {
                 var source = entry.Value;
-                graph.AddWire(new WireConnection
+                if (source == null) throw new InvalidDataException("跳线为空：" + entry.Key);
+                ValidateWire(entry.Key, identities, source.StartDeviceId, source.StartPortName,
+                    source.EndDeviceId, source.EndPortName, source.LineColor, source.LineArea, source.LineType);
+                result.Add(new WireConnection
                 {
                     Id = entry.Key,
                     StartPort = CircuitGraph.Port(source.StartDeviceId, source.StartPortName),
@@ -158,11 +199,28 @@ namespace ElectricalSim
                     FaultSide = source.FaultSide
                 });
             }
+            return result;
+        }
+
+        private static void ValidateWire(string id, HashSet<string> identities, string startDevice, string startPort,
+            string endDevice, string endPort, float[] color, float area, string type)
+        {
+            if (string.IsNullOrWhiteSpace(id) || !identities.Add(id)) throw new InvalidDataException("导线 ID 为空或重复：" + id);
+            if (string.IsNullOrWhiteSpace(startDevice) || string.IsNullOrWhiteSpace(startPort) ||
+                string.IsNullOrWhiteSpace(endDevice) || string.IsNullOrWhiteSpace(endPort) ||
+                (startDevice == endDevice && startPort == endPort))
+                throw new InvalidDataException("导线端点无效：" + id);
+            if (string.IsNullOrWhiteSpace(type) || !IsFinite(area) || area <= 0)
+                throw new InvalidDataException("导线类型或截面积无效：" + id);
+            if (color == null || (color.Length != 3 && color.Length != 4)) throw new InvalidDataException("导线颜色无效：" + id);
+            foreach (var channel in color)
+                if (!IsFinite(channel)) throw new InvalidDataException("导线颜色无效：" + id);
         }
 
         public static Cc3dDocument Export(CircuitGraph graph, IEnumerable<DeviceSceneState> devices, Cc3dDocument baseDocument = null)
         {
-            var document = baseDocument ?? new Cc3dDocument();
+            var document = baseDocument == null ? new Cc3dDocument() :
+                Cc3dSerializer.Deserialize(Cc3dSerializer.Serialize(baseDocument));
             document.Elements.Clear();
             document.CustomPoints.Clear();
             document.Lines.Clear();
@@ -235,10 +293,20 @@ namespace ElectricalSim
         private static List<Vector3> ResolvePoints(IEnumerable<string> ids, IReadOnlyDictionary<string, Cc3dPoint> points)
         {
             var result = new List<Vector3>();
+            if (ids == null) throw new InvalidDataException("导线路径点列表为空。");
             foreach (var id in ids)
-                if (points.TryGetValue(id, out var point)) result.Add(ToVector3(point.Position));
+            {
+                if (id == null || !points.TryGetValue(id, out var point) || point == null)
+                    throw new InvalidDataException("找不到导线路径点：" + id);
+                if (point.Position == null || point.Position.Length != 3 ||
+                    !IsFinite(point.Position[0]) || !IsFinite(point.Position[1]) || !IsFinite(point.Position[2]))
+                    throw new InvalidDataException("导线路径点坐标无效：" + id);
+                result.Add(ToVector3(point.Position));
+            }
             return result;
         }
+
+        private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 
         private static Color ToColor(IReadOnlyList<float> values)
         {

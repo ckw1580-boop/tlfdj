@@ -170,11 +170,9 @@ namespace ElectricalSim
 
         private void Update()
         {
-            if (rotor != null && Runtime != null && Runtime.MotorDirection != MotorDirection.Stopped)
+            if (rotor != null && Runtime != null)
             {
-                var sign = Runtime.MotorDirection == MotorDirection.Reverse ? -1f : 1f;
-                var speed = Runtime.MotorDirection == MotorDirection.Braking ? 120f : 720f;
-                rotor.Rotate(Vector3.forward, sign * speed * Time.deltaTime, Space.Self);
+                rotor.Rotate(Vector3.up, Runtime.ActualSpeedRpm * 6f * Time.deltaTime, Space.Self);
             }
         }
 

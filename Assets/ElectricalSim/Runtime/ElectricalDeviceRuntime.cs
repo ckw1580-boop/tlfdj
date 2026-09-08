@@ -31,6 +31,42 @@ namespace ElectricalSim
         public bool IsNormallyClosedButton { get; set; }
         public float TimerDelaySeconds { get; set; } = 1f;
         public MotorDirection MotorDirection { get; private set; }
+        public float ActualSpeedRpm { get; private set; }
+        public float CoastStopSeconds { get; set; } = 3f;
+        public float BrakeStopSeconds { get; set; } = 1f;
+        private float stoppingRate;
+        private bool wasStopping;
+        private bool wasBraking;
+
+        public void ResetMotorSpeed()
+        {
+            ActualSpeedRpm = 0f;
+            wasStopping = false;
+            MotorDirection = MotorDirection.Stopped;
+        }
+
+        internal void AdvanceMotorSpeed(SimulationSnapshot snapshot, float deltaTime)
+        {
+            var braking = MotorDirection == MotorDirection.Braking;
+            var drive = snapshot.MotorDrives.TryGetValue(DeviceId, out var sample) ? sample : default;
+            if (!braking && drive.HasDrive)
+            {
+                ActualSpeedRpm = drive.SpeedRpm;
+                wasStopping = false;
+                return;
+            }
+            if (!braking && !drive.Connected && MotorDirection != MotorDirection.Stopped)
+            {
+                ActualSpeedRpm = MotorDirection == MotorDirection.Reverse ? -1450f : 1450f;
+                wasStopping = false;
+                return;
+            }
+            if (!wasStopping || braking != wasBraking)
+                stoppingRate = Math.Abs(ActualSpeedRpm) / Math.Max(0.01f, braking ? BrakeStopSeconds : CoastStopSeconds);
+            wasStopping = true;
+            wasBraking = braking;
+            ActualSpeedRpm = UnityEngine.Mathf.MoveTowards(ActualSpeedRpm, 0f, stoppingRate * Math.Max(0f, deltaTime));
+        }
         public Action<ElectricalDeviceRuntime> VisualStateChanged;
 
         public void AddFixedLink(string localPort, string qualifiedTarget)
@@ -159,6 +195,9 @@ namespace ElectricalSim
         {
             if (snapshot.IsDeviceActive("KB") || snapshot.IsDeviceActive("KMB"))
                 return MotorDirection.Braking;
+            if (snapshot.MotorDrives.TryGetValue(DeviceId, out var drive) && drive.Connected)
+                return !drive.HasDrive || Math.Abs(drive.SpeedRpm) < 0.1f ? MotorDirection.Stopped :
+                    drive.SpeedRpm < 0f ? MotorDirection.Reverse : MotorDirection.Forward;
             var u = snapshot.GetPotential(Port("U"));
             var v = snapshot.GetPotential(Port("V"));
             var w = snapshot.GetPotential(Port("W"));

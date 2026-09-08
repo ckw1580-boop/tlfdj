@@ -26,6 +26,7 @@ namespace ElectricalSim
         public bool IsViewingFaultSide => IsPositionOnFaultSide(transform.position);
 
         public TrainingViewPreset CurrentPreset { get; private set; } = TrainingViewPreset.Default;
+        public bool InputBlocked { get; set; }
         public event Action<TrainingViewPreset> PresetChanged;
         public event Action<bool> ViewSideChanged;
 
@@ -40,6 +41,7 @@ namespace ElectricalSim
 
         private void Update()
         {
+            if (InputBlocked) return;
             var speed = MoveSpeed * Time.unscaledDeltaTime;
             var horizontal = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
             var forward = (Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.S) ? 1f : 0f);

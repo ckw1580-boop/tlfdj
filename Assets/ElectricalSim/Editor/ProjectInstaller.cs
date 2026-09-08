@@ -40,7 +40,10 @@ namespace ElectricalSim.Editor
             else EnsureSceneResources();
             ConfigurePlayerSettings();
             OriginalReferenceGenerator.Generate();
-            var outputDirectory = Path.GetFullPath("Build/Windows");
+            var buildArgs = System.Environment.GetCommandLineArgs();
+            var outputOption = System.Array.IndexOf(buildArgs, "-trainingBuildOutput");
+            var outputDirectory = Path.GetFullPath(outputOption >= 0 && outputOption + 1 < buildArgs.Length
+                ? buildArgs[outputOption + 1] : "Build/Windows");
             Directory.CreateDirectory(outputDirectory);
             var options = new BuildPlayerOptions
             {

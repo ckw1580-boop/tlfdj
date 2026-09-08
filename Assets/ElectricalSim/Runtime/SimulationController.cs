@@ -9,7 +9,7 @@ using UnityEngine.UI;
 
 namespace ElectricalSim
 {
-    public sealed class SimulationController : MonoBehaviour
+    public sealed partial class SimulationController : MonoBehaviour
     {
         private readonly CircuitGraph graph = new CircuitGraph();
         private readonly Dictionary<string, ElectricalDeviceRuntime> devices = new Dictionary<string, ElectricalDeviceRuntime>();
@@ -40,6 +40,12 @@ namespace ElectricalSim
         private Cc3dDocument loadedDocument;
         private SimulationSnapshot lastSnapshot;
         private InstrumentKind instrumentKind = InstrumentKind.Multimeter;
+        public TachometerController Tachometer { get; private set; }
+        public void RegisterTachometer(TachometerController tachometer)
+        {
+            Tachometer = tachometer;
+            if (Tachometer != null) Tachometer.SetFaultMode(Mode == SimulationMode.Fault);
+        }
         private readonly Stack<List<WireConnection>> undoWires = new Stack<List<WireConnection>>();
         private readonly Stack<List<WireConnection>> redoWires = new Stack<List<WireConnection>>();
         private Color currentWireColor = Color.red;
@@ -179,6 +185,7 @@ namespace ElectricalSim
         {
             inverterModel = model;
             inverterPanel = panel;
+            graph.RegisterDevice(new InverterDriveRuntime("G120", () => panel.ActualSpeedRpm, () => panel.HasFault));
             setInverterPanelVisible = setVisible;
             setInverterPanelVisible?.Invoke(false);
         }
@@ -196,10 +203,13 @@ namespace ElectricalSim
 
         private void Update()
         {
-            HandleHotkeys();
-            UpdatePortHover();
-            UpdateWiringDraft();
-            HandleSceneInput();
+            if (!IsFileOperationActive && Time.frameCount > fileInputResumeFrame)
+            {
+                HandleHotkeys();
+                UpdatePortHover();
+                UpdateWiringDraft();
+                HandleSceneInput();
+            }
             lastSnapshot = graph.Solve(Time.deltaTime);
             foreach (var view in wireViews) view.Refresh();
             UpdateInstrumentReadout();
@@ -210,6 +220,7 @@ namespace ElectricalSim
         public void SetMode(SimulationMode mode)
         {
             Mode = mode;
+            if (Tachometer != null) Tachometer.SetFaultMode(mode == SimulationMode.Fault);
             if (mode != SimulationMode.Drag) setInverterPanelVisible?.Invoke(false);
             foreach (var breaker in cabinetBreakers)
                 if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
@@ -254,6 +265,7 @@ namespace ElectricalSim
             foreach (var breaker in cabinetBreakers) breaker.ResetClosed();
             foreach (var device in devices.Values)
             {
+                if (device.Kind == ElectricalDeviceKind.Motor) device.ResetMotorSpeed();
                 if (device.Kind == ElectricalDeviceKind.Breaker)
                     device.SetControl(!IsMainBreaker(device) || AreCabinetBreakersClosed);
                 else if (device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);
@@ -271,53 +283,15 @@ namespace ElectricalSim
             StartCoroutine(EvaluateCurrentTask());
         }
 
-        public void OpenCc3d()
-        {
-            var path = WindowsFileDialog.OpenCc3d(ProjectDirectory());
-            if (string.IsNullOrEmpty(path)) return;
-            try
-            {
-                loadedDocument = Cc3dSerializer.Load(path);
-                Cc3dCircuitAdapter.ImportWires(loadedDocument, graph);
-                RefreshWireViews();
-                SetStatus($"已打开：{Path.GetFileName(path)}（{loadedDocument.Elements.Count} 个元件，{graph.Wires.Count} 条线路）", false);
-            }
-            catch (Exception exception)
-            {
-                SetStatus("打开失败：" + exception.Message, true);
-            }
-        }
-
-        public void SaveCc3d()
-        {
-            var path = WindowsFileDialog.SaveCc3d(ProjectDirectory());
-            if (string.IsNullOrEmpty(path)) return;
-            try
-            {
-                var states = FindObjectsOfType<ElectricalDeviceView>()
-                    .Select(view => new DeviceSceneState(
-                        view.Runtime.DeviceId,
-                        view.Runtime.Kind.ToString(),
-                        view.gameObject.name,
-                        view.transform.position,
-                        view.transform.rotation));
-                var document = Cc3dCircuitAdapter.Export(graph, states, loadedDocument);
-                Cc3dSerializer.Save(path, document);
-                loadedDocument = document;
-                SetStatus($"已导出：{Path.GetFileName(path)}", false);
-            }
-            catch (Exception exception)
-            {
-                SetStatus("导出失败：" + exception.Message, true);
-            }
-        }
-
         public void SelectInstrument(InstrumentKind kind)
         {
+            foreach (var port in meterPorts) port.SetHighlighted(false);
+            if (Tachometer != null) Tachometer.Deselect();
             instrumentKind = kind;
             meterPorts.Clear();
             instrumentText.text = $"{InstrumentName(kind)}：请选择两个端子";
             SetMode(SimulationMode.Fault);
+            if (kind == InstrumentKind.Tachometer && Tachometer != null) Tachometer.Select();
         }
 
         public void SetWireStyle(Color color, float area, string lineType)
@@ -388,6 +362,11 @@ namespace ElectricalSim
         private void UpdatePortHover()
         {
             if (portHover == null) return;
+            if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer)
+            {
+                portHover.Hide();
+                return;
+            }
             if (Mode != SimulationMode.Wiring && Mode != SimulationMode.Fault)
             {
                 portHover.Hide();
@@ -483,7 +462,7 @@ namespace ElectricalSim
                 var end = Time.realtimeSinceStartup + Mathf.Max(0.05f, step.HoldSeconds);
                 while (Time.realtimeSinceStartup < end)
                 {
-                    lastSnapshot = graph.Solve(Time.unscaledDeltaTime);
+                    // Update owns the simulation clock, including shaft coast-down.
                     yield return null;
                 }
 
@@ -510,6 +489,11 @@ namespace ElectricalSim
 
         private void HandleSceneInput()
         {
+            if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer)
+            {
+                if (Tachometer != null) Tachometer.HandleInput(Camera.main);
+                return;
+            }
             if (Mode == SimulationMode.Drag)
             {
                 if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
@@ -916,8 +900,11 @@ namespace ElectricalSim
             if (instrumentText == null) return;
             if (instrumentKind == InstrumentKind.Tachometer)
             {
-                var meter = new ElectricalInstrument(instrumentKind);
-                instrumentText.text = $"转速表：{meter.SampleMotorSpeed("M1", lastSnapshot):0} r/min";
+                if (Tachometer != null) Tachometer.Refresh(lastSnapshot);
+                var target = Tachometer != null ? Tachometer.AttachedTarget : null;
+                instrumentText.text = target != null && lastSnapshot != null
+                    ? $"转速表 · {target.MotorId}：{Mathf.Abs(lastSnapshot.GetMotorSpeedRpm(target.MotorId)):0} rpm\n点击表体可拿起"
+                    : "转速表：将探头移至电机前端轴头，点击绿色测点放置";
                 return;
             }
             if (meterPorts.Count < 2 || lastSnapshot == null)

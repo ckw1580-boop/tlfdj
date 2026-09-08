@@ -34,18 +34,22 @@ namespace ElectricalSim
         private readonly Dictionary<string, ElectricalPotential> potentials;
         private readonly Dictionary<string, bool> activeDevices;
         private readonly Dictionary<string, MotorDirection> motorDirections;
+        private readonly Dictionary<string, float> motorSpeeds;
+        internal readonly Dictionary<string, MotorDriveSample> MotorDrives = new Dictionary<string, MotorDriveSample>();
 
         public SimulationSnapshot(
             Dictionary<string, string> roots,
             Dictionary<string, ElectricalPotential> potentials,
             Dictionary<string, bool> activeDevices,
             Dictionary<string, MotorDirection> motorDirections,
-            IReadOnlyList<string> errors)
+            IReadOnlyList<string> errors,
+            Dictionary<string, float> motorSpeeds = null)
         {
             this.roots = roots;
             this.potentials = potentials;
             this.activeDevices = activeDevices;
             this.motorDirections = motorDirections;
+            this.motorSpeeds = motorSpeeds ?? new Dictionary<string, float>();
             Errors = errors;
         }
 
@@ -78,6 +82,9 @@ namespace ElectricalSim
         {
             return motorDirections.TryGetValue(deviceId, out var direction) ? direction : MotorDirection.Stopped;
         }
+
+        public float GetMotorSpeedRpm(string deviceId)
+            => deviceId != null && motorSpeeds.TryGetValue(deviceId, out var speed) ? speed : 0f;
     }
 
     public sealed class CircuitGraph
@@ -172,6 +179,10 @@ namespace ElectricalSim
             }
 
             snapshot = BuildSnapshot();
+            // Time advances once, after contact convergence, never in the iteration loop.
+            foreach (var motor in devices.Values.OfType<ElectricalDeviceRuntime>().Where(d => d.Kind == ElectricalDeviceKind.Motor))
+                motor.AdvanceMotorSpeed(snapshot, deltaTime);
+            snapshot = BuildSnapshot();
             foreach (var device in devices.Values) device.ApplyVisualState(snapshot);
             return snapshot;
         }
@@ -194,7 +205,19 @@ namespace ElectricalSim
             var active = devices.Values.ToDictionary(d => d.DeviceId, d => d.IsActive);
             var directions = devices.Values.ToDictionary(d => d.DeviceId, d =>
                 d is ElectricalDeviceRuntime runtime ? runtime.MotorDirection : MotorDirection.Stopped);
-            return new SimulationSnapshot(rootMap, potentialsByRoot, active, directions, errors);
+            var speeds = devices.Values.OfType<ElectricalDeviceRuntime>()
+                .Where(d => d.Kind == ElectricalDeviceKind.Motor).ToDictionary(d => d.DeviceId, d => d.ActualSpeedRpm);
+            var snapshot = new SimulationSnapshot(rootMap, potentialsByRoot, active, directions, errors, speeds);
+            foreach (var drive in devices.Values.OfType<InverterDriveRuntime>())
+            {
+                drive.Validate(snapshot, errors);
+                foreach (var motor in devices.Values.Where(d => d.Kind == ElectricalDeviceKind.Motor))
+                {
+                    var sample = drive.SampleMotor(motor.DeviceId, snapshot);
+                    if (sample.Connected) snapshot.MotorDrives[motor.DeviceId] = sample;
+                }
+            }
+            return snapshot;
         }
 
         private DisjointSet BuildUnion(bool includeDeviceContacts)

@@ -31,11 +31,7 @@ namespace ElectricalSim
 
         public double SampleMotorSpeed(string motorId, SimulationSnapshot snapshot)
         {
-            var direction = snapshot.GetMotorDirection(motorId);
-            if (direction == MotorDirection.Forward) return 1450d;
-            if (direction == MotorDirection.Reverse) return -1450d;
-            if (direction == MotorDirection.Braking) return 250d;
-            return 0d;
+            return snapshot == null ? double.NaN : snapshot.GetMotorSpeedRpm(motorId);
         }
 
         private static bool IsPhase(ElectricalPotential potential)

@@ -447,6 +447,8 @@ namespace ElectricalSim
                 RefreshAutomaticCommand();
             }
             var target = HasFault ? 0f : requestedSpeedRpm;
+            // A direction change must finish deceleration before reverse acceleration.
+            if (OutputSpeedRpm * target < 0f) target = 0f;
             var accelerating = Mathf.Abs(target) > Mathf.Abs(OutputSpeedRpm);
             var rampKey = accelerating ? "P1120" : "P1121";
             var rampSeconds = Mathf.Max(0.01f, GetNumericValue(rampKey));

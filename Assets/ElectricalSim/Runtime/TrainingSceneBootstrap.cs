@@ -9,7 +9,7 @@ using UnityEngine.UI;
 
 namespace ElectricalSim
 {
-    public sealed class TrainingSceneBootstrap : MonoBehaviour
+    public sealed partial class TrainingSceneBootstrap : MonoBehaviour
     {
         [SerializeField] private OriginalVisualRegistry originalVisuals;
         [SerializeField] private bool showMissingAssetNotice = true;
@@ -115,6 +115,7 @@ namespace ElectricalSim
             controller.RegisterCabinetBreakers(CreateCabinetBreakerInteractions());
             BindUi(ui);
             BindOriginalUi(ui);
+            CreateTachometer();
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
             Debug.Log("[OfflineBootstrap] Build complete.");
         }
@@ -2140,9 +2141,9 @@ namespace ElectricalSim
                 SetRect(button.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(930f + i * 112f, 14f), new Vector2(1032f + i * 112f, -14f));
             }
 
-            var open = Button("Open", ui.Top.transform, "打开", controller.OpenCc3d);
+            var open = Button("Open", ui.Top.transform, "打开接线", controller.OpenCc3d);
             SetRect(open.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1500f, 14f), new Vector2(1592f, 74f));
-            var save = Button("Save", ui.Top.transform, "导出", controller.SaveCc3d);
+            var save = Button("Save", ui.Top.transform, "保存接线", controller.SaveCc3d);
             SetRect(save.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1600f, 14f), new Vector2(1692f, 74f));
             var reset = Button("Reset", ui.Top.transform, "重置", controller.ResetTraining);
             SetRect(reset.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1700f, 14f), new Vector2(1792f, 74f));
@@ -2187,7 +2188,7 @@ namespace ElectricalSim
                 SetNamedButtonActive(navigation, "downloadBtn", false);
                 SetNamedButtonActive(navigation, "mineBtn", false);
                 SetNamedButtonText(navigation, "scheduleBtn", "任务查询");
-                SetNamedButtonText(navigation, "saveBtn", "保存");
+                SetNamedButtonText(navigation, "saveBtn", "保存接线");
                 SetNamedButtonText(navigation, "submitBtn", "提交");
                 SetNamedButtonText(navigation, "resetBtn", "重置");
                 foreach (var id in new[] { "EditorBtn_A", "EditorBtn_B", "EditorBtn_C", "EditorBtn_D" })
@@ -2203,9 +2204,11 @@ namespace ElectricalSim
                 BindNamedButton(toolbar, "btn_drag", () => controller.SetMode(SimulationMode.Drag));
                 BindNamedButton(toolbar, "btn_line", () => controller.SetMode(SimulationMode.Wiring));
                 BindNamedButton(toolbar, "btn_sim", () => controller.SetMode(SimulationMode.Simulate));
-                BindNamedButton(toolbar, "btn_resume", controller.OpenCc3d);
+                BindNamedButton(toolbar, "btn_resume", controller.ResetTraining);
                 BindNamedButton(toolbar, "btn_snapshot", captureRecorder.CaptureScreenshot);
-                BindNamedButton(toolbar, "btn_submit", controller.SubmitTask);
+                // Imported object names do not match their icons: btn_submit
+                // carries the original "打开" folder sprite; btn_resume is reset.
+                BindNamedButton(toolbar, "btn_submit", controller.OpenCc3d);
                 BindNamedButton(toolbar, "btn_localSave", controller.SaveCc3d);
                 BindNamedButton(toolbar, "btn_saveAnswer", controller.SaveCc3d);
                 BindNamedButton(toolbar, "btn_record", captureRecorder.ToggleRecording);
@@ -2315,6 +2318,8 @@ namespace ElectricalSim
             var shouldShow = !instrumentTools.activeSelf;
             instrumentTools.SetActive(shouldShow);
             if (motorFaultBlocks != null) motorFaultBlocks.SetActive(shouldShow);
+            if (shouldShow && controller != null && controller.Mode != SimulationMode.Fault)
+                controller.SetMode(SimulationMode.Fault);
             if (!shouldShow && controller != null && controller.Mode == SimulationMode.Fault)
                 controller.SetMode(SimulationMode.View);
         }

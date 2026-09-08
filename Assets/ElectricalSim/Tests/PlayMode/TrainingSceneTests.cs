@@ -260,6 +260,8 @@ namespace ElectricalSim.Tests
             inverter.SetDigitalInput(1, false);
             inverter.SetDigitalInput(1, true);
             yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f), "Reversal finishes deceleration before accelerating in reverse");
+            yield return null;
             Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(-500f).Within(2f));
 
             inverter.SetFault(true, 123);
@@ -276,6 +278,7 @@ namespace ElectricalSim.Tests
             inverter.SetDigitalInput(5, false);
             inverter.SetMotorizedPotentiometer(350f);
             inverter.SetDigitalInput(0, true);
+            yield return null;
             yield return null;
             Assert.That(inverter.IsLocalControl, Is.True);
             Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(350f).Within(2f));
@@ -300,6 +303,8 @@ namespace ElectricalSim.Tests
             Assert.That((inverter.FieldbusStatusWord & (1 << 9)), Is.Not.Zero, "Status word must report PZD control");
 
             inverter.SetProfibusCommand(0x0C7F, 400f);
+            yield return null;
+            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f), "Profibus direction changes also pass through zero");
             yield return null;
             Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(-400f).Within(2f));
             inverter.SetProfibusCommand(0x047E, 400f);
