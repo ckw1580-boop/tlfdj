@@ -1587,7 +1587,7 @@ namespace ElectricalSim.Tests
             Assert.That(Object.FindObjectsOfType<ElectricalPortView>()
                 .All(port => terminalBoardIds.Contains(port.DeviceId) ||
                              faultDeviceIds.Contains(port.DeviceId) ||
-                             new[] { "M1", "M_DOUBLE", "M2" }.Contains(port.DeviceId)), Is.True);
+                             new[] { "M1", "M_DOUBLE", "M2", "M3" }.Contains(port.DeviceId)), Is.True);
 
             controller.SetMode(SimulationMode.Wiring);
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
@@ -1837,6 +1837,7 @@ namespace ElectricalSim.Tests
             var motors = new[]
             {
                 new { DeviceId = "M1", Nut = "38" },
+                new { DeviceId = "M3", Nut = "107" },
                 new { DeviceId = "M_DOUBLE", Nut = "118" },
                 new { DeviceId = "M2", Nut = "49" }
             };
@@ -1871,8 +1872,8 @@ namespace ElectricalSim.Tests
             Assert.That(faultMotorPorts.Select(port => port.CurrentAnchor.name),
                 Is.EquivalentTo(expectedAnchors));
             Assert.That(faultMotorPorts.All(port => port.IsVisible &&
-                                                   HasAncestor(port.CurrentAnchor, "107")), Is.True,
-                "Troubleshooting-view motor terminals must move to its six rear studs");
+                                                   HasAncestor(port.CurrentAnchor, "38")), Is.True,
+                "Changing views must not move M1 terminals to a different motor");
 
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
             yield return null;
@@ -1881,7 +1882,8 @@ namespace ElectricalSim.Tests
 
             var motorBoard = views.Single(item => item.Runtime.DeviceId == "DuanZiPai_7");
             Assert.That(motorBoard.Ports.Count, Is.EqualTo(18));
-            Assert.That(motorBoard.Runtime.GetConductiveLinks().Count(), Is.EqualTo(18));
+            Assert.That(motorBoard.Runtime.GetConductiveLinks(), Is.Empty,
+                "Cabinet motor terminals must not energize any motor without explicit jumpers");
         }
 
         [UnityTest]
@@ -1933,9 +1935,9 @@ namespace ElectricalSim.Tests
             var faultBodyPorts = electricalPorts.Where(port => faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var terminalElectricalPorts = electricalPorts.Where(port => !faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var motorBoardPorts = ports.Where(port => port.DeviceId == "DuanZiPai_7").ToArray();
-            Assert.That(jumperPorts.Length, Is.EqualTo(18));
+            Assert.That(jumperPorts.Length, Is.EqualTo(24));
             Assert.That(jumperPorts.Select(port => port.DeviceId).Distinct(),
-                Is.EquivalentTo(new[] { "M1", "M_DOUBLE", "M2" }));
+                Is.EquivalentTo(new[] { "M1", "M_DOUBLE", "M2", "M3" }));
             Assert.That(electricalPorts.Length, Is.GreaterThan(0));
             Assert.That(motorBoardPorts.Length, Is.EqualTo(18));
             Assert.That(motorBoardPorts.All(port => !port.JumperOnly && !port.ElectricalOnly), Is.True);
@@ -2266,10 +2268,6 @@ namespace ElectricalSim.Tests
                 .Single(item => item.name == "btn_paigu");
 
             controller.SetMode(SimulationMode.View);
-            var expectedPosition = cameraController.transform.position;
-            var expectedRotation = cameraController.transform.rotation;
-            var expectedPreset = cameraController.CurrentPreset;
-
             Assert.That(instrumentTools.gameObject.activeSelf, Is.False);
             Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.False);
             Assert.That(motorFaultBlocks.childCount, Is.EqualTo(4));
@@ -2284,10 +2282,9 @@ namespace ElectricalSim.Tests
 
             Assert.That(instrumentTools.gameObject.activeSelf, Is.True);
             Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.True);
-            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.View));
-            Assert.That(cameraController.transform.position, Is.EqualTo(expectedPosition));
-            Assert.That(cameraController.transform.rotation, Is.EqualTo(expectedRotation));
-            Assert.That(cameraController.CurrentPreset, Is.EqualTo(expectedPreset));
+            // The existing tachometer workflow enters fault mode immediately so shaft targets are visible.
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Fault));
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.FaultBack));
 
             instrumentTools.GetComponentsInChildren<Button>(true)
                 .Single(item => item.name == "Instrument_Multimeter").onClick.Invoke();

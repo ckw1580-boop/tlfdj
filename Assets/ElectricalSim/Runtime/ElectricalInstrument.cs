@@ -14,6 +14,7 @@ namespace ElectricalSim
         public double Sample(MeasurementKind measurement, string portA, string portB, SimulationSnapshot snapshot)
         {
             if (snapshot == null) return double.NaN;
+            if (measurement == MeasurementKind.DcVoltage) return snapshot.GetDcVoltage(portA, portB);
             if (measurement == MeasurementKind.Continuity)
                 return snapshot.SameNet(portA, portB) ? 1d : 0d;
             if (measurement == MeasurementKind.Resistance)

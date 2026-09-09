@@ -41,6 +41,8 @@ namespace ElectricalSim
 
         private void Update()
         {
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
+                EventSystem.current.currentSelectedGameObject.GetComponent<UnityEngine.UI.InputField>() != null) return;
             if (InputBlocked) return;
             var speed = MoveSpeed * Time.unscaledDeltaTime;
             var horizontal = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);

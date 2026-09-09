@@ -81,6 +81,7 @@ namespace ElectricalSim
             CreateFaultButtonTerminalConnections(cameraController);
             Debug.Log("[OfflineBootstrap] Environment ready.");
             var wireRoot = new GameObject("ElectricalWires").transform;
+            CreatePanelDevices();
             CreateDevices();
             CreateOriginalTerminalBoardPorts();
             CreateOriginalCabinetTerminalBoardPorts();
@@ -106,7 +107,14 @@ namespace ElectricalSim
                     faultWireSurface.SurfaceOffset, cabinetBounds.bounds);
             }
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, originalVisuals, ui.PortHover);
+            controller.RegisterPanel(panelViews, panelPower);
+            controller.RegisterPlcs(originalEnvironment, uiFont, ui.Status.canvas);
+            ValidatePanelBindings();
             ui.Status.transform.parent.gameObject.AddComponent<WirePropertiesPresenter>().Initialize(controller, ui.Status, () =>
+            {
+                if (statusPanelSlide.IsCollapsed) ToggleSlidePanel(statusPanelSlide);
+            });
+            ui.Status.transform.parent.gameObject.AddComponent<PanelPropertiesPresenter>().Initialize(controller, ui.Status, () =>
             {
                 if (statusPanelSlide.IsCollapsed) ToggleSlidePanel(statusPanelSlide);
             });
@@ -717,9 +725,8 @@ namespace ElectricalSim
             CreateButton("SB1B", "启 B", false, new Vector3(1.22f, 0.62f, -0.17f), new Color(0.1f, 0.75f, 0.25f));
 
             CreateDevice(new ElectricalDeviceRuntime("BRAKE", ElectricalDeviceKind.BrakeUnit, new[] { "IN", "OUT" }), "制动单元", new Vector3(-0.2f, 0.6f, -0.17f), new Vector3(0.52f, 0.32f, 0.18f), new Color(0.3f, 0.32f, 0.35f));
-            CreateMotor("M1", "三相电机 M1", new Vector3(-0.55f, 0.25f, -0.45f));
-            CreateMotor("M_DOUBLE", "双速电机", new Vector3(0f, 0.25f, -0.45f));
-            CreateMotor("M2", "三相电机 M2", new Vector3(0.45f, 0.25f, -0.45f));
+            foreach (var binding in MotorBindingDefinition.All)
+                CreateMotor(binding.Id, binding.Label, binding.FallbackPosition);
         }
 
         private IReadOnlyList<CabinetBreakerInteractable> CreateCabinetBreakerInteractions()
@@ -899,6 +906,7 @@ namespace ElectricalSim
 
         private void CreateButton(string id, string label, bool normallyClosed, Vector3 position, Color color)
         {
+            if (CreateLegacyPanelControl(id, normallyClosed)) return;
             CreateDevice(ElectricalDeviceRuntime.CreatePushButton(id, normallyClosed), label, position, new Vector3(0.28f, 0.25f, 0.16f), color);
         }
 
@@ -935,11 +943,30 @@ namespace ElectricalSim
             var view = root.AddComponent<ElectricalDeviceView>();
             view.Initialize(runtime, label);
             CreatePorts(view, root.transform, runtime.Ports, new Vector3(0.62f, 0.5f, 0.1f));
+            if (originalEnvironment != null)
+            {
+                var model = originalEnvironment.Find(MotorBindingDefinition.Find(id).ModelPath);
+                if (model == null || view.Ports.Count != 6)
+                    throw new InvalidOperationException("Incomplete motor binding: " + id);
+                var positions = view.Ports.Select(p => p.GetOriginalAnchor(TrainingViewPreset.WiringFront, true).position).ToArray();
+                if (positions.Distinct().Count() != 6)
+                    throw new InvalidOperationException("Motor terminals must have six distinct anchors: " + id);
+                var body = model.GetComponentsInChildren<MeshRenderer>(true)
+                    .Where(r => r.GetComponent<TextMesh>() == null && !IsTerminalPointTransform(r.transform)).ToArray();
+                if (body.Length == 0) throw new InvalidOperationException("Motor body is missing: " + id);
+                var bounds = body[0].bounds;
+                foreach (var renderer in body) bounds.Encapsulate(renderer.bounds);
+                var outward = MotorBindingDefinition.TerminalOutward(positions, bounds.center);
+                foreach (var port in view.Ports) port.ConfigureMotorTerminal(id, model, outward);
+                Debug.Log("[MotorValidation] " + id + " @ " + MotorBindingDefinition.Find(id).Nut + ": 6/6 terminals");
+            }
             deviceViews.Add(view);
         }
 
         private void CreateDevice(ElectricalDeviceRuntime runtime, string label, Vector3 position, Vector3 size, Color color)
         {
+            if (runtime.Kind == ElectricalDeviceKind.PowerSource && panelPower != null)
+                runtime.SupplyEnabled = () => panelPower.Enabled;
             position.x *= 0.72f;
             var original = originalVisuals != null ? originalVisuals.Resolve(runtime.DeviceId, runtime.Kind.ToString()) : null;
             GameObject root;
@@ -1038,10 +1065,7 @@ namespace ElectricalSim
                     }
 
                     frontJumper = frontElectrical;
-                    backElectrical = view.Runtime.DeviceId == "M1"
-                        ? FindMappedEnvironmentTerminal(
-                            view.Runtime.DeviceId, view.Runtime.Kind, list[index], true) ?? frontElectrical
-                        : frontElectrical;
+                    backElectrical = frontElectrical;
                     localPosition = parent.InverseTransformPoint(frontElectrical.position);
                 }
                 else
@@ -1152,13 +1176,7 @@ namespace ElectricalSim
 
         private void RebuildMotorFaultBlocks(Transform environment)
         {
-            var markerPaths = new[]
-            {
-                "Bench/ElectricBench/Nuts/38/SanXiangShuLongDianJi/Cube",
-                "Bench/ElectricBench/Nuts/49/SanXiangShuLongDianJi/Cube",
-                "Bench/ElectricBench/Nuts/107/SanXiangShuLongDianJi/Cube",
-                "Bench/ElectricBench/Nuts/118/ShuangSuDianJi/Cube"
-            };
+            var markerPaths = MotorBindingDefinition.All.Select(m => m.ModelPath + "/Cube").ToArray();
 
             motorFaultBlocks = new GameObject("MotorFaultBlocks");
             motorFaultBlocks.transform.SetParent(environment, false);
@@ -1532,6 +1550,8 @@ namespace ElectricalSim
 
         private static string FrontDeviceNut(string deviceId)
         {
+            var motor = MotorBindingDefinition.Find(deviceId);
+            if (motor != null) return motor.Nut;
             switch (deviceId)
             {
                 case "POWER": return "123";
@@ -1555,9 +1575,6 @@ namespace ElectricalSim
                 case "SB0B": return "10";
                 case "SB1A": return "7";
                 case "SB1B": return "11";
-                case "M1": return "38";
-                case "M_DOUBLE": return "118";
-                case "M2": return "49";
                 case "BRAKE": return "35";
                 default: return null;
             }
@@ -1565,6 +1582,8 @@ namespace ElectricalSim
 
         private static string BackDeviceNut(string deviceId)
         {
+            var motor = MotorBindingDefinition.Find(deviceId);
+            if (motor != null) return motor.Nut;
             switch (deviceId)
             {
                 case "QF": return "123";
@@ -1577,9 +1596,6 @@ namespace ElectricalSim
                 case "SB1": return "108";
                 case "SB0": return "109";
                 case "SB2": return "110";
-                case "M1": return "107";
-                case "M_DOUBLE": return "118";
-                case "M2": return "118";
                 default: return null;
             }
         }

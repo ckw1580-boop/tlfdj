@@ -36,6 +36,14 @@ namespace ElectricalSim
         public Vector3 CurrentAnchorPosition => CurrentAnchor != null ? CurrentAnchor.position : transform.position;
         public WireBodyGeometry RearWireBody { get; private set; }
         public void ConfigureRearWireBody(WireBodyGeometry body) => RearWireBody = body;
+        public string MotorId { get; private set; }
+        private Transform motorRoot;
+        private Vector3 motorLocalOutward;
+        public Vector3 MotorOutward => motorRoot != null ? motorRoot.TransformDirection(motorLocalOutward).normalized : Vector3.zero;
+        public void ConfigureMotorTerminal(string id, Transform root, Vector3 outward)
+        { MotorId = id; motorRoot = root; motorLocalOutward = root.InverseTransformDirection(outward); }
+        public WireEndpointGeometry EndpointGeometry(Vector3 position, bool rear)
+            => new WireEndpointGeometry(position, rear ? RearWireBody : null, MotorId, MotorOutward);
 
         public void Initialize(string deviceId, string portName, Color color)
         {

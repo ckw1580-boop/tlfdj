@@ -41,7 +41,7 @@ namespace ElectricalSim.Tests
             if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
             {
                 Capture(Camera.main, "tachometer-fault-mode");
-                var target = meter.Targets.Single(t => t.MotorId == "M1" && t.transform.parent.parent.name == "107");
+                var target = meter.Targets.Single(t => t.MotorId == "M3" && t.transform.parent.parent.name == "107");
                 var camera = Camera.main;
                 camera.transform.position = target.transform.position + target.Outward * 0.5f + Vector3.up * 0.16f;
                 camera.transform.LookAt(target.transform.position);
@@ -126,7 +126,7 @@ namespace ElectricalSim.Tests
             controller.enabled = false;
             var camera = Camera.main;
             camera.GetComponent<TrainingCameraController>().enabled = false;
-            var target = meter.Targets.Single(t => t.MotorId == "M1" && t.transform.parent.parent.name == "107");
+            var target = meter.Targets.Single(t => t.MotorId == "M3" && t.transform.parent.parent.name == "107");
             camera.transform.position = target.transform.position + target.Outward * 0.5f;
             camera.transform.LookAt(target.transform.position);
             camera.nearClipPlane = 0.01f;
@@ -200,7 +200,7 @@ namespace ElectricalSim.Tests
             foreach (var canvas in Object.FindObjectsOfType<Canvas>())
                 if (canvas.renderMode != RenderMode.WorldSpace) canvas.enabled = false;
             controller.SelectInstrument(InstrumentKind.Tachometer);
-            var target = meter.Targets.Single(t => t.MotorId == "M1" && t.transform.parent.parent.name == "107");
+            var target = meter.Targets.Single(t => t.MotorId == "M3" && t.transform.parent.parent.name == "107");
             meter.TryAttach(target);
             controller.enabled = false;
             meter.Refresh(controller.Graph.Solve(0));
@@ -210,7 +210,7 @@ namespace ElectricalSim.Tests
             camera.nearClipPlane = 0.01f;
             yield return null;
             Capture(camera, "tachometer-attached");
-            ConnectInverter();
+            ConnectInverter("M3");
             var inverter = controller.InverterPanel;
             inverter.TrySetParameter("SP", 600f);
             inverter.TrySetParameter("P1120", 0.1f);
@@ -233,10 +233,11 @@ namespace ElectricalSim.Tests
                 string.Join("\n", meter.Targets.Select(t => t.MotorId + " " + t.transform.parent.parent.name + " " + t.transform.position + " normal=" + t.Outward)));
         }
 
-        private void ConnectInverter()
+        private void ConnectInverter(string motorId = "M1")
         {
+            controller.PanelPower.StartForAssessment();
             foreach (var phase in new[] { "L1", "L2", "L3" }) controller.Graph.AddWire("POWER." + phase, "G120." + phase, Color.red);
-            foreach (var phase in new[] { "U", "V", "W" }) controller.Graph.AddWire("G120." + phase + "2", "M1." + phase, Color.red);
+            foreach (var phase in new[] { "U", "V", "W" }) controller.Graph.AddWire("G120." + phase + "2", motorId + "." + phase, Color.red);
         }
         private static void Capture(Camera camera, string name)
         {

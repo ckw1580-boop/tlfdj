@@ -23,20 +23,20 @@ namespace ElectricalSim.Tests
                 Assert.That(Vector3.Distance(path.Points[i], reversed.Points[32 - i]), Is.LessThan(0.00001f));
             Assert.That(WireRenderPath.Build(a, b, new[] { Vector3.one }, surface, true).Points, Is.EqualTo(path.Points));
             Assert.That(WireRenderPath.Build(a, b, new[] { Vector3.one }, surface, false).IsSoftJumper, Is.False);
-            foreach (var motor in new[] { "M1.U", "M2.V", "M_DOUBLE.W" })
+            foreach (var motor in new[] { "M1.U", "M2.V", "M3.U2", "M_DOUBLE.W" })
             {
                 Assert.That(WireRenderPath.IsMotorJumper("DuanZiPai_7.A_u1", motor, "JumperLine"), Is.True);
                 Assert.That(WireRenderPath.IsMotorJumper(motor, "DuanZiPai_7.A_u1", "JumperLine"), Is.True);
                 Assert.That(WireRenderPath.IsMotorJumper(motor, "DuanZiPai_7.A_u1", "ElectricalWire"), Is.False);
             }
-            Assert.That(WireRenderPath.IsMotorJumper("M1.U", "M1.V", "JumperLine"), Is.False);
+            Assert.That(WireRenderPath.IsMotorJumper("M1.U", "M1.V", "JumperLine"), Is.True);
             foreach (var source in new[] { "FR.T1", "FR.T2", "FR.T3" })
             {
                 Assert.That(WireRenderPath.IsMotorJumper(source, "M1.U", "JumperLine"), Is.True);
                 Assert.That(WireRenderPath.IsMotorJumper("M1.U", source, "JumperLine"), Is.True);
                 Assert.That(WireRenderPath.IsMotorJumper(source, "M1.U", "ElectricalWire"), Is.False);
             }
-            Assert.That(WireRenderPath.IsMotorJumper("FR.L1", "M1.U", "JumperLine"), Is.False);
+            Assert.That(WireRenderPath.IsMotorJumper("FR.L1", "M1.U", "JumperLine"), Is.True);
         }
 
         [Test]

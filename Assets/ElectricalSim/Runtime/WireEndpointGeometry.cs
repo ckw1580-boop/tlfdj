@@ -63,14 +63,18 @@ namespace ElectricalSim
 
     public readonly struct WireEndpointGeometry
     {
-        public WireEndpointGeometry(Vector3 position, WireBodyGeometry body = null)
+        public WireEndpointGeometry(Vector3 position, WireBodyGeometry body = null, string motorId = null, Vector3 motorOutward = default)
         {
             Position = position;
             Body = body;
+            MotorId = motorId;
+            MotorOutward = motorOutward;
         }
 
         public Vector3 Position { get; }
         public WireBodyGeometry Body { get; }
+        public string MotorId { get; }
+        public Vector3 MotorOutward { get; }
 
         public Vector3[] BuildLead(WireSurfacePlane surface)
         {
@@ -98,6 +102,8 @@ namespace ElectricalSim
         }
     }
 
+    public enum WireRouteKind { Cabinet, MotorLead, MotorTerminalBridge }
+
     public sealed class WireRenderPath
     {
         public Vector3[] Points;
@@ -107,19 +113,20 @@ namespace ElectricalSim
         public int[] InsertionIndices;
         public bool HasSpatialLeads;
         public bool IsSoftJumper;
+        public WireRouteKind RouteKind;
 
         public static bool IsMotorJumper(string start, string end, string lineType)
         {
             var jumper = (lineType ?? "").IndexOf("jumper", StringComparison.OrdinalIgnoreCase) >= 0 ||
                          (lineType ?? "").IndexOf("rope", StringComparison.OrdinalIgnoreCase) >= 0;
-            return jumper && ((IsMotor(start) && IsMotorSource(end)) || (IsMotor(end) && IsMotorSource(start)));
+            return jumper && (IsMotor(start) || IsMotor(end));
         }
 
-        private static bool IsMotorSource(string port) => port != null &&
-            (port.StartsWith("DuanZiPai_7.", StringComparison.Ordinal) || port == "FR.T1" || port == "FR.T2" || port == "FR.T3");
-        private static bool IsMotor(string port) => port != null &&
-            (port.StartsWith("M1.", StringComparison.Ordinal) || port.StartsWith("M2.", StringComparison.Ordinal) ||
-             port.StartsWith("M_DOUBLE.", StringComparison.Ordinal));
+        private static bool IsMotor(string port)
+        {
+            var separator = port?.IndexOf('.') ?? -1;
+            return separator > 0 && MotorBindingDefinition.Find(port.Substring(0, separator)) != null;
+        }
 
         public static WireRenderPath Build(WireEndpointGeometry start, WireEndpointGeometry end,
             IReadOnlyList<Vector3> bends, WireSurfacePlane surface, bool softJumper = false)
@@ -131,15 +138,19 @@ namespace ElectricalSim
                 const int segments = 32;
                 var curve = new Vector3[segments + 1];
                 var curveIndices = new int[segments];
-                var sag = Mathf.Min(Vector3.Distance(start.Position, end.Position) * 0.15f, 0.15f);
+                var localBridge = !string.IsNullOrEmpty(start.MotorId) && start.MotorId == end.MotorId;
+                var direction = localBridge ? (start.MotorOutward + end.MotorOutward).normalized : Vector3.down;
+                var length = Vector3.Distance(start.Position, end.Position);
+                var sag = localBridge ? Mathf.Clamp(length * 0.2f, 0.008f, 0.025f) : Mathf.Min(length * 0.15f, 0.15f);
                 for (var i = 0; i <= segments; i++)
                 {
                     var t = i / (float)segments;
-                    curve[i] = Vector3.Lerp(start.Position, end.Position, t) + Vector3.down * (4f * sag * t * (1f - t));
+                    curve[i] = Vector3.Lerp(start.Position, end.Position, t) + direction * (4f * sag * t * (1f - t));
                     if (i < segments) curveIndices[i] = -1;
                 }
                 return new WireRenderPath { Points = curve, StartLead = curve, EndLead = Array.Empty<Vector3>(),
-                    Trunk = Array.Empty<Vector3>(), InsertionIndices = curveIndices, HasSpatialLeads = true, IsSoftJumper = true };
+                    Trunk = Array.Empty<Vector3>(), InsertionIndices = curveIndices, HasSpatialLeads = true, IsSoftJumper = true,
+                    RouteKind = localBridge ? WireRouteKind.MotorTerminalBridge : WireRouteKind.MotorLead };
             }
             var result = new WireRenderPath
             {

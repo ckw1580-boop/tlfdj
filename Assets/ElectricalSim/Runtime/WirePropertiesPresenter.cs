@@ -85,7 +85,7 @@ namespace ElectricalSim
         private void OnSelection(WireConnection wire)
         {
             content.SetActive(wire != null);
-            status.gameObject.SetActive(wire == null);
+            status.gameObject.SetActive(wire == null && controller.SelectedPanelDevice == null);
             if (wire == null) return;
             swatch.color = wire.Color;
             colorLabel.text = "颜色：" + ColorName(wire.Color);

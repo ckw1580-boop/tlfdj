@@ -98,9 +98,6 @@ namespace ElectricalSim
                 return DeviceId + "." + displayName;
             var device = displayName.Substring(0, separator);
             var port = displayName.Substring(separator + 1);
-            if ((device == "SB1" || device == "SB2") && port.StartsWith("COM", StringComparison.Ordinal)) port = "COM";
-            else if ((device == "SB1" || device == "SB2") && port.StartsWith("NO", StringComparison.Ordinal)) port = "NO";
-            else if ((device == "SB1" || device == "SB2") && port.StartsWith("NC", StringComparison.Ordinal)) port = "NC";
             return device + "." + port;
         }
     }

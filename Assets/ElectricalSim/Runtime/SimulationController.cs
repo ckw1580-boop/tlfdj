@@ -203,6 +203,7 @@ namespace ElectricalSim
 
         private void Update()
         {
+            if (heldPanelButton != null && (!Input.GetMouseButton(0) || IsFileOperationActive)) ReleasePanelButton();
             if (!IsFileOperationActive && Time.frameCount > fileInputResumeFrame)
             {
                 HandleHotkeys();
@@ -210,7 +211,9 @@ namespace ElectricalSim
                 UpdateWiringDraft();
                 HandleSceneInput();
             }
+            PreparePlcOutputs();
             lastSnapshot = graph.Solve(Time.deltaTime);
+            SamplePlcInputs();
             foreach (var view in wireViews) view.Refresh();
             UpdateInstrumentReadout();
             if (lastSnapshot.HasShortCircuit)
@@ -219,6 +222,9 @@ namespace ElectricalSim
 
         public void SetMode(SimulationMode mode)
         {
+            if (mode != SimulationMode.Simulate) PausePlcSimulation();
+            ReleasePanelButton();
+            SelectPanelDevice(null);
             Mode = mode;
             if (Tachometer != null) Tachometer.SetFaultMode(mode == SimulationMode.Fault);
             if (mode != SimulationMode.Drag) setInverterPanelVisible?.Invoke(false);
@@ -260,6 +266,8 @@ namespace ElectricalSim
 
         public void ResetTraining()
         {
+            ReleasePanelButton();
+            PanelPower?.Reset();
             PushWireHistory();
             graph.ClearWires();
             foreach (var breaker in cabinetBreakers) breaker.ResetClosed();
@@ -307,6 +315,7 @@ namespace ElectricalSim
 
         private void OnDestroy()
         {
+            StopPlcConnections();
             if (wireMaterial != null && wireMaterial.name == "Cabinet Surface Wire") Destroy(wireMaterial);
             if (trainingCamera != null)
             {
@@ -450,6 +459,7 @@ namespace ElectricalSim
                 else device.SetControl(false);
             }
 
+            PanelPower?.StartForAssessment();
             foreach (var step in CurrentTask.Actions)
             {
                 if (!devices.TryGetValue(step.DeviceId, out var device))
@@ -476,6 +486,8 @@ namespace ElectricalSim
 
         private void HandleHotkeys()
         {
+            if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
+                EventSystem.current.currentSelectedGameObject.GetComponent<InputField>() != null) return;
             if (Input.GetKeyDown(KeyCode.Alpha1)) SetMode(SimulationMode.View);
             if (Input.GetKeyDown(KeyCode.Alpha2)) SetMode(SimulationMode.Drag);
             if (Input.GetKeyDown(KeyCode.Alpha3)) SetMode(SimulationMode.Wiring);
@@ -489,6 +501,7 @@ namespace ElectricalSim
 
         private void HandleSceneInput()
         {
+            if (TrySelectPlcFromPointer()) return;
             if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer)
             {
                 if (Tachometer != null) Tachometer.HandleInput(Camera.main);
@@ -516,7 +529,17 @@ namespace ElectricalSim
             var hasHit = Physics.Raycast(ray, out var hit, 100f);
             var port = hasHit ? hit.collider.GetComponent<ElectricalPortView>() : null;
 
-            if (!hasHit) return;
+            if (!hasHit)
+            {
+                if (Mode == SimulationMode.View || Mode == SimulationMode.Simulate) SelectPanelDevice(null);
+                return;
+            }
+            var panelView = hit.collider.GetComponentInParent<PanelDeviceView>();
+            if (panelView != null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate))
+            {
+                PressPanelDevice(panelView);
+                return;
+            }
             var deviceView = hit.collider.GetComponentInParent<ElectricalDeviceView>();
 
             if (Mode == SimulationMode.Fault && port != null) HandleMeterPort(port);
@@ -649,6 +672,7 @@ namespace ElectricalSim
 
         private void SelectWire(ElectricalWireView view)
         {
+            SelectPanelDevice(null);
             if (selectedWire != view)
             {
                 if (selectedWire != null) selectedWire.SetSelected(false);
@@ -767,7 +791,7 @@ namespace ElectricalSim
                 currentWireColor,
                 currentWireArea,
                 wireSurface,
-                () => new WireEndpointGeometry(port.CurrentAnchorPosition, trainingCamera.IsViewingFaultSide ? port.RearWireBody : null));
+                () => port.EndpointGeometry(port.CurrentAnchorPosition, trainingCamera.IsViewingFaultSide));
             wireDraftView.Refresh(pendingWirePoints, wireDraftCursor);
             SetStatus($"起点：{port.QualifiedPort}。左键空白处添加路径点，点击另一个端子完成。", false);
         }
@@ -821,7 +845,7 @@ namespace ElectricalSim
             }
             wireDraftView.SetVisible(true);
             wireDraftView.Refresh(pendingWirePoints, wireDraftCursor,
-                port != null ? new WireEndpointGeometry(port.CurrentAnchorPosition, trainingCamera.IsViewingFaultSide ? port.RearWireBody : null) : (WireEndpointGeometry?)null,
+                port != null ? port.EndpointGeometry(port.CurrentAnchorPosition, trainingCamera.IsViewingFaultSide) : (WireEndpointGeometry?)null,
                 port != null && WireRenderPath.IsMotorJumper(selectedPort.QualifiedPort, port.QualifiedPort, currentLineType));
         }
 
@@ -916,10 +940,11 @@ namespace ElectricalSim
             var a = meterPorts[0].QualifiedPort;
             var b = meterPorts[1].QualifiedPort;
             var voltage = instrument.Sample(MeasurementKind.AcVoltage, a, b, lastSnapshot);
+            var dcVoltage = instrument.Sample(MeasurementKind.DcVoltage, a, b, lastSnapshot);
             var continuity = instrument.Sample(MeasurementKind.Continuity, a, b, lastSnapshot) > 0.5 ? "导通" : "断开";
             instrumentText.text = instrumentKind == InstrumentKind.Oscilloscope
                 ? $"示波器：{voltage:0} V / 50 Hz"
-                : $"{InstrumentName(instrumentKind)}：{a} ↔ {b}\n交流 {voltage:0} V · {continuity}";
+                : $"{InstrumentName(instrumentKind)}：{a} ↔ {b}\n交流 {voltage:0} V · 直流 {dcVoltage:+0;-0;0} V · {continuity}";
         }
 
         private void RefreshWireViews()
@@ -942,8 +967,9 @@ namespace ElectricalSim
                 var view = gameObject.AddComponent<ElectricalWireView>();
                 view.Initialize(wire, port => port == wire.StartPort ? startAnchor.position : endAnchor.position,
                     wireMaterial, wire.FaultSide.Value ? faultWireSurface : frontWireSurface,
-                    port => new WireEndpointGeometry(port == wire.StartPort ? startAnchor.position : endAnchor.position,
-                        wire.FaultSide.Value && portViews.TryGetValue(port, out var endpoint) ? endpoint.RearWireBody : null));
+                    port => portViews.TryGetValue(port, out var endpoint)
+                        ? endpoint.EndpointGeometry(port == wire.StartPort ? startAnchor.position : endAnchor.position, wire.FaultSide.Value)
+                        : new WireEndpointGeometry(port == wire.StartPort ? startAnchor.position : endAnchor.position));
                 wireViews.Add(view);
             }
         }
@@ -969,17 +995,27 @@ namespace ElectricalSim
 
         private Transform ResolveWireAnchor(string qualifiedPort, TrainingViewPreset preset, bool jumper)
         {
-            if (portViews.TryGetValue(qualifiedPort, out var port))
+            // Resolve legacy aliases through permanent connections only, never through user wires or switched contacts.
+            var pending = new Queue<string>();
+            var visited = new HashSet<string>();
+            pending.Enqueue(qualifiedPort);
+            while (pending.Count > 0)
             {
-                var anchor = port.GetOriginalAnchor(preset, jumper) ?? port.GetOriginalAnchor(preset, false);
-                if (anchor != null) return anchor;
-            }
-            foreach (var device in devices.Values)
-            foreach (var link in device.FixedLinks)
-            {
-                if (link.B != qualifiedPort || !portViews.TryGetValue(CircuitGraph.Port(device.DeviceId, link.A), out var terminal)) continue;
-                var anchor = terminal.GetOriginalAnchor(preset, jumper) ?? terminal.GetOriginalAnchor(preset, false);
-                if (anchor != null) return anchor;
+                var current = pending.Dequeue();
+                if (!visited.Add(current)) continue;
+                if (portViews.TryGetValue(current, out var port))
+                {
+                    var anchor = port.GetOriginalAnchor(preset, jumper) ?? port.GetOriginalAnchor(preset, false);
+                    if (anchor != null) return anchor;
+                }
+                foreach (var device in devices.Values)
+                foreach (var link in device.FixedLinks)
+                {
+                    var a = link.A.Contains(".") ? link.A : CircuitGraph.Port(device.DeviceId, link.A);
+                    var b = link.B.Contains(".") ? link.B : CircuitGraph.Port(device.DeviceId, link.B);
+                    if (a == current) pending.Enqueue(b);
+                    if (b == current) pending.Enqueue(a);
+                }
             }
             return null;
         }

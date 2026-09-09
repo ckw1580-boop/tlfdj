@@ -15,24 +15,22 @@ namespace ElectricalSim
                 return;
             }
             var targets = new List<MotorSpeedTarget>();
-            var ids = new[] { "M1", "M2", "M1", "M_DOUBLE" };
-            var nuts = new[] { "38", "49", "107", "118" };
-            for (var i = 0; i < nuts.Length; i++)
+            for (var i = 0; i < MotorBindingDefinition.All.Count; i++)
             {
+                var binding = MotorBindingDefinition.All[i];
                 var model = originalEnvironment != null
-                    ? originalEnvironment.Find("Bench/ElectricBench/Nuts/" + nuts[i] + "/" +
-                        (nuts[i] == "118" ? "ShuangSuDianJi" : "SanXiangShuLongDianJi")) : null;
+                    ? originalEnvironment.Find(binding.ModelPath) : null;
                 if (model == null) continue;
                 var marker = motorFaultBlocks.transform.Find("MotorFaultBlock_" + (i + 1));
                 if (marker == null)
                 {
-                    Debug.LogWarning("Motor shaft marker is missing: " + nuts[i]);
+                    Debug.LogWarning("Motor shaft marker is missing: " + binding.Nut);
                     continue;
                 }
                 var position = marker.position;
                 // Legacy green cubes were only visual markers, not electrical terminals.
                 marker.gameObject.SetActive(false);
-                var target = CreateSpeedTarget(model, ids[i], position, model.TransformDirection(Vector3.right));
+                var target = CreateSpeedTarget(model, binding.Id, position, model.TransformDirection(Vector3.right));
                 targets.Add(target);
                 var discs = model.GetComponentsInChildren<Transform>(true)
                     .Where(t => t.name == "zhuanpan" || t.name == "zhuanpan (1)").ToArray();
@@ -43,7 +41,7 @@ namespace ElectricalSim
                     shaft.position = discs[0].GetComponent<Renderer>().bounds.center;
                     shaft.rotation = target.transform.rotation;
                     model.gameObject.AddComponent<MotorRotorView>().Initialize(
-                        deviceViews.Single(v => v.Runtime.DeviceId == ids[i]).Runtime, shaft, discs);
+                        deviceViews.Single(v => v.Runtime.DeviceId == binding.Id).Runtime, shaft, discs);
                 }
             }
             if (originalEnvironment == null)

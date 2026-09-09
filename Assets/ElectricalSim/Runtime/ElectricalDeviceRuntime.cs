@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace ElectricalSim
 {
-    public sealed class ElectricalDeviceRuntime : IElectricalDevice
+    public sealed partial class ElectricalDeviceRuntime : IElectricalDevice, IElectricalSource
     {
         private readonly List<string> ports;
         private readonly List<PortPair> fixedLinks = new List<PortPair>();
@@ -78,6 +78,8 @@ namespace ElectricalSim
 
         public void SetControl(bool active)
         {
+            if (ControlTarget != null) { ControlTarget.SetControl(active); return; }
+            if (PanelDefinition != null) { SetPanelControl(active); return; }
             switch (Kind)
             {
                 case ElectricalDeviceKind.PushButton:
@@ -101,6 +103,12 @@ namespace ElectricalSim
         public IEnumerable<PortPair> GetConductiveLinks()
         {
             foreach (var link in fixedLinks) yield return link;
+            if (ControlTarget != null) yield break;
+            if (PanelDefinition != null)
+            {
+                foreach (var link in PanelContacts()) yield return link;
+                yield break;
+            }
             switch (Kind)
             {
                 case ElectricalDeviceKind.Breaker:
@@ -152,6 +160,17 @@ namespace ElectricalSim
         public bool Evaluate(SimulationSnapshot snapshot, float deltaTime)
         {
             lastEvaluatedState = IsActive;
+            if (ControlTarget != null)
+            {
+                IsActive = ControlTarget.IsPressed;
+                IsPressed = ControlTarget.IsPressed;
+                return lastEvaluatedState != IsActive;
+            }
+            if (PanelDefinition != null)
+            {
+                EvaluatePanel(snapshot);
+                return lastEvaluatedState != IsActive;
+            }
             switch (Kind)
             {
                 case ElectricalDeviceKind.Contactor:
@@ -193,7 +212,7 @@ namespace ElectricalSim
 
         private MotorDirection ResolveMotorDirection(SimulationSnapshot snapshot)
         {
-            if (snapshot.IsDeviceActive("KB") || snapshot.IsDeviceActive("KMB"))
+            if (DeviceId == "M1" && (snapshot.IsDeviceActive("KB") || snapshot.IsDeviceActive("KMB")))
                 return MotorDirection.Braking;
             if (snapshot.MotorDrives.TryGetValue(DeviceId, out var drive) && drive.Connected)
                 return !drive.HasDrive || Math.Abs(drive.SpeedRpm) < 0.1f ? MotorDirection.Stopped :

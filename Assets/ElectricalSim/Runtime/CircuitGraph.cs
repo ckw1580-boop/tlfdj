@@ -12,7 +12,9 @@ namespace ElectricalSim
         PhaseL1,
         PhaseL2,
         PhaseL3,
-        Conflict
+        Conflict,
+        DcPositive24,
+        DcNegative
     }
 
     [Serializable]
@@ -74,6 +76,16 @@ namespace ElectricalSim
             var aPhase = a == ElectricalPotential.PhaseL1 || a == ElectricalPotential.PhaseL2 || a == ElectricalPotential.PhaseL3;
             var bPhase = b == ElectricalPotential.PhaseL1 || b == ElectricalPotential.PhaseL2 || b == ElectricalPotential.PhaseL3;
             return (aPhase && b == ElectricalPotential.Neutral) || (bPhase && a == ElectricalPotential.Neutral);
+        }
+
+        public double GetDcVoltage(string portA, string portB)
+        {
+            var a = GetPotential(portA);
+            var b = GetPotential(portB);
+            if (a == ElectricalPotential.Conflict || b == ElectricalPotential.Conflict) return double.NaN;
+            if (a == ElectricalPotential.DcPositive24 && b == ElectricalPotential.DcNegative) return 24d;
+            if (b == ElectricalPotential.DcPositive24 && a == ElectricalPotential.DcNegative) return -24d;
+            return 0d;
         }
 
         public bool IsDeviceActive(string deviceId) => activeDevices.TryGetValue(deviceId, out var active) && active;
@@ -193,12 +205,10 @@ namespace ElectricalSim
             var potentialsByRoot = new Dictionary<string, ElectricalPotential>();
             var errors = new List<string>();
 
-            foreach (var source in devices.Values.Where(d => d.Kind == ElectricalDeviceKind.PowerSource))
+            foreach (var source in devices.Values.OfType<IElectricalSource>())
             {
-                AddPotential(union, potentialsByRoot, Port(source.DeviceId, "L1"), ElectricalPotential.PhaseL1, errors);
-                AddPotential(union, potentialsByRoot, Port(source.DeviceId, "L2"), ElectricalPotential.PhaseL2, errors);
-                AddPotential(union, potentialsByRoot, Port(source.DeviceId, "L3"), ElectricalPotential.PhaseL3, errors);
-                AddPotential(union, potentialsByRoot, Port(source.DeviceId, "N"), ElectricalPotential.Neutral, errors);
+                foreach (var output in source.GetSourcePotentials())
+                    AddPotential(union, potentialsByRoot, output.Key, output.Value, errors);
             }
 
             var rootMap = union.Items.ToList().ToDictionary(item => item, union.Find);
@@ -264,8 +274,11 @@ namespace ElectricalSim
 
         public static string Port(string deviceId, string portName) => $"{deviceId}.{portName}";
 
-        private static string Qualify(string deviceId, string port)
+        private string Qualify(string deviceId, string port)
         {
+            // PLC local terminal names (Q0.0 / PLC_1_M0.0) contain dots too.
+            // Registered local ports take precedence over the cross-device notation.
+            if (devices.TryGetValue(deviceId, out var device) && device.Ports.Contains(port)) return Port(deviceId, port);
             return port.Contains(".") ? port : Port(deviceId, port);
         }
 

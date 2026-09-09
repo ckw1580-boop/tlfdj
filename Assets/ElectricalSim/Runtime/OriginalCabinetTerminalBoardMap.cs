@@ -162,7 +162,9 @@ namespace ElectricalSim
             if (board.Kind == OriginalCabinetTerminalBoardKind.PowerDistribution)
                 return ResolvePowerDistributionLogicalNode(terminalName);
             if (board.Kind == OriginalCabinetTerminalBoardKind.Motor)
-                return ResolveMotorLogicalNode(terminalName);
+                // These are cabinet feed-through terminals. Their upper/lower
+                // anchors share one port, but a motor requires an explicit lead.
+                return string.Empty;
             if (board.Kind == OriginalCabinetTerminalBoardKind.SceneIo)
                 return ResolveSceneIoLogicalNode(terminalName);
             if (terminalName.StartsWith("KT_", StringComparison.Ordinal))
@@ -197,27 +199,6 @@ namespace ElectricalSim
             return separator > 0
                 ? terminalName.Substring(0, separator) + "." + terminalName.Substring(separator + 1)
                 : terminalName;
-        }
-
-        private static string ResolveMotorLogicalNode(string terminalName)
-        {
-            if (string.IsNullOrWhiteSpace(terminalName) || terminalName.Length != 4 || terminalName[1] != '_')
-                return string.Empty;
-
-            string runtimeDevice;
-            switch (char.ToUpperInvariant(terminalName[0]))
-            {
-                case 'A': runtimeDevice = "M1"; break;
-                case 'B': runtimeDevice = "M_DOUBLE"; break;
-                case 'C': runtimeDevice = "M2"; break;
-                default: return string.Empty;
-            }
-
-            var winding = terminalName.Substring(2).ToUpperInvariant();
-            if (winding == "U1") return runtimeDevice + ".U";
-            if (winding == "V1") return runtimeDevice + ".V";
-            if (winding == "W1") return runtimeDevice + ".W";
-            return runtimeDevice + "." + winding;
         }
 
         private static string ResolvePowerDistributionLogicalNode(string terminalName)

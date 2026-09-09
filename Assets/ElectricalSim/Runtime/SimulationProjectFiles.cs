@@ -39,6 +39,7 @@ namespace ElectricalSim
         {
             get
             {
+                if (plcSessions.Count > 0 && savedPlcConfiguration != PlcConfigurationSignature()) return true;
                 if (savedWires.Count != graph.Wires.Count) return true;
                 var current = graph.Wires.OrderBy(w => w.Id, StringComparer.Ordinal).ToArray();
                 var saved = savedWires.OrderBy(w => w.Id, StringComparer.Ordinal).ToArray();
@@ -109,10 +110,12 @@ namespace ElectricalSim
                     .Select(view => new DeviceSceneState(view.Runtime.DeviceId, view.Runtime.Kind.ToString(),
                         view.gameObject.name, view.transform.position, view.transform.rotation));
                 var document = Cc3dCircuitAdapter.Export(staged, states, loadedDocument);
+                ExportPlcConfigurations(document);
                 ValidateProjectWires(Cc3dCircuitAdapter.ReadWires(document));
                 Cc3dSerializer.Save(path, document);
                 loadedDocument = document;
                 savedWires = snapshot;
+                savedPlcConfiguration = PlcConfigurationSignature();
                 RememberProjectPath(path);
                 ClearWireSelection();
                 SetStatus($"已保存接线：{path}\n共 {snapshot.Count} 条导线。", false);
@@ -131,6 +134,8 @@ namespace ElectricalSim
                 var document = Cc3dSerializer.Load(path);
                 var incoming = Cc3dCircuitAdapter.ReadWires(document);
                 ValidateProjectWires(incoming);
+                var incomingPlcs = ReadPlcConfigurations(document);
+                ReplacePlcConfigurations(incomingPlcs);
                 // Legacy projects have no cabinet-side field; retain the existing
                 // convention of resolving it against the current view on import.
                 foreach (var wire in incoming) wire.FaultSide ??= trainingCamera.IsViewingFaultSide;
@@ -181,6 +186,8 @@ namespace ElectricalSim
 
         private void BeginFileOperation()
         {
+            PausePlcSimulation();
+            ReleasePanelButton();
             IsFileOperationActive = true;
             LastFileError = string.Empty;
             cameraInputWasBlocked = trainingCamera.InputBlocked;
