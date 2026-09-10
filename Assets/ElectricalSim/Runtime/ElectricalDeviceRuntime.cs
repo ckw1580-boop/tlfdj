@@ -10,7 +10,6 @@ namespace ElectricalSim
         private readonly List<PortPair> fixedLinks = new List<PortPair>();
         private float timerElapsed;
         private bool lastEvaluatedState;
-        private bool manualOverride;
 
         public ElectricalDeviceRuntime(string deviceId, ElectricalDeviceKind kind, IEnumerable<string> portNames)
         {
@@ -30,6 +29,8 @@ namespace ElectricalSim
         public bool IsPressed { get; private set; }
         public bool IsNormallyClosedButton { get; set; }
         public float TimerDelaySeconds { get; set; } = 1f;
+        public double RelayCoilVoltage { get; private set; }
+        public double ContactorCoilVoltage { get; private set; }
         public MotorDirection MotorDirection { get; private set; }
         public float ActualSpeedRpm { get; private set; }
         public float CoastStopSeconds { get; set; } = 3f;
@@ -92,11 +93,6 @@ namespace ElectricalSim
                 case ElectricalDeviceKind.ThermalRelay:
                     IsTripped = active;
                     break;
-                case ElectricalDeviceKind.Contactor:
-                case ElectricalDeviceKind.IntermediateRelay:
-                case ElectricalDeviceKind.BrakeUnit:
-                    manualOverride = active;
-                    break;
             }
         }
 
@@ -125,31 +121,21 @@ namespace ElectricalSim
                     if (closed) yield return new PortPair("COM", IsNormallyClosedButton ? "NC" : "NO");
                     break;
                 case ElectricalDeviceKind.Contactor:
+                    foreach (var contact in ContactorDefinition.Contacts)
+                        if (IsActive != contact.NormallyClosed)
+                            yield return new PortPair(contact.Input, contact.Output);
+                    break;
                 case ElectricalDeviceKind.IntermediateRelay:
-                    if (IsActive)
-                    {
-                        yield return new PortPair("L1", "T1");
-                        yield return new PortPair("L2", "T2");
-                        yield return new PortPair("L3", "T3");
-                        yield return new PortPair("13", "14");
-                    }
+                    foreach (var contact in IntermediateRelayDefinition.Contacts)
+                        yield return new PortPair(contact.Common, IsActive ? contact.NormallyOpen : contact.NormallyClosed);
                     break;
                 case ElectricalDeviceKind.TimeRelay:
                     if (IsActive) yield return new PortPair("15", "18");
                     else yield return new PortPair("15", "16");
                     break;
                 case ElectricalDeviceKind.ThermalRelay:
-                    if (!IsTripped)
-                    {
-                        yield return new PortPair("L1", "T1");
-                        yield return new PortPair("L2", "T2");
-                        yield return new PortPair("L3", "T3");
-                        yield return new PortPair("95", "96");
-                    }
-                    else
-                    {
-                        yield return new PortPair("97", "98");
-                    }
+                    foreach (var heater in ThermalRelayDefinition.Heaters) yield return heater;
+                    yield return IsTripped ? new PortPair("97", "98") : new PortPair("95", "96");
                     break;
                 case ElectricalDeviceKind.BrakeUnit:
                     if (IsClosed) yield return new PortPair("IN", "OUT");
@@ -174,8 +160,12 @@ namespace ElectricalSim
             switch (Kind)
             {
                 case ElectricalDeviceKind.Contactor:
+                    ContactorCoilVoltage = snapshot.GetAcVoltage(Port("A1"), Port("A2"));
+                    IsActive = ContactorCoilVoltage == ContactorDefinition.RatedAcVoltage;
+                    break;
                 case ElectricalDeviceKind.IntermediateRelay:
-                    IsActive = manualOverride || snapshot.HasControlVoltage(Port("A1"), Port("A2"));
+                    RelayCoilVoltage = snapshot.GetDcVoltage(Port(IntermediateRelayDefinition.CoilPositive), Port(IntermediateRelayDefinition.CoilNegative));
+                    IsActive = RelayCoilVoltage == IntermediateRelayDefinition.RatedDcVoltage;
                     break;
                 case ElectricalDeviceKind.TimeRelay:
                     if (snapshot.HasControlVoltage(Port("A1"), Port("A2"))) timerElapsed += Math.Max(0f, deltaTime);
@@ -243,15 +233,14 @@ namespace ElectricalSim
             { IsNormallyClosedButton = normallyClosed };
 
         public static ElectricalDeviceRuntime CreateContactor(string id)
-            => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Contactor,
-                ThreePhasePorts().Concat(new[]
-                {
-                    "13", "14", "53", "54", "61", "62", "71", "72", "83", "84", "A1", "A2"
-                }));
+            => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Contactor, ContactorDefinition.Ports);
+
+        public static ElectricalDeviceRuntime CreateIntermediateRelay(string id)
+            => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.IntermediateRelay, IntermediateRelayDefinition.Ports);
 
         public static ElectricalDeviceRuntime CreateThermalRelay(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.ThermalRelay,
-                ThreePhasePorts().Concat(new[] { "95", "96", "97", "98" }));
+                ThermalRelayDefinition.Ports);
 
         public static ElectricalDeviceRuntime CreateTimeRelay(string id, float delay = 1f)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.TimeRelay,

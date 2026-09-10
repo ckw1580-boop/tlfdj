@@ -88,6 +88,16 @@ namespace ElectricalSim
             return 0d;
         }
 
+        public double GetAcVoltage(string portA, string portB)
+        {
+            var a = GetPotential(portA); var b = GetPotential(portB);
+            if (a == ElectricalPotential.Conflict || b == ElectricalPotential.Conflict) return double.NaN;
+            if (a == b) return 0d;
+            bool Phase(ElectricalPotential p) => p == ElectricalPotential.PhaseL1 || p == ElectricalPotential.PhaseL2 || p == ElectricalPotential.PhaseL3;
+            if (Phase(a) && b == ElectricalPotential.Neutral || Phase(b) && a == ElectricalPotential.Neutral) return 220d;
+            return Phase(a) && Phase(b) ? 380d : 0d;
+        }
+
         public bool IsDeviceActive(string deviceId) => activeDevices.TryGetValue(deviceId, out var active) && active;
 
         public MotorDirection GetMotorDirection(string deviceId)

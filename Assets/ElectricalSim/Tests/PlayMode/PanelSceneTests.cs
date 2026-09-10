@@ -12,7 +12,7 @@ namespace ElectricalSim.Tests
     public sealed class PanelSceneTests
     {
         private SimulationController controller;
-        private PanelDeviceView Control(string id) => controller.PanelControls.Single(v => v.Runtime.DeviceId == id);
+        private PanelDeviceView Control(string id) => controller.PanelControls.Single(v => v.Runtime.DeviceId == id && !v.IsRear);
         [UnitySetUp]
         public IEnumerator SetUp()
         {
@@ -81,10 +81,10 @@ namespace ElectricalSim.Tests
         [UnityTest]
         public IEnumerator AllOriginalModelsAreBoundAndPropertiesAreReadOnly()
         {
-            Assert.That(controller.PanelControls.Count, Is.EqualTo(20));
+            Assert.That(controller.PanelControls.Count, Is.EqualTo(23));
             FramePanel();
             Physics.SyncTransforms();
-            foreach (var view in controller.PanelControls)
+            foreach (var view in controller.PanelControls.Where(v => !v.IsRear))
             {
                 Assert.That(view.Picker.enabled && view.Picker.gameObject.activeInHierarchy, Is.True, view.name);
                 Assert.That(view.MovingParts.All(p => p != null), Is.True);
@@ -134,6 +134,103 @@ namespace ElectricalSim.Tests
             public string ChooseOpen(string directory) => null;
             public string ChooseSave(string directory, string fileName) => null;
             public void ConfirmUnsaved(System.Action<UnsavedWiringChoice> completed) => completed(UnsavedWiringChoice.Cancel);
+        }
+
+        [UnityTest]
+        public IEnumerator RearButtonsShareFrontAnimationPropertiesAndPhysicalContacts()
+        {
+            var rears = controller.PanelControls.Where(v => v.IsRear).OrderBy(v => v.Definition.Id).ToArray();
+            Assert.That(rears.Length, Is.EqualTo(3));
+            var board = (ElectricalDeviceRuntime)controller.Graph.Devices["DuanZiPai_0"];
+            var ports = Object.FindObjectsOfType<ElectricalPortView>();
+            var terminalOrder = new[] { "NO1", "COM1", "NC2", "COM2" };
+            for (var index = 0; index < rears.Length; index++)
+            {
+                var rear = rears[index];
+                var id = "SB" + (index + 1);
+                var front = Control(id);
+                Assert.That(rear.transform.parent.name, Is.EqualTo((108 + index).ToString()));
+                Assert.That(rear.Runtime, Is.SameAs(front.Runtime));
+                Assert.That(rear.Definition, Is.SameAs(front.Definition));
+                Assert.That(rear.MovingParts.Single(), Is.SameAs(rear.transform.Find("mesh/Box")));
+                var rest = rear.MovingParts[0].position;
+                var fixedParts = rear.GetComponentsInChildren<Transform>(true)
+                    .Where(t => !t.IsChildOf(rear.MovingParts[0])).ToArray();
+                var fixedPositions = fixedParts.Select(t => t.position).ToArray();
+                var fixedRotations = fixedParts.Select(t => t.rotation).ToArray();
+                var physical = terminalOrder.Select(port => "DuanZiPai_0." + board.FixedLinks.Single(l => l.B == id + "." + port).A).ToArray();
+                var anchors = physical.Select(endpoint => ports.Single(p => p.QualifiedPort == endpoint)
+                    .GetOriginalAnchor(TrainingViewPreset.FaultBack, false)).ToArray();
+                var anchorPositions = anchors.Select(t => t.position).ToArray();
+                for (var contact = 0; contact < 4; contact++)
+                {
+                    Assert.That(anchors[contact].parent.parent.name, Is.EqualTo("DuanZiPai_5"));
+                    Assert.That(anchors[contact].name, Is.EqualTo("a" + (index * 4 + contact + 1)));
+                }
+
+                controller.SetMode(SimulationMode.View);
+                Physics.SyncTransforms();
+                var center = rear.Picker.bounds.center;
+                Assert.That(Physics.Raycast(center + rear.transform.forward * 0.15f, -rear.transform.forward, out var hit, 0.2f), Is.True);
+                Assert.That(hit.collider.GetComponentInParent<PanelDeviceView>(), Is.SameAs(rear), id + " 背面点击");
+                controller.PressPanelDevice(rear);
+                Assert.That(rear.Runtime.IsPressed, Is.False, "视角模式只读");
+                yield return null;
+                var text = Object.FindObjectOfType<PanelPropertiesPresenter>().DisplayedText;
+                Assert.That(text, Does.Contain(id).And.Contain("柜体背面").And.Contain("释放"));
+                for (var contact = 0; contact < 4; contact++)
+                    Assert.That(text, Does.Contain(terminalOrder[contact] + " → DuanZiPai_5.a" + (index * 4 + contact + 1)));
+
+                controller.SetMode(SimulationMode.Simulate);
+                string Endpoint(string node) => "DuanZiPai_0." + board.FixedLinks.First(l => l.B == node).A;
+                controller.Graph.AddWire(Endpoint("TERMINAL_BUS.DC_POSITIVE"), physical[1], Color.red);
+                controller.Graph.AddWire(physical[0], Endpoint("HL" + (index + 1) + ".L"), Color.red);
+                controller.Graph.AddWire(Endpoint("HL" + (index + 1) + ".N"), Endpoint("TERMINAL_BUS.DC_NEGATIVE"), Color.blue);
+                controller.PanelPower.StartForAssessment();
+                foreach (var source in new[] { rear, front })
+                {
+                    controller.PressPanelDevice(source);
+                    rear.AdvanceAnimation(0.05f);
+                    front.AdvanceAnimation(0.05f);
+                    Assert.That(Vector3.Distance(rest, rear.MovingParts[0].position), Is.EqualTo(0.0015f).Within(0.00001f));
+                    rear.AdvanceAnimation(0.05f);
+                    front.AdvanceAnimation(0.05f);
+                    Assert.That(rear.AnimationAmount, Is.EqualTo(front.AnimationAmount));
+                    Assert.That(Vector3.Dot(rear.MovingParts[0].position - rest, rear.transform.forward), Is.EqualTo(-0.003f).Within(0.00001f));
+                    var snapshot = controller.Graph.Solve();
+                    Assert.That(snapshot.SameNet(physical[0], physical[1]), Is.True, id + " 常开闭合");
+                    Assert.That(snapshot.SameNet(physical[2], physical[3]), Is.False, id + " 常闭断开");
+                    Assert.That(snapshot.SameNet(physical[1], physical[3]), Is.False, "两组公共端独立");
+                    Assert.That(Control("HL" + (index + 1)).Runtime.IsActive, Is.True);
+                    for (var part = 0; part < fixedParts.Length; part++)
+                    {
+                        Assert.That(fixedParts[part].position, Is.EqualTo(fixedPositions[part]));
+                        Assert.That(Quaternion.Angle(fixedParts[part].rotation, fixedRotations[part]), Is.LessThan(0.001f));
+                    }
+                    for (var contact = 0; contact < 4; contact++)
+                        Assert.That(anchors[contact].position, Is.EqualTo(anchorPositions[contact]));
+                    if (source == rear)
+                    {
+                        var target = (rears[0].Picker.bounds.center + rears[2].Picker.bounds.center) * 0.5f;
+                        Camera.main.transform.position = target + rear.transform.forward * 0.38f;
+                        Camera.main.transform.LookAt(target, rear.transform.up);
+                        Camera.main.fieldOfView = 35f;
+                        Capture("rear-button-" + id + "-pressed");
+                    }
+                    controller.ReleasePanelButton();
+                    rear.AdvanceAnimation(0.1f);
+                    front.AdvanceAnimation(0.1f);
+                    snapshot = controller.Graph.Solve();
+                    Assert.That(snapshot.SameNet(physical[0], physical[1]), Is.False);
+                    Assert.That(snapshot.SameNet(physical[2], physical[3]), Is.True);
+                    Assert.That(Control("HL" + (index + 1)).Runtime.IsActive, Is.False);
+                    Assert.That(Vector3.Distance(rest, rear.MovingParts[0].position), Is.LessThan(0.000001f));
+                }
+            }
+            controller.SetMode(SimulationMode.View);
+            controller.SelectPanelDevice(rears[0]);
+            yield return null;
+            Capture("rear-button-properties", true);
         }
 
         [UnityTest]

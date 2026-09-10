@@ -92,9 +92,9 @@ namespace ElectricalSim.Tests
             Wire("TB.U", "KM.L1"); Wire("G120.V2", "KM.L2"); Wire("G120.W2", "KM.L3");
             Wire("KM.T1", "M1.U"); Wire("KM.T2", "M1.V"); Wire("KM.T3", "M1.W");
             Assert.That(graph.Solve().GetMotorSpeedRpm("M1"), Is.Zero);
-            contactor.SetControl(true);
+            var coilSupply = Wire("POWER.L1", "KM.A1"); Wire("POWER.N", "KM.A2");
             Assert.That(graph.Solve().GetMotorSpeedRpm("M1"), Is.EqualTo(600));
-            contactor.SetControl(false);
+            graph.RemoveWire(coilSupply.Id);
             Assert.That(graph.Solve(3).GetMotorSpeedRpm("M1"), Is.Zero);
         }
         [Test]
@@ -105,7 +105,7 @@ namespace ElectricalSim.Tests
             Assert.That(graph.Solve().GetMotorSpeedRpm("M1"), Is.EqualTo(1450));
             var brake = ElectricalDeviceRuntime.CreateContactor("KB");
             graph.RegisterDevice(brake);
-            brake.SetControl(true);
+            Wire("POWER.L1", "KB.A1"); Wire("POWER.N", "KB.A2");
             Assert.That(graph.Solve(0.5f).GetMotorSpeedRpm("M1"), Is.EqualTo(725));
             Assert.That(graph.Solve(0.5f).GetMotorSpeedRpm("M1"), Is.Zero);
         }

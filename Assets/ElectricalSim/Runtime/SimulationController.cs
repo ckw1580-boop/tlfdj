@@ -222,6 +222,7 @@ namespace ElectricalSim
 
         public void SetMode(SimulationMode mode)
         {
+            if (mode != SimulationMode.Wiring) HideRelaySchematic();
             if (mode != SimulationMode.Simulate) PausePlcSimulation();
             ReleasePanelButton();
             SelectPanelDevice(null);
@@ -523,11 +524,46 @@ namespace ElectricalSim
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject()) return;
             if (!Input.GetMouseButtonDown(0)) return;
 
-            var camera = Camera.main;
-            if (camera == null) return;
-            var ray = camera.ScreenPointToRay(Input.mousePosition);
+            HandleScenePointerDown(Camera.main, Input.mousePosition);
+        }
+
+        private void HandleScenePointerDown(Camera camera, Vector2 screenPosition)
+        {
+            if (camera == null || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && Mode != SimulationMode.Fault) return;
+            if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer) return;
+            if (EventSystem.current != null)
+            {
+                var uiHits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = screenPosition }, uiHits);
+                if (uiHits.Count > 0) return;
+            }
+            var ray = camera.ScreenPointToRay(screenPosition);
             var hasHit = Physics.Raycast(ray, out var hit, 100f);
             var port = hasHit ? hit.collider.GetComponent<ElectricalPortView>() : null;
+
+            if (Mode == SimulationMode.View || Mode == SimulationMode.Simulate)
+            {
+                var relay = hasHit ? hit.collider.GetComponentInParent<IntermediateRelayView>() : null;
+                SelectRelay(relay);
+                if (relay != null) return;
+                var contactor = hasHit && port == null ? hit.collider.GetComponentInParent<ContactorView>() : null;
+                SelectContactor(contactor);
+                if (contactor != null) return;
+                var thermal = hasHit && port == null ? hit.collider.GetComponentInParent<ThermalRelayView>() : null;
+                SelectThermalRelay(thermal);
+                if (thermal != null) return;
+            }
+
+            if (Mode == SimulationMode.Fault)
+            {
+                // Meter terminals keep priority; rear body inspection never selects a probe.
+                var rear = hasHit && port == null ? hit.collider.GetComponentInParent<ContactorView>() : null;
+                SelectContactor(rear != null && rear.IsRear ? rear : null);
+                if (SelectedContactor != null) return;
+                var thermal = hasHit && port == null ? hit.collider.GetComponentInParent<ThermalRelayView>() : null;
+                SelectThermalRelay(thermal != null && thermal.IsRear ? thermal : null);
+                if (SelectedThermalRelay != null) return;
+            }
 
             if (!hasHit)
             {
@@ -580,9 +616,48 @@ namespace ElectricalSim
 
             if (pointerOverUi || !Input.GetMouseButtonDown(0)) return;
 
-            var ray = camera.ScreenPointToRay(Input.mousePosition);
+            HandleWiringPointerDown(camera, Input.mousePosition);
+        }
+
+        private void HandleWiringPointerDown(Camera camera, Vector2 screenPosition)
+        {
+            if (Mode != SimulationMode.Wiring || draggingWirePoint || camera == null) return;
+            if (EventSystem.current != null)
+            {
+                var uiHits = new List<RaycastResult>();
+                EventSystem.current.RaycastAll(new PointerEventData(EventSystem.current) { position = screenPosition }, uiHits);
+                if (uiHits.Count > 0) return;
+            }
+            var ray = camera.ScreenPointToRay(screenPosition);
             var hasHit = Physics.Raycast(ray, out var hit, 100f);
             var port = hasHit ? hit.collider.GetComponent<ElectricalPortView>() : null;
+
+            // Terminals and an existing node drag have precedence over body inspection.
+            if (selectedPort == null && port == null && selectedWire != null &&
+                selectedWire.TryHitNode(camera, screenPosition, WireNodeHitDistancePixels, out var pointIndex))
+            {
+                selectedWirePointIndex = pointIndex;
+                selectedWire.SetSelectedPoint(pointIndex);
+                draggingWirePoint = true;
+                wirePointDragChanged = false;
+                return;
+            }
+
+            var relay = hasHit && port == null ? hit.collider.GetComponentInParent<IntermediateRelayView>() : null;
+            if (relay != null)
+            {
+                ShowRelaySchematic(relay);
+                return;
+            }
+
+            var contactor = hasHit && port == null ? hit.collider.GetComponentInParent<ContactorView>() : null;
+            if (contactor != null)
+            {
+                ShowContactorSchematic(contactor);
+                return;
+            }
+            var thermal = hasHit && port == null ? hit.collider.GetComponentInParent<ThermalRelayView>() : null;
+            if (thermal != null) { ShowThermalRelaySchematic(thermal); return; }
 
             if (selectedPort != null)
             {
@@ -597,17 +672,7 @@ namespace ElectricalSim
                 return;
             }
 
-            if (selectedWire != null &&
-                selectedWire.TryHitNode(camera, Input.mousePosition, WireNodeHitDistancePixels, out var pointIndex))
-            {
-                selectedWirePointIndex = pointIndex;
-                selectedWire.SetSelectedPoint(pointIndex);
-                draggingWirePoint = true;
-                wirePointDragChanged = false;
-                return;
-            }
-
-            if (!TryFindWireAt(camera, Input.mousePosition, out var hitWire, out var insertionIndex, out var surfacePoint))
+            if (!TryFindWireAt(camera, screenPosition, out var hitWire, out var insertionIndex, out var surfacePoint))
             {
                 ClearWireSelection();
                 lastWireClickId = string.Empty;
@@ -617,7 +682,7 @@ namespace ElectricalSim
             var wireId = hitWire.Connection.Id;
             var doubleClick = string.Equals(lastWireClickId, wireId, StringComparison.Ordinal) &&
                               Time.unscaledTime - lastWireClickTime <= DoubleClickSeconds &&
-                              Vector2.Distance(lastWireClickPosition, Input.mousePosition) <= DoubleClickDistancePixels;
+                              Vector2.Distance(lastWireClickPosition, screenPosition) <= DoubleClickDistancePixels;
             SelectWire(hitWire);
             if (doubleClick && insertionIndex >= 0)
             {
@@ -633,7 +698,7 @@ namespace ElectricalSim
 
             lastWireClickId = wireId;
             lastWireClickTime = Time.unscaledTime;
-            lastWireClickPosition = Input.mousePosition;
+            lastWireClickPosition = screenPosition;
             SetStatus("已选中导线；拖动节点可调整路径，双击线段可添加节点。", false);
         }
 
@@ -672,6 +737,9 @@ namespace ElectricalSim
 
         private void SelectWire(ElectricalWireView view)
         {
+            SelectContactor(null); SelectThermalRelay(null);
+            SelectRelay(null);
+            SelectPlc(null);
             SelectPanelDevice(null);
             if (selectedWire != view)
             {
@@ -1022,6 +1090,8 @@ namespace ElectricalSim
 
         private void ClearSelection()
         {
+            SelectContactor(null); SelectThermalRelay(null);
+            SelectRelay(null);
             if (selectedPort != null) selectedPort.SetHighlighted(false);
             selectedPort = null;
             pendingWirePoints.Clear();

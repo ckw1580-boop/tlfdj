@@ -173,7 +173,7 @@ namespace ElectricalSim
                 return "G120." + terminalName.Substring(5);
             if (terminalName.StartsWith("FR1_", StringComparison.Ordinal) ||
                 terminalName.StartsWith("FR2_", StringComparison.Ordinal))
-                return "FR." + NormalizePowerTerminal(terminalName.Substring(4));
+                return terminalName.Substring(0, 3) + "." + NormalizePowerTerminal(terminalName.Substring(4));
             if (terminalName.StartsWith("KM", StringComparison.Ordinal) && terminalName.Length > 4 &&
                 char.IsDigit(terminalName[2]) && terminalName[3] == '_')
             {
@@ -260,16 +260,16 @@ namespace ElectricalSim
         {
             switch (terminal)
             {
-                case "53NO":
-                case "83NO":
+                case "53NO": return "53";
+                case "83NO": return "83";
                 case "13NO": return "13";
-                case "54NO":
-                case "84NO":
+                case "54NO": return "54";
+                case "84NO": return "84";
                 case "14NO": return "14";
-                case "61NC":
-                case "71NC": return "21";
-                case "62NC":
-                case "72NC": return "22";
+                case "61NC": return "61";
+                case "71NC": return "71";
+                case "62NC": return "62";
+                case "72NC": return "72";
                 default: return NormalizePowerTerminal(terminal);
             }
         }

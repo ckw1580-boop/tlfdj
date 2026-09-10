@@ -109,7 +109,7 @@ namespace ElectricalSim.Tests
             graph.AddWire("HL1.N", "TERMINAL_BUS.DC_NEGATIVE", Color.blue);
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate);
             controller.ConnectPlc("PLC_1");
-            controller.PanelControls.Single(p => p.Runtime.DeviceId == "SB1").Runtime.SetControl(true);
+            controller.PanelControls.Single(p => p.Runtime.DeviceId == "SB1" && !p.IsRear).Runtime.SetControl(true);
             var lamp = controller.PanelControls.Single(p => p.Runtime.DeviceId == "HL1").Runtime;
             var deadline = Time.realtimeSinceStartup + 4;
             while (!lamp.IsActive && Time.realtimeSinceStartup < deadline) yield return null;

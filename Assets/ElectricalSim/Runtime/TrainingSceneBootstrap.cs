@@ -109,6 +109,9 @@ namespace ElectricalSim
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, originalVisuals, ui.PortHover);
             controller.RegisterPanel(panelViews, panelPower);
             controller.RegisterPlcs(originalEnvironment, uiFont, ui.Status.canvas);
+            controller.RegisterIntermediateRelays(originalEnvironment, uiFont, ui.Status.canvas);
+            controller.RegisterContactors(originalEnvironment, uiFont, ui.Status.canvas);
+            controller.RegisterThermalRelays(originalEnvironment, uiFont, ui.Status.canvas);
             ValidatePanelBindings();
             ui.Status.transform.parent.gameObject.AddComponent<WirePropertiesPresenter>().Initialize(controller, ui.Status, () =>
             {

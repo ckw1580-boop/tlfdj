@@ -23,7 +23,7 @@ namespace ElectricalSim
 
         public void SelectPanelDevice(PanelDeviceView view)
         {
-            if (view != null) ClearWireSelection();
+            if (view != null) { ClearWireSelection(); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); }
             SelectedPanelDevice = view;
             PanelSelectionChanged?.Invoke(view);
         }
@@ -63,6 +63,7 @@ namespace ElectricalSim
                 d.Control == PanelControlKind.Key ? runtime.IsPressed ? "开启" : "关闭" :
                 d.Control == PanelControlKind.Selector ? runtime.IsPressed ? "工作位 · 保持" : "零位 · 保持" : runtime.IsPressed ? "按下" : "释放";
             var rows = new List<string> { title, "状态：" + state };
+            if (view.IsRear) rows[0] += "（柜体背面）";
             if (d.Internal)
                 rows.Add("柜内预接 · 总供电" + (PanelPower.Enabled ? "开启" : "关闭"));
             if (d.Control != PanelControlKind.Indicator)
@@ -75,6 +76,12 @@ namespace ElectricalSim
                 foreach (var port in d.Ports)
                 {
                     var node = d.Id + "." + port;
+                    if (view.IsRear)
+                    {
+                        var anchor = ResolveWireAnchor(node, TrainingViewPreset.FaultBack, false);
+                        rows.Add(port + " → " + (anchor != null ? anchor.parent.parent.name + "." + anchor.name : "未绑定"));
+                        continue;
+                    }
                     var physical = devices.Values.Where(v => v.Kind == ElectricalDeviceKind.Terminal)
                         .SelectMany(v => v.FixedLinks.Where(l => l.B == node).Select(l => l.A));
                     rows.Add(port + " → " + string.Join("、", physical));

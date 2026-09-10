@@ -12,6 +12,7 @@ namespace ElectricalSim
         public Transform[] MovingParts { get; private set; }
         public Collider Picker { get; private set; }
         public float AnimationAmount { get; private set; }
+        public bool IsRear { get; private set; }
         private Vector3[] restPositions;
         private Quaternion[] restRotations;
         private Material[] lampMaterials = Array.Empty<Material>();
@@ -28,10 +29,11 @@ namespace ElectricalSim
             return root;
         }
 
-        public void Initialize(ElectricalDeviceRuntime runtime)
+        public void Initialize(ElectricalDeviceRuntime runtime, bool isRear = false)
         {
             enabled = false;
             Runtime = runtime;
+            IsRear = isRear;
             MovingParts = Definition.MovingParts.Select(p => FindPart(transform, p)).ToArray();
             if (MovingParts.Any(p => p == null)) throw new InvalidOperationException("面板可动部件缺失：" + Definition.Id);
             restPositions = MovingParts.Select(t => t.localPosition).ToArray();

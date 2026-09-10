@@ -1573,9 +1573,15 @@ namespace ElectricalSim.Tests
                 new { Id = "FR", PortCount = 10, BackNut = "114" }
             };
             var faultDeviceIds = new HashSet<string>(faultDevices.Select(item => item.Id));
+            // Cabinet breakers now expose their own physical connection points in normal views.
+            var breakerIds = new HashSet<string> { "QF106", "QF122" };
+            foreach (var breaker in new[] { new { Id = "QF106", Count = 6 }, new { Id = "QF122", Count = 8 } })
+                Assert.That(Object.FindObjectsOfType<ElectricalDeviceView>().Single(view => view.Runtime.DeviceId == breaker.Id).Ports.Count,
+                    Is.EqualTo(breaker.Count));
             var deviceViews = Object.FindObjectsOfType<ElectricalDeviceView>()
                 .Where(view => !terminalBoardIds.Contains(view.Runtime.DeviceId) &&
                                !faultDeviceIds.Contains(view.Runtime.DeviceId) &&
+                               !breakerIds.Contains(view.Runtime.DeviceId) &&
                                view.Runtime.Kind != ElectricalDeviceKind.Motor)
                 .ToArray();
 
@@ -1587,6 +1593,7 @@ namespace ElectricalSim.Tests
             Assert.That(Object.FindObjectsOfType<ElectricalPortView>()
                 .All(port => terminalBoardIds.Contains(port.DeviceId) ||
                              faultDeviceIds.Contains(port.DeviceId) ||
+                             breakerIds.Contains(port.DeviceId) ||
                              new[] { "M1", "M_DOUBLE", "M2", "M3" }.Contains(port.DeviceId)), Is.True);
 
             controller.SetMode(SimulationMode.Wiring);
@@ -1810,7 +1817,9 @@ namespace ElectricalSim.Tests
                 var view = views.Single(item => item.Runtime.DeviceId == definition.DeviceId);
                 Assert.That(view.Ports.Count, Is.EqualTo(expectedCount));
                 Assert.That(view.Ports.Count, Is.EqualTo(definition.ExpectedPortCount));
-                Assert.That(view.Runtime.GetConductiveLinks().Count(), Is.EqualTo(expectedCount));
+                // Motor feed-through terminals require explicit leads to a motor.
+                Assert.That(view.Runtime.GetConductiveLinks().Count(),
+                    Is.EqualTo(definition.Kind == OriginalCabinetTerminalBoardKind.Motor ? 0 : expectedCount));
             }
             yield return null;
         }

@@ -49,7 +49,8 @@ namespace ElectricalSim.Tests
             graph.Solve();
             var brake = ElectricalDeviceRuntime.CreateContactor(brakeId);
             graph.RegisterDevice(brake);
-            brake.SetControl(true);
+            graph.AddWire("POWER.L1", brakeId + ".A1", Color.red);
+            graph.AddWire("POWER.N", brakeId + ".A2", Color.red);
             var snapshot = graph.Solve(1);
             Assert.That(snapshot.GetMotorSpeedRpm("M1"), Is.Zero);
             foreach (var id in new[] { "M2", "M3", "M_DOUBLE" })

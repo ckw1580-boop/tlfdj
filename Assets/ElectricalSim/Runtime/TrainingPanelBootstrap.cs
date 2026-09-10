@@ -24,6 +24,15 @@ namespace ElectricalSim
                 view.Initialize(runtime);
                 panelViews.Add(view);
                 AddPanelRuntime(runtime, definition.Label);
+                if (!string.IsNullOrEmpty(definition.RearModelPath))
+                {
+                    var rearModel = originalEnvironment.Find(definition.RearModelPath);
+                    if (rearModel == null) throw new InvalidOperationException("背面按钮模型缺失：" + definition.RearModelPath);
+                    // Both faces operate the same contacts and existing terminal-strip endpoints.
+                    var rearView = rearModel.gameObject.AddComponent<PanelDeviceView>();
+                    rearView.Initialize(runtime, true);
+                    panelViews.Add(rearView);
+                }
             }
             panelPower = new PanelPowerState(panelDevices);
             var dc = new ElectricalDeviceRuntime("TERMINAL_BUS", ElectricalDeviceKind.PowerSource, new[] { "DC_POSITIVE", "DC_NEGATIVE" })
@@ -74,15 +83,23 @@ namespace ElectricalSim
                     throw new InvalidOperationException("面板绑定目标不存在：" + link.B);
                 count++;
             }
-            if (panelViews.Count != 20 || panelViews.Select(v => v.Runtime.DeviceId).Distinct().Count() != 20 || count != 64)
+            if (panelViews.Count(v => !v.IsRear) != 20 || panelViews.Count(v => v.IsRear) != 3 ||
+                panelViews.Select(v => v.Runtime.DeviceId).Distinct().Count() != 20 || count != 64)
                 throw new InvalidOperationException($"面板绑定数量错误：{panelViews.Count} 元件，{count} 端子");
+            foreach (var rear in panelViews.Where(v => v.IsRear))
+            foreach (var port in rear.Definition.Ports)
+            {
+                var anchor = ResolveFaultButtonTerminalAnchor(rear.Definition.Id + "_" + port);
+                if (anchor == null || anchor.parent.parent.name != "DuanZiPai_5")
+                    throw new InvalidOperationException("背面按钮连接点缺失：" + rear.Definition.Id + "." + port);
+            }
             foreach (var runtime in panelDevices.Values.Where(d => !d.PanelDefinition.Internal && d.Kind != ElectricalDeviceKind.Indicator))
             {
                 var links = runtime.FixedLinks.Concat(runtime.GetConductiveLinks());
                 if (links.Any(l => l.A == "COM1" && l.B == "COM2" || l.A == "COM2" && l.B == "COM1"))
                     throw new InvalidOperationException("面板公共端被短接：" + runtime.DeviceId);
             }
-            Debug.Log($"[PanelValidation] {panelViews.Count}/20 元件，{count}/64 端子绑定通过。");
+            Debug.Log($"[PanelValidation] 20 个正面元件、3 个背面按钮，{count}/64 端子绑定通过。");
         }
     }
 }

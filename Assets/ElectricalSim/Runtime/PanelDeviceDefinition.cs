@@ -18,6 +18,7 @@ namespace ElectricalSim
         public string Id;
         public string Label;
         public string ModelPath;
+        public string RearModelPath;
         public string[] MovingParts;
         public PanelControlKind Control;
         public Color Color;
@@ -50,8 +51,13 @@ namespace ElectricalSim
             list.Add(Make("SA2", "两档旋钮", "10", "XuanNiu", PanelControlKind.Selector, new[] { "mesh/XuanNiu01" }, Color.white));
             var nuts = new[] { "8", "9", "11", "12", "39", "40", "41", "42" };
             for (var i = 1; i <= 8; i++)
+            {
                 list.Add(Make("SB" + i, "瞬时按钮", nuts[i - 1], "AnNiu_" + (i % 2 == 1 ? "Green" : "Red"),
                     PanelControlKind.Button, new[] { "mesh/Box" }, i % 2 == 1 ? Color.green : Color.red));
+                if (i <= 3)
+                    list[list.Count - 1].RearModelPath = "Bench/ElectricBench/Nuts/" + (107 + i) +
+                        "/AnNiu_" + (i % 2 == 1 ? "Green" : "Red");
+            }
             // The imported mesh names describe the housings poorly: Box is the colored cap,
             // AnNiu*/JiTing02 are fixed mounts, and the actual key is nested inside the lock face.
             list.Add(Make("PANEL_KEY", "钥匙开关", "105", "XuanNiu_PowerStart", PanelControlKind.Key, new[] { "mesh/box/YaoShi01" }, Color.white));
