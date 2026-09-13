@@ -27,7 +27,6 @@ namespace ElectricalSim
                 OverloadSelfLock(),
                 ForwardReverse(),
                 MultiLocation(),
-                TimedControl(),
                 SequentialStart(),
                 ReverseBraking(),
                 EnergyBraking()
@@ -64,10 +63,10 @@ namespace ElectricalSim
         private static CircuitTaskSpec OverloadSelfLock()
         {
             var task = Base("overload", "三相异步电动机过载保护自锁控制仿真", "热继电器常闭保护触点串入接触器线圈回路。", "KM1");
-            Add(task, "POWER.L1", "SB0.COM", "SB0.NC", "SB1.COM", "SB1.NO", "KM1.A1", "KM1.A2", "FR.95", "FR.96", "POWER.N");
+            Add(task, "POWER.L1", "SB0.COM", "SB0.NC", "SB1.COM", "SB1.NO", "KM1.A1", "KM1.A2", "FR1.95", "FR1.96", "POWER.N");
             Add(task, "SB1.COM", "KM1.13", "SB1.NO", "KM1.14");
             task.Actions.Add(Action("SB1", true, "M1", MotorDirection.Forward));
-            task.Actions.Add(Action("FR", true, "M1", MotorDirection.Stopped));
+            task.Actions.Add(Action("FR1", true, "M1", MotorDirection.Stopped));
             return task;
         }
 
@@ -95,15 +94,6 @@ namespace ElectricalSim
                 "SB1A.COM", "SB1B.COM", "SB1A.NO", "SB1B.NO", "SB1A.COM", "KM1.13", "SB1A.NO", "KM1.14");
             task.Actions.Add(Action("SB1A", true, "M1", MotorDirection.Forward));
             task.Actions.Add(Action("SB0B", true, "M1", MotorDirection.Stopped));
-            return task;
-        }
-
-        private static CircuitTaskSpec TimedControl()
-        {
-            var task = Base("timed", "三相异步电动机时间电路控制仿真", "时间继电器延时触点控制第二接触器。", "KM1");
-            AddSelfLockControl(task, "KM1", "SB0", "SB1");
-            Add(task, "KM1.14", "KT.A1", "KT.A2", "POWER.N", "POWER.L1", "KT.15", "KT.18", "KM2.A1", "KM2.A2", "POWER.N");
-            task.Actions.Add(Action("SB1", true, "M1", MotorDirection.Forward));
             return task;
         }
 
@@ -146,8 +136,8 @@ namespace ElectricalSim
             Add(task,
                 "POWER.L1", "QF.L1", "POWER.L2", "QF.L2", "POWER.L3", "QF.L3",
                 "QF.T1", $"{mainContactor}.L1", "QF.T2", $"{mainContactor}.L2", "QF.T3", $"{mainContactor}.L3",
-                $"{mainContactor}.T1", "FR.L1", $"{mainContactor}.T2", "FR.L2", $"{mainContactor}.T3", "FR.L3",
-                "FR.T1", "M1.U", "FR.T2", "M1.V", "FR.T3", "M1.W");
+                $"{mainContactor}.T1", "FR1.L1", $"{mainContactor}.T2", "FR1.L2", $"{mainContactor}.T3", "FR1.L3",
+                "FR1.T1", "M1.U", "FR1.T2", "M1.V", "FR1.T3", "M1.W");
             task.ForbiddenConnections.Add(new PortPair("POWER.L1", "POWER.N"));
             task.ForbiddenConnections.Add(new PortPair("POWER.L1", "POWER.L2"));
             return task;
@@ -165,7 +155,7 @@ namespace ElectricalSim
             Add(task,
                 "POWER.L1", "QF.L1", "POWER.L2", "QF.L2", "POWER.L3", "QF.L3",
                 "QF.T1", "KMR.L2", "QF.T2", "KMR.L1", "QF.T3", "KMR.L3",
-                "KMR.T1", "FR.L1", "KMR.T2", "FR.L2", "KMR.T3", "FR.L3");
+                "KMR.T1", "FR1.L1", "KMR.T2", "FR1.L2", "KMR.T3", "FR1.L3");
         }
 
         private static void Add(CircuitTaskSpec task, params string[] ports)

@@ -200,20 +200,24 @@ namespace ElectricalSim.Tests
             RelaySchematicTests.CaptureAndCheck(controller, 1280, 720, "contactor-schematic-");
         }
 
-        [UnityTest] public IEnumerator RearBodiesBindAll54ExistingPortsAndShareFrontRuntime()
+        [UnityTest] public IEnumerator RearBodiesBind54PortsToThreeIndependentRuntimes()
         {
             var environment = GameObject.Find("OriginalLabEnvironment").transform;
             Assert.That(controller.RearContactorViews.Count, Is.EqualTo(3));
-            Assert.That(controller.RearContactorViews.Select(v => v.Runtime.DeviceId), Is.EqualTo(new[] { "KMF", "KM1", "KMR" }));
+            Assert.That(controller.RearContactorViews.Select(v => v.Definition.Id), Is.EqualTo(new[] { "KM5", "KM6", "KM7" }));
+            Assert.That(controller.RearContactorViews.Select(v => v.Runtime.DeviceId), Is.EqualTo(new[] { "KMBACK1", "KMBACK2", "KMBACK3" }));
+            Assert.That(controller.ContactorViews.Concat(controller.RearContactorViews).Select(v => v.Runtime).Distinct().Count(), Is.EqualTo(7));
             var all = controller.RearContactorViews.SelectMany(v => v.Bindings.Values).ToArray();
             Assert.That(all.Length, Is.EqualTo(54)); Assert.That(all.Distinct().Count(), Is.EqualTo(54));
             var snapshot = controller.Graph.Solve();
-            foreach (var rear in controller.RearContactorViews)
+            for (var index = 0; index < controller.RearContactorViews.Count; index++)
             {
-                var front = controller.ContactorViews.Single(v => v.Definition == rear.Definition);
+                var rear = controller.RearContactorViews[index];
+                var front = controller.ContactorViews[index];
                 Assert.That(rear.IsRear, Is.True); Assert.That(front.IsRear, Is.False);
-                Assert.That(rear.Runtime, Is.SameAs(front.Runtime));
-                Assert.That(rear.transform, Is.SameAs(environment.Find(rear.Definition.RearModelPath)));
+                Assert.That(rear.Runtime, Is.Not.SameAs(front.Runtime));
+                Assert.That(rear.Runtime.DeviceId, Is.Not.EqualTo(front.Runtime.DeviceId));
+                Assert.That(rear.transform, Is.SameAs(environment.Find(rear.Definition.ModelPath)));
                 Assert.That(rear.Picker, Is.SameAs(rear.transform.Find("picker").GetComponent<Collider>()));
                 foreach (var binding in rear.Bindings)
                 {
@@ -222,10 +226,25 @@ namespace ElectricalSim.Tests
                     Assert.That(port.GetOriginalAnchor(TrainingViewPreset.FaultBack, false).IsChildOf(rear.transform), Is.True);
                     Assert.That(port.GetOriginalAnchor(TrainingViewPreset.FaultBack, true), Is.Null);
                     Assert.That(port.ElectricalOnly, Is.True);
-                    Assert.That(snapshot.SameNet(port.QualifiedPort, front.Bindings[binding.Key].QualifiedPort), Is.True);
+                    Assert.That(snapshot.SameNet(port.QualifiedPort, front.Bindings[binding.Key].QualifiedPort), Is.False);
                 }
             }
             yield return null;
+        }
+
+        [UnityTest] public IEnumerator EachRearPhysicalCoilEnergizesOnlyItsOwnRuntime()
+        {
+            controller.PanelPower.StartForAssessment();
+            foreach (var selected in controller.RearContactorViews)
+            {
+                controller.Graph.ClearWires();
+                Wire("POWER.L1", selected.Bindings["A1"].QualifiedPort);
+                Wire("POWER.N", selected.Bindings["A2"].QualifiedPort);
+                yield return null; yield return null;
+                foreach (var view in controller.ContactorViews.Concat(controller.RearContactorViews))
+                    Assert.That(view.Runtime.IsActive, Is.EqualTo(view == selected),
+                        selected.Definition.Id + " 供电时错误联动：" + view.Definition.Id);
+            }
         }
 
         [UnityTest] public IEnumerator RearBodyClicksShowPropertiesInViewSimulationAndFaultModes()
@@ -311,7 +330,7 @@ namespace ElectricalSim.Tests
             }
         }
 
-        [UnityTest] public IEnumerator RearCoilAndContactsControlLoadAndUpdateFrontProperties()
+        [UnityTest] public IEnumerator RearCoilAndContactsStayIndependentFromFrontAndSurviveReload()
         {
             var rear = controller.RearContactorViews[0]; var front = controller.ContactorViews[0];
             Wire("DuanZiPai_6.V_1", rear.Bindings["A1"].QualifiedPort);
@@ -321,20 +340,27 @@ namespace ElectricalSim.Tests
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate);
             Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
             controller.SelectContactor(rear); yield return null; yield return null;
-            Assert.That(front.Runtime.IsActive, Is.True); Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
-            Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("已吸合").And.Contain("KMF.53").And.Contain("DuanZiPai_3.KM1_53NO"));
+            Assert.That(rear.Runtime.IsActive, Is.True); Assert.That(front.Runtime.IsActive, Is.False);
+            Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
+            Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("KM5").And.Contain("已吸合").And.Contain("KMBACK1.53").And.Not.Contain("DuanZiPai_3.KM1_53NO"));
             RelaySceneTests.CapturePanel(controller.ContactorProperties, "rear-contactor-properties-top.png", 1);
             RelaySceneTests.CapturePanel(controller.ContactorProperties, "rear-contactor-properties-bottom.png", 0);
             Assert.That(controller.SaveCc3dToPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
             Assert.That(controller.OpenCc3dFromPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate); controller.SelectContactor(front);
             yield return null; yield return null;
-            Assert.That(front.Runtime.IsActive, Is.True); Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
-            Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("柜体正面").And.Contain("已吸合"));
-            controller.Graph.RemoveWire(controller.Graph.Wires.Single(w => w.EndPort == "KMF.A1").Id);
+            Assert.That(rear.Runtime.IsActive, Is.True); Assert.That(front.Runtime.IsActive, Is.False);
+            Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
+            Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("柜体正面").And.Contain("已释放"));
+            controller.Graph.RemoveWire(controller.Graph.Wires.Single(w => w.EndPort == "KMBACK1.A1").Id);
             yield return null; yield return null;
             Assert.That(rear.Runtime.IsActive, Is.False); Assert.That(front.Runtime.IsActive, Is.False);
             Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.False);
+
+            Wire("DuanZiPai_6.V_1", front.Bindings["A1"].QualifiedPort);
+            Wire("DuanZiPai_6.N_1", front.Bindings["A2"].QualifiedPort);
+            yield return null; yield return null;
+            Assert.That(front.Runtime.IsActive, Is.True); Assert.That(rear.Runtime.IsActive, Is.False);
         }
 
         [UnityTest] public IEnumerator RearMeterTerminalsTakePriorityOverBodyInspection()
@@ -355,6 +381,20 @@ namespace ElectricalSim.Tests
             var before = Field<List<ElectricalPortView>>("meterPorts").ToArray();
             Invoke("HandleScenePointerDown", Camera.main, BodyPoint(rear.Picker));
             Assert.That(Field<List<ElectricalPortView>>("meterPorts"), Is.EqualTo(before));
+        }
+
+        [UnityTest] public IEnumerator LegacyRearEndpointsMigrateToIndependentRuntimeIds()
+        {
+            var legacy = new CircuitGraph();
+            var wire = legacy.AddWire("KMF.A1", "KMF.A2", Color.red, "ElectricalWire");
+            wire.FaultSide = true;
+            Cc3dSerializer.Save(savePath, Cc3dCircuitAdapter.Export(legacy, new DeviceSceneState[0]));
+            Assert.That(controller.OpenCc3dFromPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
+            var loaded = controller.Graph.Wires.Single();
+            Assert.That(loaded.StartPort, Is.EqualTo("KMBACK1.A1"));
+            Assert.That(loaded.EndPort, Is.EqualTo("KMBACK1.A2"));
+            Assert.That(loaded.FaultSide, Is.True);
+            yield return null;
         }
     }
 }

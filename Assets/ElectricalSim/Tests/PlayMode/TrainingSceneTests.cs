@@ -915,7 +915,7 @@ namespace ElectricalSim.Tests
                 new
                 {
                     ObjectName = "Terminal Annotation - FR Below Inverter",
-                    Text = "FR端子区KT端子区", Prefix = "FR"
+                    Text = "FR端子区", Prefix = "FR"
                 }
             };
             foreach (var expected in expectedAnnotations)
@@ -989,7 +989,14 @@ namespace ElectricalSim.Tests
 
             var camera = Camera.main;
             var wireViews = Object.FindObjectsOfType<ElectricalWireView>();
-            Assert.That(wireViews.Length, Is.EqualTo(controller.Graph.Wires.Count));
+            var resolve = typeof(SimulationController).GetMethod("ResolveWireAnchor",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var missing = controller.Graph.Wires.Where(wire =>
+                resolve.Invoke(controller, new object[] { wire.StartPort, TrainingViewPreset.WiringFront, true }) == null ||
+                resolve.Invoke(controller, new object[] { wire.EndPort, TrainingViewPreset.WiringFront, true }) == null)
+                .Select(wire => wire.StartPort + " → " + wire.EndPort).ToArray();
+            Assert.That(wireViews.Length, Is.EqualTo(controller.Graph.Wires.Count),
+                "无法生成显示的标准接线：" + string.Join("；", missing));
             var originalPaths = wireViews.ToDictionary(
                 view => view.name,
                 view => view.RenderedPoints.ToArray());
@@ -1204,8 +1211,8 @@ namespace ElectricalSim.Tests
             var vertices = panel.sharedMesh.vertices.Select(panel.transform.TransformPoint).ToArray();
             var rearDepth = vertices.Max(p => Vector3.Dot(p, normal));
             var ports = Object.FindObjectsOfType<ElectricalPortView>();
-            var start = ports.First(p => p.DeviceId == "KMF" && p.PortName == "T1");
-            var end = ports.First(p => p.DeviceId == "KMR" && p.PortName == "L1");
+            var start = ports.First(p => p.DeviceId == "KMBACK1" && p.PortName == "T1");
+            var end = ports.First(p => p.DeviceId == "KMBACK3" && p.PortName == "L1");
             var connection = controller.Graph.AddWire(start.QualifiedPort, end.QualifiedPort, Color.red, "ElectricalWire");
             controller.AddBendPointToLastWire((start.CurrentAnchorPosition + end.CurrentAnchorPosition) * 0.5f + Vector3.down * 0.32f);
             yield return null;
@@ -1234,7 +1241,7 @@ namespace ElectricalSim.Tests
             cameraController.SetFaultView();
             yield return null;
             var ports = Object.FindObjectsOfType<ElectricalPortView>()
-                .Where(p => new[] { "KMF", "KM1", "KMR", "FR" }.Contains(p.DeviceId))
+                .Where(p => new[] { "KMBACK1", "KMBACK2", "KMBACK3", "FR" }.Contains(p.DeviceId))
                 .OrderBy(p => p.QualifiedPort).ToArray();
             Assert.That(ports.Length, Is.EqualTo(64));
             var originalPositions = ports.Select(p => p.CurrentAnchorPosition).ToArray();
@@ -1338,16 +1345,16 @@ namespace ElectricalSim.Tests
             yield return null;
             var ports = Object.FindObjectsOfType<ElectricalPortView>();
             for (var i = 1; i <= 3; i++)
-                controller.Graph.AddWire("KMR.T" + i, "FR.T" + i, new[] { Color.red, Color.yellow, Color.cyan }[i - 1], "ElectricalWire");
-            controller.Graph.AddWire("KMF.L1", "KM1.L1", Color.green, "ElectricalWire");
-            controller.Graph.AddWire("KM1.T1", "KM1.T3", new Color(1f, 0.3f, 0.9f), "ElectricalWire");
-            controller.AddBendPointToLastWire(ports.First(p => p.QualifiedPort == "KM1.T1").CurrentAnchorPosition + Vector3.down * 0.07f);
+                controller.Graph.AddWire("KMBACK3.T" + i, "FR.T" + i, new[] { Color.red, Color.yellow, Color.cyan }[i - 1], "ElectricalWire");
+            controller.Graph.AddWire("KMBACK1.L1", "KMBACK2.L1", Color.green, "ElectricalWire");
+            controller.Graph.AddWire("KMBACK2.T1", "KMBACK2.T3", new Color(1f, 0.3f, 0.9f), "ElectricalWire");
+            controller.AddBendPointToLastWire(ports.First(p => p.QualifiedPort == "KMBACK2.T1").CurrentAnchorPosition + Vector3.down * 0.07f);
             yield return null;
             var view = Object.FindObjectsOfType<ElectricalWireView>().First();
             var normal = view.Surface.Normal;
             var right = view.Surface.Rotation * Vector3.right;
-            var center = ports.Where(p => p.DeviceId == "KM1" || p.DeviceId == "FR")
-                .Aggregate(Vector3.zero, (sum, p) => sum + p.CurrentAnchorPosition) / ports.Count(p => p.DeviceId == "KM1" || p.DeviceId == "FR");
+            var center = ports.Where(p => p.DeviceId == "KMBACK2" || p.DeviceId == "FR")
+                .Aggregate(Vector3.zero, (sum, p) => sum + p.CurrentAnchorPosition) / ports.Count(p => p.DeviceId == "KMBACK2" || p.DeviceId == "FR");
             foreach (var angle in new[] { 0f, -0.32f, 0.32f })
             {
                 Camera.main.transform.position = center + normal * 0.65f + right * angle + Vector3.up * 0.1f;
@@ -1567,9 +1574,9 @@ namespace ElectricalSim.Tests
             };
             var faultDevices = new[]
             {
-                new { Id = "KMF", PortCount = 18, BackNut = "111" },
-                new { Id = "KM1", PortCount = 18, BackNut = "112" },
-                new { Id = "KMR", PortCount = 18, BackNut = "113" },
+                new { Id = "KMBACK1", PortCount = 18, BackNut = "111" },
+                new { Id = "KMBACK2", PortCount = 18, BackNut = "112" },
+                new { Id = "KMBACK3", PortCount = 18, BackNut = "113" },
                 new { Id = "FR", PortCount = 10, BackNut = "114" }
             };
             var faultDeviceIds = new HashSet<string>(faultDevices.Select(item => item.Id));
@@ -1659,7 +1666,7 @@ namespace ElectricalSim.Tests
             var motorBoardPorts = Object.FindObjectsOfType<ElectricalDeviceView>()
                 .Single(view => view.Runtime.DeviceId == "DuanZiPai_7").Ports.ToArray();
             var faultBodyPorts = Object.FindObjectsOfType<ElectricalDeviceView>()
-                .Where(view => new[] { "KMF", "KM1", "KMR", "FR" }.Contains(view.Runtime.DeviceId))
+                .Where(view => new[] { "KMBACK1", "KMBACK2", "KMBACK3", "FR" }.Contains(view.Runtime.DeviceId))
                 .SelectMany(view => view.Ports)
                 .ToArray();
             var dualLineFrPorts = faultBodyPorts
@@ -1796,12 +1803,11 @@ namespace ElectricalSim.Tests
             AssertNamedBoardPort(environment, views, "DuanZiPai_3", "G120_L1", "G120_l1");
             AssertNamedBoardPort(environment, views, "DuanZiPai_3", "KM1_53NO", "KM1_53no");
             AssertNamedBoardPort(environment, views, "DuanZiPai_3", "FR1_95NC", "FR1_95nc");
-            AssertNamedBoardPort(environment, views, "DuanZiPai_3", "KT_A1", "a60");
             AssertNamedBoardPort(environment, views, "DuanZiPai_4", "G120_U2");
             AssertNamedBoardPort(environment, views, "DuanZiPai_4", "KM1_54NO");
             AssertNamedBoardPort(environment, views, "DuanZiPai_4", "FR1_96NC");
-            AssertNamedBoardPort(environment, views, "DuanZiPai_6", "V_1", "v_1");
-            AssertNamedBoardPort(environment, views, "DuanZiPai_6", "N_4", "n_4");
+            AssertNamedBoardPort(environment, views, "DuanZiPai_6", "V_1");
+            AssertNamedBoardPort(environment, views, "DuanZiPai_6", "N_4");
             AssertNamedBoardPort(environment, views, "DuanZiPai_7", "A_u1", "a_u1");
             AssertNamedBoardPort(environment, views, "DuanZiPai_7", "B_v2", "b_v2");
             AssertNamedBoardPort(environment, views, "DuanZiPai_7", "C_w1", "c_w1");
@@ -1825,9 +1831,54 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator ThermalTerminalStripHasTwoGroupsOfFiveWithoutTimerConnections()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            cameraController.SetWiringView();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+
+            var views = Object.FindObjectsOfType<ElectricalDeviceView>();
+            Assert.That(views.Any(view => view.Runtime.DeviceId == "KT"), Is.False);
+            Assert.That(views.SelectMany(view => view.Ports)
+                .Any(port => port.PortName.StartsWith("KT_")), Is.False);
+            var upper = views.Single(view => view.Runtime.DeviceId == "DuanZiPai_3");
+            var ports = upper.Ports.Where(port => port.PortName.StartsWith("FR"))
+                .OrderBy(port => port.CurrentAnchor.localPosition.x).ToArray();
+            Assert.That(ports.Select(port => port.PortName), Is.EqualTo(new[]
+            {
+                "FR1_95NC", "FR1_97NO", "FR1_1L1", "FR1_3L2", "FR1_5L3",
+                "FR2_95NC", "FR2_97NO", "FR2_1L1", "FR2_3L2", "FR2_5L3"
+            }));
+            Assert.That(ports.All(port => port.IsVisible), Is.True);
+            var pitch = Vector3.Distance(ports[0].CurrentAnchorPosition, ports[1].CurrentAnchorPosition);
+            var gap = Vector3.Distance(ports[4].CurrentAnchorPosition, ports[5].CurrentAnchorPosition);
+            Assert.That(gap, Is.InRange(pitch * 1.7f, pitch * 2.3f), "Leave one unused terminal between FR1 and FR2");
+            foreach (var port in ports)
+            {
+                Assert.That(Vector3.Distance(port.transform.position, port.CurrentAnchorPosition), Is.LessThan(0.0005f));
+                Assert.That(upper.Runtime.GetConductiveLinks().Any(link => link.A == port.PortName &&
+                    link.B.StartsWith(port.PortName.Substring(0, 3) + ".")), Is.True);
+            }
+
+            var camera = Camera.main;
+            cameraController.enabled = false;
+            cameraController.StopAllCoroutines();
+            var center = (ports[0].CurrentAnchorPosition + ports[9].CurrentAnchorPosition) * 0.5f;
+            var label = GameObject.Find("OriginalLabEnvironment/Terminal Board Annotations/Terminal Annotation - FR Upper");
+            camera.transform.rotation = label.transform.rotation;
+            camera.transform.position = center - camera.transform.forward * 0.34f - Vector3.up * pitch;
+            camera.orthographic = true;
+            camera.orthographicSize = Vector3.Distance(ports[0].CurrentAnchorPosition, ports[9].CurrentAnchorPosition) * 0.4f;
+            SaveRearWireFrame("fr-terminals-without-kt.png", 1200, 600);
+        }
+
+        [UnityTest]
         public IEnumerator LowerCabinetDevicesExposeConnectionsOnlyOnTerminalBoards()
         {
-            var routedDeviceIds = new[] { "KM2", "KMB", "KB", "KT" };
+            var routedDeviceIds = new[] { "KM2", "KMB", "KB" };
             var views = Object.FindObjectsOfType<ElectricalDeviceView>();
             foreach (var deviceId in routedDeviceIds)
             {
@@ -1940,7 +1991,7 @@ namespace ElectricalSim.Tests
             var ports = Object.FindObjectsOfType<ElectricalPortView>();
             var jumperPorts = ports.Where(port => port.JumperOnly).ToArray();
             var electricalPorts = ports.Where(port => port.ElectricalOnly).ToArray();
-            var faultDeviceIds = new HashSet<string> { "KMF", "KM1", "KMR", "FR" };
+            var faultDeviceIds = new HashSet<string> { "KMBACK1", "KMBACK2", "KMBACK3", "FR" };
             var faultBodyPorts = electricalPorts.Where(port => faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var terminalElectricalPorts = electricalPorts.Where(port => !faultDeviceIds.Contains(port.DeviceId)).ToArray();
             var motorBoardPorts = ports.Where(port => port.DeviceId == "DuanZiPai_7").ToArray();
@@ -2019,6 +2070,56 @@ namespace ElectricalSim.Tests
             Assert.That(port.IsVisible, Is.True);
             Assert.That(port.GetComponent<MeshRenderer>().enabled, Is.True);
             Assert.That(port.GetComponent<SphereCollider>().enabled, Is.True);
+        }
+
+        [UnityTest]
+        public IEnumerator PowerTerminalBlockUsesLowerDcPointsAndShowsPropertiesOnClick()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var block = Object.FindObjectOfType<PowerTerminalBlockView>();
+            Assert.That(block, Is.Not.Null);
+            var points = block.transform.Find("point");
+            var ports = Object.FindObjectsOfType<ElectricalPortView>().Where(p => p.DeviceId == "DuanZiPai_6").ToArray();
+            cameraController.SetWiringView();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
+            yield return null;
+            foreach (var port in ports)
+            {
+                var lower = points.Find(port.PortName);
+                var upper = points.Find(port.PortName.ToLowerInvariant());
+                Assert.That(port.CurrentAnchor, Is.SameAs(lower));
+                Assert.That(Camera.main.WorldToScreenPoint(lower.position).y,
+                    Is.LessThan(Camera.main.WorldToScreenPoint(upper.position).y));
+                Assert.That(port.HoverLabel, Is.EqualTo((port.PortName[0] == 'V' ? "24V+" : "24V-") + port.PortName.Substring(1)));
+                Assert.That(controller.ResolveWireTerminalName(port.QualifiedPort), Does.Contain(port.HoverLabel));
+                Assert.That(port.IsVisible, Is.True);
+            }
+
+            var camera = Camera.main;
+            cameraController.enabled = false;
+            var center = block.Picker.bounds.center;
+            camera.transform.position = center - camera.transform.forward * 0.5f;
+            Physics.SyncTransforms();
+            yield return null;
+            var screen = (Vector2)camera.WorldToScreenPoint(center);
+            Assert.That(Physics.Raycast(camera.ScreenPointToRay(screen), out var hit, 10f), Is.True);
+            Assert.That(hit.collider.GetComponentInParent<PowerTerminalBlockView>(), Is.SameAs(block));
+            typeof(SimulationController).GetMethod("HandleWiringPointerDown",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                .Invoke(controller, new object[] { camera, screen });
+            Assert.That(controller.SelectedPowerTerminalBlock, Is.SameAs(block));
+            var presenter = Object.FindObjectOfType<PanelPropertiesPresenter>();
+            Assert.That(presenter.DisplayedText, Does.Contain("DC 24V").And.Contain("24V+").And.Contain("24V-").And.Contain("未供电"));
+            controller.PanelPower.StartForAssessment();
+            yield return null;
+            Assert.That(presenter.DisplayedText, Does.Contain("供电中"));
+            controller.ShowStatus("普通提示");
+            Assert.That(presenter.transform.Find("PanelDeviceProperties").gameObject.activeSelf, Is.True);
+            SaveRearWireFrame("power-terminal-lower.png", 1200, 700);
+            controller.SetMode(SimulationMode.View);
+            Assert.That(controller.SelectedPowerTerminalBlock, Is.Null);
         }
 
         [UnityTest]
@@ -2654,7 +2755,8 @@ namespace ElectricalSim.Tests
             Assert.That(anchor, Is.Not.Null, boardId + "/" + physicalAnchorName + " original anchor");
             var port = views.Single(item => item.Runtime.DeviceId == boardId)
                 .Ports.Single(item => item.PortName == terminalName);
-            Assert.That(port.HoverLabel, Is.EqualTo(terminalName));
+            Assert.That(port.HoverLabel, Is.EqualTo(OriginalCabinetTerminalBoardMap.GetDisplayName(
+                OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == boardId), terminalName)));
             Assert.That(port.PhysicalAnchorId, Is.EqualTo(physicalAnchorName));
             Assert.That(Vector3.Distance(port.CurrentAnchorPosition, anchor.position), Is.LessThan(0.0005f));
             Assert.That(port.GetComponent<SphereCollider>(), Is.Not.Null);

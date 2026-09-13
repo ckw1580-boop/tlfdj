@@ -42,32 +42,34 @@ namespace ElectricalSim
                 var view = model.gameObject.AddComponent<ContactorView>();
                 view.Initialize(definition, runtime, bindings);
                 contactorViews.Add(view);
-                if (definition.RearModelPath != null)
+            }
+            foreach (var definition in ContactorDefinition.Rear)
+            {
+                var rearModel = environment.Find(definition.ModelPath);
+                if (rearModel == null) throw new InvalidOperationException("背部接触器模型缺失：" + definition.ModelPath);
+                if (!devices.TryGetValue(definition.RuntimeId, out var runtime))
+                    throw new InvalidOperationException("背部接触器运行时对象缺失：" + definition.RuntimeId);
+                var rearBindings = new Dictionary<string, ElectricalPortView>();
+                foreach (var terminal in ContactorDefinition.Ports)
                 {
-                    var rearModel = environment.Find(definition.RearModelPath);
-                    if (rearModel == null) throw new InvalidOperationException("背部接触器模型缺失：" + definition.RearModelPath);
-                    var rearBindings = new Dictionary<string, ElectricalPortView>();
-                    foreach (var terminal in ContactorDefinition.Ports)
-                    {
-                        var matches = portViews.Values.Where(p => p.DeviceId == definition.RuntimeId && p.PortName == terminal).ToArray();
-                        if (matches.Length != 1) throw new InvalidOperationException("背部接触器连接点缺失或重复：" + definition.RuntimeId + "." + terminal);
-                        var port = matches[0];
-                        var anchor = port.GetOriginalAnchor(TrainingViewPreset.FaultBack, false);
-                        if (anchor == null || !anchor.IsChildOf(rearModel))
-                            throw new InvalidOperationException("背部接触器连接点未绑定实际模型：" + port.QualifiedPort);
-                        rearBindings.Add(terminal, port);
-                    }
-                    var rearView = rearModel.gameObject.AddComponent<ContactorView>();
-                    rearView.Initialize(definition, runtime, rearBindings, true);
-                    rearContactorViews.Add(rearView);
+                    var matches = portViews.Values.Where(p => p.DeviceId == definition.RuntimeId && p.PortName == terminal).ToArray();
+                    if (matches.Length != 1) throw new InvalidOperationException("背部接触器连接点缺失或重复：" + definition.RuntimeId + "." + terminal);
+                    var port = matches[0];
+                    var anchor = port.GetOriginalAnchor(TrainingViewPreset.FaultBack, false);
+                    if (anchor == null || !anchor.IsChildOf(rearModel))
+                        throw new InvalidOperationException("背部接触器连接点未绑定实际模型：" + port.QualifiedPort);
+                    rearBindings.Add(terminal, port);
                 }
+                var rearView = rearModel.gameObject.AddComponent<ContactorView>();
+                rearView.Initialize(definition, runtime, rearBindings, true);
+                rearContactorViews.Add(rearView);
             }
             contactorSchematicTexture = Resources.Load<Texture2D>("ContactorSchematic");
             if (contactorSchematicTexture == null) throw new InvalidOperationException("交流接触器原理图资源缺失：ContactorSchematic");
             ContactorProperties = new GameObject("Contactor Properties", typeof(RectTransform)).AddComponent<ContactorPropertiesPresenter>();
             ContactorProperties.Initialize(this, canvas, font);
             Debug.Log("[ContactorValidation] 4 个本体、72/72 端子排连接点绑定通过。");
-            Debug.Log("[ContactorValidation] 背部 3 个本体、54/54 本体连接点绑定通过，与正面共用运行时状态。");
+            Debug.Log("[ContactorValidation] 背部 KM5–KM7：3 个独立运行时、54/54 本体连接点绑定通过。");
         }
 
         private bool IsRegisteredContactor(ContactorView view)
@@ -112,13 +114,11 @@ namespace ElectricalSim
                 rows.Add(ContactorDefinition.TerminalLabel(contact.Input) + "–" + ContactorDefinition.TerminalLabel(contact.Output) +
                     " " + (contact.Main ? "主触点 " : "辅助 ") + (contact.NormallyClosed ? "常闭：" : "常开：") +
                     (runtime.IsActive != contact.NormallyClosed ? "闭合" : "断开"));
-            rows.Add(""); rows.Add(view.IsRear ? "背部本体端子绑定（与正面端子排同一电气节点）" : "端子绑定");
+            rows.Add(""); rows.Add(view.IsRear ? "背部独立本体端子绑定" : "端子绑定");
             foreach (var terminal in ContactorDefinition.Ports)
             {
                 rows.Add(ContactorDefinition.TerminalLabel(terminal) + " · " + ContactorDefinition.PortRole(terminal));
                 rows.Add("  → " + view.Bindings[terminal].QualifiedPort);
-                if (view.IsRear)
-                    rows.Add("  ↔ " + contactorViews.Single(v => v.Definition == view.Definition).Bindings[terminal].QualifiedPort);
             }
             return string.Join("\n", rows);
         }

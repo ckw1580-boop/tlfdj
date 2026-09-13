@@ -32,21 +32,24 @@ namespace ElectricalSim
             properties.rectTransform.offsetMin = new Vector2(16, 5);
             properties.rectTransform.offsetMax = new Vector2(-12, -5);
             controller.PanelSelectionChanged += OnSelection;
+            controller.PowerTerminalSelectionChanged += OnPowerSelection;
             controller.StatusChanged += OnStatus;
             OnSelection(null);
         }
         private void OnSelection(PanelDeviceView view)
         {
+            var selected = view != null || controller.SelectedPowerTerminalBlock != null;
             errorVisible = false;
-            properties.gameObject.SetActive(view != null);
-            if (view != null) { status.gameObject.SetActive(false); expand?.Invoke(); }
+            properties.gameObject.SetActive(selected);
+            if (selected) { status.gameObject.SetActive(false); expand?.Invoke(); }
             else if (controller.SelectedWire == null) status.gameObject.SetActive(true);
             Refresh();
         }
+        private void OnPowerSelection() => OnSelection(controller.SelectedPanelDevice);
         private void OnStatus(string message, bool error)
         {
             errorVisible = error;
-            if (controller.SelectedPanelDevice == null) return;
+            if (controller.SelectedPanelDevice == null && controller.SelectedPowerTerminalBlock == null) return;
             properties.gameObject.SetActive(!error);
             status.gameObject.SetActive(error);
             if (error) expand?.Invoke();
@@ -56,11 +59,14 @@ namespace ElectricalSim
         {
             if (controller != null && controller.SelectedPanelDevice != null && !errorVisible)
                 properties.text = controller.DescribePanelDevice(controller.SelectedPanelDevice);
+            else if (controller != null && controller.SelectedPowerTerminalBlock != null && !errorVisible)
+                properties.text = controller.DescribePowerTerminalBlock();
         }
         private void OnDestroy()
         {
             if (controller == null) return;
             controller.PanelSelectionChanged -= OnSelection;
+            controller.PowerTerminalSelectionChanged -= OnPowerSelection;
             controller.StatusChanged -= OnStatus;
         }
     }

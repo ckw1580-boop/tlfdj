@@ -21,8 +21,8 @@ namespace ElectricalSim
         PushButton,
         Contactor,
         ThermalRelay,
-        TimeRelay,
-        IntermediateRelay,
+        // Value 6 belonged to the removed time relay. Preserve serialized device kinds.
+        IntermediateRelay = 7,
         Motor,
         Indicator,
         BrakeUnit,
@@ -33,7 +33,8 @@ namespace ElectricalSim
         Sensor,
         VariableFrequencyDrive,
         Plc,
-        PlcIo
+        PlcIo,
+        SolenoidValve
     }
 
     public enum ContactKind
@@ -96,7 +97,6 @@ namespace ElectricalSim
         public List<ContactDefinition> Contacts = new List<ContactDefinition>();
         public string CoilPortA = "A1";
         public string CoilPortB = "A2";
-        public float TimerDelaySeconds = 1f;
         public GameObject VisualPrefab;
     }
 

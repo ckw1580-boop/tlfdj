@@ -112,6 +112,7 @@ namespace ElectricalSim
             controller.RegisterIntermediateRelays(originalEnvironment, uiFont, ui.Status.canvas);
             controller.RegisterContactors(originalEnvironment, uiFont, ui.Status.canvas);
             controller.RegisterThermalRelays(originalEnvironment, uiFont, ui.Status.canvas);
+            controller.RegisterSceneIo(originalEnvironment, uiFont, ui.Status.canvas);
             ValidatePanelBindings();
             ui.Status.transform.parent.gameObject.AddComponent<WirePropertiesPresenter>().Initialize(controller, ui.Status, () =>
             {
@@ -515,7 +516,7 @@ namespace ElectricalSim
             CreateCabinetTerminalBoardAnnotation(
                 root, viewingCamera,
                 lowerAnchors.Where(item => item.name.StartsWith("FR", StringComparison.Ordinal)).ToArray(),
-                objectNameSuffix == "Below Inverter" ? "FR端子区KT端子区" : "FR端子区",
+                "FR端子区",
                 "FR " + objectNameSuffix, verticalOffsetInGlyphHeights);
         }
 
@@ -710,10 +711,12 @@ namespace ElectricalSim
             CreateContactorDevice("KM1", "接触器 KM1", new Vector3(-0.35f, 2.22f, -0.16f));
             CreateContactorDevice("KMR", "反转接触器", new Vector3(0.25f, 2.22f, -0.16f));
             CreateDevice(ElectricalDeviceRuntime.CreateContactor("KM2"), "接触器 KM2", new Vector3(0.85f, 2.22f, -0.16f), new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
+            CreateRearContactorDevice("KMBACK1", "背部接触器 KM5");
+            CreateRearContactorDevice("KMBACK2", "背部接触器 KM6");
+            CreateRearContactorDevice("KMBACK3", "背部接触器 KM7");
             CreateDevice(ElectricalDeviceRuntime.CreateContactor("KMB"), "反接制动", new Vector3(1.22f, 1.68f, -0.16f), new Vector3(0.42f, 0.34f, 0.18f), new Color(0.25f, 0.18f, 0.2f));
             CreateDevice(ElectricalDeviceRuntime.CreateContactor("KB"), "能耗制动", new Vector3(0.72f, 1.68f, -0.16f), new Vector3(0.42f, 0.34f, 0.18f), new Color(0.25f, 0.18f, 0.2f));
             CreateDevice(ElectricalDeviceRuntime.CreateThermalRelay("FR"), "热继电器 FR", new Vector3(-0.65f, 1.62f, -0.16f), new Vector3(0.52f, 0.34f, 0.18f), new Color(0.78f, 0.8f, 0.82f));
-            CreateDevice(ElectricalDeviceRuntime.CreateTimeRelay("KT", 0.8f), "时间继电器 KT", new Vector3(0f, 1.62f, -0.16f), new Vector3(0.48f, 0.34f, 0.18f), new Color(0.18f, 0.2f, 0.22f));
 
             CreateButton("SB0", "停止", true, new Vector3(-1.12f, 1.05f, -0.17f), Color.red);
             CreateButton("SB1", "启动", false, new Vector3(-0.72f, 1.05f, -0.17f), new Color(0.1f, 0.75f, 0.25f));
@@ -918,6 +921,15 @@ namespace ElectricalSim
             CreateDevice(ElectricalDeviceRuntime.CreateContactor(id), label, position, new Vector3(0.48f, 0.38f, 0.18f), new Color(0.16f, 0.2f, 0.24f));
         }
 
+        private void CreateRearContactorDevice(string id, string label)
+        {
+            var root = new GameObject(id + "_" + label);
+            var view = root.AddComponent<ElectricalDeviceView>();
+            view.Initialize(ElectricalDeviceRuntime.CreateContactor(id), label);
+            CreatePorts(view, root.transform, view.Runtime.Ports, new Vector3(0.48f, 0.38f, 0.18f));
+            deviceViews.Add(view);
+        }
+
         private void CreateMotor(string id, string label, Vector3 position)
         {
             position.x *= 0.72f;
@@ -1088,6 +1100,7 @@ namespace ElectricalSim
                     ? 0.016f
                     : motorBodyPorts ? 0.0125f
                     : frontElectrical != null ? 0.0075f : 0.009f;
+                if (faultBodyPorts) worldMarkerSize *= 0.5f;
                 var parentScale = Mathf.Max(Mathf.Abs(parent.lossyScale.x), Mathf.Abs(parent.lossyScale.y), Mathf.Abs(parent.lossyScale.z));
                 var markerSize = worldMarkerSize / Mathf.Max(0.0001f, parentScale);
                 var portObject = CreatePrimitive(PrimitiveType.Sphere, "Port", parent, localPosition, Vector3.one * markerSize, new Color(0.08f, 1f, 0.32f));
@@ -1133,15 +1146,14 @@ namespace ElectricalSim
                 return true;
 
             return runtime.Kind == ElectricalDeviceKind.Contactor ||
-                   runtime.Kind == ElectricalDeviceKind.ThermalRelay ||
-                   runtime.Kind == ElectricalDeviceKind.TimeRelay;
+                   runtime.Kind == ElectricalDeviceKind.ThermalRelay;
         }
 
         private static bool ShouldExposeContactorBodyPorts(ElectricalDeviceRuntime runtime)
         {
             return runtime != null &&
                    runtime.Kind == ElectricalDeviceKind.Contactor &&
-                   (runtime.DeviceId == "KMF" || runtime.DeviceId == "KM1" || runtime.DeviceId == "KMR");
+                   (runtime.DeviceId == "KMBACK1" || runtime.DeviceId == "KMBACK2" || runtime.DeviceId == "KMBACK3");
         }
 
         private static bool ShouldExposeThermalRelayBodyPorts(ElectricalDeviceRuntime runtime)
@@ -1433,6 +1445,9 @@ namespace ElectricalSim
                 var view = root.AddComponent<ElectricalDeviceView>();
                 view.Initialize(runtime, definition.DisplayName);
 
+                if (definition.Kind == OriginalCabinetTerminalBoardKind.PowerDistribution)
+                    board.gameObject.AddComponent<PowerTerminalBlockView>().Initialize(runtime);
+
                 foreach (var anchor in anchors)
                 {
                     var physicalAnchorName = anchor.name;
@@ -1452,7 +1467,7 @@ namespace ElectricalSim
                     runtime.AddFixedLink(terminalName, OriginalCabinetTerminalBoardMap.ResolveLogicalNode(definition, terminalName));
 
                     var markerSize = definition.Kind == OriginalCabinetTerminalBoardKind.Motor
-                        ? 0.0125f
+                        ? 0.00625f
                         : 0.0075f;
                     var portObject = CreatePrimitive(
                         PrimitiveType.Sphere,
@@ -1465,7 +1480,7 @@ namespace ElectricalSim
                     if (collider != null) collider.radius = 1.6f;
                     var port = portObject.AddComponent<ElectricalPortView>();
                     port.Initialize(definition.DeviceId, terminalName, new Color(0.12f, 0.86f, 0.36f));
-                    port.ConfigureHover(terminalName, connectionAnchor.name);
+                    port.ConfigureHover(OriginalCabinetTerminalBoardMap.GetDisplayName(definition, terminalName), connectionAnchor.name);
                     // The original semantic point Transform remains authoritative. The explicit
                     // marker makes the connection location visible even when the ripped point
                     // renderer is inactive or occluded in the Unity 2022 player.
@@ -1566,7 +1581,6 @@ namespace ElectricalSim
                 case "KMB": return "29";
                 case "KB": return "30";
                 case "FR": return "33";
-                case "KT": return "35";
                 case "SB0": return "9";
                 case "SB1": return "8";
                 case "SB2": return "11";
@@ -1591,10 +1605,9 @@ namespace ElectricalSim
             {
                 case "QF": return "123";
                 case "POWER": return "123";
-                case "KMF": return "111";
-                case "KM1": return "112";
-                case "KMR": return "113";
-                case "KM2": return "113";
+                case "KMBACK1": return "111";
+                case "KMBACK2": return "112";
+                case "KMBACK3": return "113";
                 case "FR": return "114";
                 case "SB1": return "108";
                 case "SB0": return "109";
@@ -2047,15 +2060,6 @@ namespace ElectricalSim
                     { "U2", new[] { "U2" } }, { "V2", new[] { "V2" } }, { "W2", new[] { "W2" } }
                 };
                 if (motor.TryGetValue(port, out var aliases)) return aliases;
-            }
-            if (kind == ElectricalDeviceKind.TimeRelay)
-            {
-                var timer = new Dictionary<string, string[]>
-                {
-                    { "A1", new[] { "2" } }, { "A2", new[] { "7" } },
-                    { "15", new[] { "1" } }, { "16", new[] { "3" } }, { "18", new[] { "4" } }
-                };
-                if (timer.TryGetValue(port, out var aliases)) return aliases;
             }
             if (kind == ElectricalDeviceKind.PowerSource) return new[] { port };
             if (kind == ElectricalDeviceKind.BrakeUnit)

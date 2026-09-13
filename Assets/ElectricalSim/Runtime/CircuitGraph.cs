@@ -203,7 +203,7 @@ namespace ElectricalSim
             snapshot = BuildSnapshot();
             // Time advances once, after contact convergence, never in the iteration loop.
             foreach (var motor in devices.Values.OfType<ElectricalDeviceRuntime>().Where(d => d.Kind == ElectricalDeviceKind.Motor))
-                motor.AdvanceMotorSpeed(snapshot, deltaTime);
+                if (deltaTime > 0) motor.AdvanceMotorSpeed(snapshot, deltaTime);
             snapshot = BuildSnapshot();
             foreach (var device in devices.Values) device.ApplyVisualState(snapshot);
             return snapshot;
@@ -228,6 +228,9 @@ namespace ElectricalSim
             var speeds = devices.Values.OfType<ElectricalDeviceRuntime>()
                 .Where(d => d.Kind == ElectricalDeviceKind.Motor).ToDictionary(d => d.DeviceId, d => d.ActualSpeedRpm);
             var snapshot = new SimulationSnapshot(rootMap, potentialsByRoot, active, directions, errors, speeds);
+            foreach (var sensor in devices.Values.OfType<SceneIoDeviceRuntime>())
+                if (sensor.Powered && sensor.Wet && sensor.SignalShortCircuit)
+                    errors.Add(sensor.Definition.Name + "：SIGNAL与GND短接，输出已保护断开。");
             foreach (var drive in devices.Values.OfType<InverterDriveRuntime>())
             {
                 drive.Validate(snapshot, errors);

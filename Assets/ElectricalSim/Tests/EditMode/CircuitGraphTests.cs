@@ -8,11 +8,14 @@ namespace ElectricalSim.Tests
     public sealed class CircuitGraphTests
     {
         [Test]
-        public void CatalogContainsAllTenPlannedTasks()
+        public void CatalogContainsNineTasksWithoutRemovedTimeRelay()
         {
             var tasks = CircuitTaskCatalog.CreateAll();
-            Assert.That(tasks.Count, Is.EqualTo(10));
-            Assert.That(tasks.Select(task => task.Id).Distinct().Count(), Is.EqualTo(10));
+            Assert.That(tasks.Count, Is.EqualTo(9));
+            Assert.That(tasks.Select(task => task.Id).Distinct().Count(), Is.EqualTo(9));
+            Assert.That(tasks.Any(task => task.Id == "timed"), Is.False);
+            Assert.That(tasks.SelectMany(task => task.RequiredConnections)
+                .Any(pair => pair.A.StartsWith("KT.") || pair.B.StartsWith("KT.")), Is.False);
         }
 
         [Test]
@@ -109,7 +112,7 @@ namespace ElectricalSim.Tests
             var power = ElectricalDeviceRuntime.CreatePowerSource();
             var breaker = ElectricalDeviceRuntime.CreateBreaker("QF");
             var contactor = ElectricalDeviceRuntime.CreateContactor("KM1");
-            var relay = ElectricalDeviceRuntime.CreateThermalRelay("FR");
+            var relay = ElectricalDeviceRuntime.CreateThermalRelay("FR1");
             var motor = ElectricalDeviceRuntime.CreateMotor("M1");
             button = ElectricalDeviceRuntime.CreatePushButton("SB1", false);
             foreach (var device in new[] { power, breaker, contactor, relay, motor, button }) graph.RegisterDevice(device);
@@ -131,8 +134,7 @@ namespace ElectricalSim.Tests
             Add(ElectricalDeviceRuntime.CreateBreaker("QF"));
             foreach (var id in new[] { "KM1", "KM2", "KMF", "KMR", "KMB", "KB" })
                 Add(ElectricalDeviceRuntime.CreateContactor(id));
-            Add(ElectricalDeviceRuntime.CreateThermalRelay("FR"));
-            Add(ElectricalDeviceRuntime.CreateTimeRelay("KT", 0.8f));
+            Add(ElectricalDeviceRuntime.CreateThermalRelay("FR1"));
             foreach (var id in new[] { "SB0", "SB0A", "SB0B" })
                 Add(ElectricalDeviceRuntime.CreatePushButton(id, true));
             foreach (var id in new[] { "SB1", "SB2", "SBF", "SBR", "SBB", "SBE", "SB1A", "SB1B" })

@@ -84,7 +84,7 @@ namespace ElectricalSim
                 count++;
             }
             if (panelViews.Count(v => !v.IsRear) != 20 || panelViews.Count(v => v.IsRear) != 3 ||
-                panelViews.Select(v => v.Runtime.DeviceId).Distinct().Count() != 20 || count != 64)
+                panelViews.Select(v => v.Runtime.DeviceId).Distinct().Count() != 20 || count != 72)
                 throw new InvalidOperationException($"面板绑定数量错误：{panelViews.Count} 元件，{count} 端子");
             foreach (var rear in panelViews.Where(v => v.IsRear))
             foreach (var port in rear.Definition.Ports)
@@ -99,7 +99,7 @@ namespace ElectricalSim
                 if (links.Any(l => l.A == "COM1" && l.B == "COM2" || l.A == "COM2" && l.B == "COM1"))
                     throw new InvalidOperationException("面板公共端被短接：" + runtime.DeviceId);
             }
-            Debug.Log($"[PanelValidation] 20 个正面元件、3 个背面按钮，{count}/64 端子绑定通过。");
+            Debug.Log($"[PanelValidation] 20 个正面元件、3 个背面按钮，{count}/72 端子绑定通过。");
         }
     }
 }

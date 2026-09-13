@@ -13,6 +13,8 @@ namespace ElectricalSim
         public PanelPowerState PanelPower { get; private set; }
         public PanelDeviceView SelectedPanelDevice { get; private set; }
         public event Action<PanelDeviceView> PanelSelectionChanged;
+        public PowerTerminalBlockView SelectedPowerTerminalBlock { get; private set; }
+        public event Action PowerTerminalSelectionChanged;
 
         public void RegisterPanel(IEnumerable<PanelDeviceView> views, PanelPowerState power)
         {
@@ -23,9 +25,31 @@ namespace ElectricalSim
 
         public void SelectPanelDevice(PanelDeviceView view)
         {
+            SelectSceneIo(null);
+            SelectedPowerTerminalBlock = null;
+            PowerTerminalSelectionChanged?.Invoke();
             if (view != null) { ClearWireSelection(); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); }
             SelectedPanelDevice = view;
             PanelSelectionChanged?.Invoke(view);
+        }
+
+        public void SelectPowerTerminalBlock(PowerTerminalBlockView view)
+        {
+            SelectPanelDevice(null);
+            if (view != null)
+            {
+                ClearWireSelection(); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null);
+            }
+            SelectedPowerTerminalBlock = view;
+            PowerTerminalSelectionChanged?.Invoke();
+        }
+
+        public string DescribePowerTerminalBlock()
+        {
+            if (SelectedPowerTerminalBlock == null) return string.Empty;
+            return "电源端子区 · 属性\n额定电压：DC 24V\n状态：" +
+                (PanelPower != null && PanelPower.Enabled ? "供电中" : "未供电") +
+                "\n24V+：1、2、3、4（正极）\n24V-：1、2、3、4（负极）\n同极端子内部连通\n连接点：端子排下方";
         }
 
         public void PressPanelDevice(PanelDeviceView view)

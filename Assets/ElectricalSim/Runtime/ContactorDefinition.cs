@@ -28,19 +28,24 @@ namespace ElectricalSim
         { "L1", "L2", "L3", "T1", "T2", "T3", "13", "14", "53", "54", "61", "62", "71", "72", "83", "84", "A1", "A2" });
         public static readonly IReadOnlyList<ContactorDefinition> All = System.Array.AsReadOnly(new[]
         {
-            new ContactorDefinition(1, "KMF"), new ContactorDefinition(2, "KM1"),
-            new ContactorDefinition(3, "KMR"), new ContactorDefinition(4, "KM2")
+            new ContactorDefinition(1, "KMF", 29), new ContactorDefinition(2, "KM1", 30),
+            new ContactorDefinition(3, "KMR", 31), new ContactorDefinition(4, "KM2", 32)
+        });
+        public static readonly IReadOnlyList<ContactorDefinition> Rear = System.Array.AsReadOnly(new[]
+        {
+            new ContactorDefinition(5, "KMBACK1", 111, true),
+            new ContactorDefinition(6, "KMBACK2", 112, true),
+            new ContactorDefinition(7, "KMBACK3", 113, true)
         });
         public string Id { get; }
         public string RuntimeId { get; }
         public string ModelPath { get; }
-        public string RearModelPath { get; }
-        private ContactorDefinition(int index, string runtimeId)
+        public bool IsRear { get; }
+        public string RearModelPath => IsRear ? ModelPath : null;
+        private ContactorDefinition(int index, string runtimeId, int nut, bool isRear = false)
         {
-            Id = "KM" + index; RuntimeId = runtimeId;
-            ModelPath = "Bench/ElectricBench/Nuts/" + (28 + index) + "/JiaoLiuJieChuQi_F4-32";
-            // The rear cabinet contains three contactors, not a second KM4.
-            RearModelPath = index <= 3 ? "Bench/ElectricBench/Nuts/" + (110 + index) + "/JiaoLiuJieChuQi_F4-32" : null;
+            Id = "KM" + index; RuntimeId = runtimeId; IsRear = isRear;
+            ModelPath = "Bench/ElectricBench/Nuts/" + nut + "/JiaoLiuJieChuQi_F4-32";
         }
         public static string TerminalLabel(string port)
         {

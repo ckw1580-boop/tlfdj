@@ -36,7 +36,6 @@ namespace ElectricalSim.Editor
             { "overload", "三相异步电动机过载保护自锁控制" },
             { "forward-reverse", "三相异步电动机联锁正反转控制" },
             { "multi-location", "三相异步电动机两地与多地控制" },
-            { "timed", "三相异步电动机时间电路控制" },
             { "sequence", "三相异步电动机顺序启动控制" },
             { "reverse-brake", "三相异步电动机反接制动" },
             { "energy-brake", "三相异步电动机能耗制动" }
@@ -269,7 +268,6 @@ namespace ElectricalSim.Editor
             foreach (var id in new[] { "KM1", "KM2", "KMF", "KMR", "KMB", "KB" })
                 AddDevice(registry, id, "JiaoLiuJieChuQiK");
             AddDevice(registry, "FR", "ReJiDianQiK");
-            AddDevice(registry, "KT", "ShiJianJiDianQiK");
             foreach (var id in new[] { "SB0", "SB0A", "SB0B", "SBR", "SBB" })
                 AddDevice(registry, id, "AnNiu_Red");
             foreach (var id in new[] { "SB1", "SB2", "SBF", "SBE", "SB1A", "SB1B" })

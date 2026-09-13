@@ -8,7 +8,6 @@ namespace ElectricalSim
     {
         private readonly List<string> ports;
         private readonly List<PortPair> fixedLinks = new List<PortPair>();
-        private float timerElapsed;
         private bool lastEvaluatedState;
 
         public ElectricalDeviceRuntime(string deviceId, ElectricalDeviceKind kind, IEnumerable<string> portNames)
@@ -28,7 +27,6 @@ namespace ElectricalSim
         public bool IsTripped { get; private set; }
         public bool IsPressed { get; private set; }
         public bool IsNormallyClosedButton { get; set; }
-        public float TimerDelaySeconds { get; set; } = 1f;
         public double RelayCoilVoltage { get; private set; }
         public double ContactorCoilVoltage { get; private set; }
         public MotorDirection MotorDirection { get; private set; }
@@ -129,10 +127,6 @@ namespace ElectricalSim
                     foreach (var contact in IntermediateRelayDefinition.Contacts)
                         yield return new PortPair(contact.Common, IsActive ? contact.NormallyOpen : contact.NormallyClosed);
                     break;
-                case ElectricalDeviceKind.TimeRelay:
-                    if (IsActive) yield return new PortPair("15", "18");
-                    else yield return new PortPair("15", "16");
-                    break;
                 case ElectricalDeviceKind.ThermalRelay:
                     foreach (var heater in ThermalRelayDefinition.Heaters) yield return heater;
                     yield return IsTripped ? new PortPair("97", "98") : new PortPair("95", "96");
@@ -166,11 +160,6 @@ namespace ElectricalSim
                 case ElectricalDeviceKind.IntermediateRelay:
                     RelayCoilVoltage = snapshot.GetDcVoltage(Port(IntermediateRelayDefinition.CoilPositive), Port(IntermediateRelayDefinition.CoilNegative));
                     IsActive = RelayCoilVoltage == IntermediateRelayDefinition.RatedDcVoltage;
-                    break;
-                case ElectricalDeviceKind.TimeRelay:
-                    if (snapshot.HasControlVoltage(Port("A1"), Port("A2"))) timerElapsed += Math.Max(0f, deltaTime);
-                    else timerElapsed = 0f;
-                    IsActive = timerElapsed >= TimerDelaySeconds;
                     break;
                 case ElectricalDeviceKind.Indicator:
                     IsActive = snapshot.HasControlVoltage(Port("L"), Port("N"));
@@ -242,9 +231,6 @@ namespace ElectricalSim
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.ThermalRelay,
                 ThermalRelayDefinition.Ports);
 
-        public static ElectricalDeviceRuntime CreateTimeRelay(string id, float delay = 1f)
-            => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.TimeRelay,
-                new[] { "A1", "A2", "15", "16", "18" }) { TimerDelaySeconds = delay };
 
         public static ElectricalDeviceRuntime CreateMotor(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Motor,

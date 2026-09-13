@@ -52,14 +52,12 @@ namespace ElectricalSim.Tests
         [TestCase("DuanZiPai_3", "KM1_53no", "KM1_53NO", "KMF.53")]
         [TestCase("DuanZiPai_3", "KM2_61nc", "KM2_61NC", "KM1.61")]
         [TestCase("DuanZiPai_3", "FR1_95nc", "FR1_95NC", "FR1.95")]
-        [TestCase("DuanZiPai_3", "a60", "KT_A1", "KT.A1")]
-        [TestCase("DuanZiPai_3", "a64", "KT_18", "KT.18")]
         [TestCase("DuanZiPai_4", "G120_u2", "G120_U2", "G120.U2")]
         [TestCase("DuanZiPai_4", "KM3_72nc", "KM3_72NC", "KMR.72")]
         [TestCase("DuanZiPai_4", "KM4_14no", "KM4_14NO", "KM2.14")]
         [TestCase("DuanZiPai_4", "FR2_6t3", "FR2_6T3", "FR2.T3")]
-        [TestCase("DuanZiPai_6", "v_1", "V_1", "POWER.L1")]
-        [TestCase("DuanZiPai_6", "n_4", "N_4", "POWER.N")]
+        [TestCase("DuanZiPai_6", "v_1", "V_1", "TERMINAL_BUS.DC_POSITIVE")]
+        [TestCase("DuanZiPai_6", "n_4", "N_4", "TERMINAL_BUS.DC_NEGATIVE")]
         [TestCase("DuanZiPai_7", "a_u1", "A_u1", "")]
         [TestCase("DuanZiPai_7", "a_w2", "A_w2", "")]
         [TestCase("DuanZiPai_7", "b_v1", "B_v1", "")]
@@ -93,7 +91,7 @@ namespace ElectricalSim.Tests
             var power = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_6");
             var motor = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_7");
             var sceneIo = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_8");
-            Assert.That(upper.ExpectedPortCount, Is.EqualTo(64));
+            Assert.That(upper.ExpectedPortCount, Is.EqualTo(59));
             Assert.That(lower.ExpectedPortCount, Is.EqualTo(48));
             Assert.That(power.ExpectedPortCount, Is.EqualTo(8));
             Assert.That(motor.ExpectedPortCount, Is.EqualTo(18));
@@ -101,6 +99,7 @@ namespace ElectricalSim.Tests
             Assert.That(upper.UsesSeparateJumperAnchors, Is.True);
             Assert.That(lower.UsesSeparateJumperAnchors, Is.True);
             Assert.That(power.UsesSeparateJumperAnchors, Is.True);
+            Assert.That(power.AlwaysUsesJumperAnchor, Is.True);
             Assert.That(motor.UsesSeparateJumperAnchors, Is.True);
             Assert.That(sceneIo.UsesSeparateJumperAnchors, Is.True);
             Assert.That(upper.AlwaysUsesElectricalAnchor, Is.True);
@@ -110,6 +109,19 @@ namespace ElectricalSim.Tests
             Assert.That(motor.AlwaysUsesJumperAnchor, Is.False);
             Assert.That(sceneIo.AlwaysUsesElectricalAnchor, Is.True);
             Assert.That(sceneIo.AlwaysUsesJumperAnchor, Is.False);
+        }
+
+        [TestCase("a60")]
+        [TestCase("a61")]
+        [TestCase("a62")]
+        [TestCase("a63")]
+        [TestCase("a64")]
+        [TestCase("KT_A1")]
+        public void RemovedTimerAnchorsAreNotConnectable(string anchor)
+        {
+            var board = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_3");
+            Assert.That(OriginalCabinetTerminalBoardMap.IsTerminalName(board, anchor), Is.False);
+            Assert.That(OriginalCabinetTerminalBoardMap.ResolveLogicalNode(board, "KT_A1"), Is.Empty);
         }
 
         private static void AssertBinding(

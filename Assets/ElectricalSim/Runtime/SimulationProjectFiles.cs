@@ -40,6 +40,7 @@ namespace ElectricalSim
             get
             {
                 if (plcSessions.Count > 0 && savedPlcConfiguration != PlcConfigurationSignature()) return true;
+                if (Liquid != null && savedLiquidConfiguration != LiquidConfigurationSignature()) return true;
                 if (savedWires.Count != graph.Wires.Count) return true;
                 var current = graph.Wires.OrderBy(w => w.Id, StringComparer.Ordinal).ToArray();
                 var saved = savedWires.OrderBy(w => w.Id, StringComparer.Ordinal).ToArray();
@@ -111,11 +112,13 @@ namespace ElectricalSim
                         view.gameObject.name, view.transform.position, view.transform.rotation));
                 var document = Cc3dCircuitAdapter.Export(staged, states, loadedDocument);
                 ExportPlcConfigurations(document);
+                ExportLiquidConfiguration(document);
                 ValidateProjectWires(Cc3dCircuitAdapter.ReadWires(document));
                 Cc3dSerializer.Save(path, document);
                 loadedDocument = document;
                 savedWires = snapshot;
                 savedPlcConfiguration = PlcConfigurationSignature();
+                savedLiquidConfiguration = LiquidConfigurationSignature();
                 RememberProjectPath(path);
                 ClearWireSelection();
                 SetStatus($"已保存接线：{path}\n共 {snapshot.Count} 条导线。", false);
@@ -133,13 +136,25 @@ namespace ElectricalSim
                 path = Path.GetFullPath(path);
                 var document = Cc3dSerializer.Load(path);
                 var incoming = Cc3dCircuitAdapter.ReadWires(document);
-                ValidateProjectWires(incoming);
-                var incomingPlcs = ReadPlcConfigurations(document);
-                ReplacePlcConfigurations(incomingPlcs);
                 // Legacy projects have no cabinet-side field; retain the existing
                 // convention of resolving it against the current view on import.
                 foreach (var wire in incoming) wire.FaultSide ??= trainingCamera.IsViewingFaultSide;
+                foreach (var wire in incoming)
+                {
+                    wire.StartPort = MigrateLegacyRearContactorPort(wire.StartPort, wire.FaultSide == true);
+                    wire.EndPort = MigrateLegacyRearContactorPort(wire.EndPort, wire.FaultSide == true);
+                }
+                ValidateProjectWires(incoming);
+                var incomingPlcs = ReadPlcConfigurations(document);
+                var incomingLiquid = ReadLiquidConfiguration(document);
+                ReplacePlcConfigurations(incomingPlcs);
                 graph.ReplaceWires(incoming);
+                if (Liquid != null)
+                {
+                    Liquid.Configure(incomingLiquid, true);
+                    ResetLiquidState();
+                    savedLiquidConfiguration = LiquidConfigurationSignature();
+                }
                 SetMode(SimulationMode.Wiring);
                 RefreshWireViews();
                 undoWires.Clear();
@@ -165,6 +180,22 @@ namespace ElectricalSim
                     if (ResolveWireAnchor(port, preset, jumper) == null)
                         throw new InvalidDataException($"导线 {wire.Id} 的端子不存在或无法定位：{port}");
             }
+        }
+
+        private static string MigrateLegacyRearContactorPort(string port, bool rear)
+        {
+            if (!rear || string.IsNullOrEmpty(port)) return port;
+            var separator = port.IndexOf('.');
+            if (separator <= 0) return port;
+            string runtime;
+            switch (port.Substring(0, separator))
+            {
+                case "KMF": runtime = "KMBACK1"; break;
+                case "KM1": runtime = "KMBACK2"; break;
+                case "KMR": runtime = "KMBACK3"; break;
+                default: return port;
+            }
+            return runtime + port.Substring(separator);
         }
 
         private string DialogDirectory() => !string.IsNullOrEmpty(lastProjectDirectory) && Directory.Exists(lastProjectDirectory)

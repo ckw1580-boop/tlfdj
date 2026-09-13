@@ -7,7 +7,7 @@ namespace ElectricalSim.Tests
     public sealed class ContactorTests
     {
         private CircuitGraph graph;
-        private static readonly string[] Ids = { "KMF", "KM1", "KMR", "KM2" };
+        private static readonly string[] Ids = { "KMF", "KM1", "KMR", "KM2", "KMBACK1", "KMBACK2", "KMBACK3" };
         // Expectations transcribed from the reference, independent of the definition.
         private static readonly string[][] Pairs = {
             new[] { "L1", "T1" }, new[] { "L2", "T2" }, new[] { "L3", "T3" },
@@ -39,6 +39,7 @@ namespace ElectricalSim.Tests
             Assert.That(snapshot.SameNet(id + ".A1", id + ".A2"), Is.False);
         }
         [TestCase("KMF")][TestCase("KM1")][TestCase("KMR")][TestCase("KM2")]
+        [TestCase("KMBACK1")][TestCase("KMBACK2")][TestCase("KMBACK3")]
         public void AllEightContactsSwitchIndependentlyAndRelease(string id)
         {
             Assert.That(graph.Devices[id].Ports.Count, Is.EqualTo(18));

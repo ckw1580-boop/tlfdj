@@ -25,6 +25,31 @@ namespace ElectricalSim.Tests
         }
         private void Wire(string a, string b) => graph.AddWire(a, b, Color.red);
 
+        [Test]
+        public void PowerDistributionProvidesSwitched24VoltDcWithSeparatePolarities()
+        {
+            var definition = OriginalCabinetTerminalBoardMap.Boards.Single(d => d.DeviceId == "DuanZiPai_6");
+            var names = new[] { "V_1", "V_2", "V_3", "V_4", "N_1", "N_2", "N_3", "N_4" };
+            var board = new ElectricalDeviceRuntime(definition.DeviceId, ElectricalDeviceKind.Terminal, names);
+            foreach (var name in names)
+                board.AddFixedLink(name, OriginalCabinetTerminalBoardMap.ResolveLogicalNode(definition, name));
+            graph.RegisterDevice(board);
+            power.StartForAssessment();
+            var snapshot = graph.Solve();
+            foreach (var name in names)
+            {
+                var node = board.DeviceId + "." + name;
+                Assert.That(snapshot.GetPotential(node), Is.EqualTo(name[0] == 'V'
+                    ? ElectricalPotential.DcPositive24 : ElectricalPotential.DcNegative));
+                Assert.That(snapshot.SameNet(node, "POWER.L1"), Is.False);
+            }
+            Assert.That(snapshot.GetDcVoltage("DuanZiPai_6.V_1", "DuanZiPai_6.N_4"), Is.EqualTo(24f));
+            Assert.That(snapshot.SameNet("DuanZiPai_6.V_1", "DuanZiPai_6.V_4"), Is.True);
+            Assert.That(snapshot.SameNet("DuanZiPai_6.V_1", "DuanZiPai_6.N_1"), Is.False);
+            controls["PANEL_ESTOP"].SetControl(true);
+            Assert.That(graph.Solve().GetDcVoltage("DuanZiPai_6.V_1", "DuanZiPai_6.N_4"), Is.Zero);
+        }
+
         [TestCase("SB1")][TestCase("SB2")][TestCase("SB3")][TestCase("SB4")]
         [TestCase("SB5")][TestCase("SB6")][TestCase("SB7")][TestCase("SB8")]
         [TestCase("SA1")][TestCase("SA2")]

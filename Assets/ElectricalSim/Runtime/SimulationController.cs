@@ -212,7 +212,12 @@ namespace ElectricalSim
                 HandleSceneInput();
             }
             PreparePlcOutputs();
-            lastSnapshot = graph.Solve(Time.deltaTime);
+            var wasOverflowing = Liquid != null && Liquid.IsOverflowing;
+            lastSnapshot = AdvanceSimulation(Time.deltaTime);
+            if (Liquid != null && Liquid.IsOverflowing && !wasOverflowing)
+                SetStatus("混合罐满罐溢流：请检查进液控制。阀门仍由实际接线及PLC控制。", true);
+            else if (Liquid != null && !Liquid.IsOverflowing && wasOverflowing)
+                SetStatus($"溢流已停止，累计溢流量：{Liquid.OverflowVolume * 100:F2}%罐容。", false);
             SamplePlcInputs();
             foreach (var view in wireViews) view.Refresh();
             UpdateInstrumentReadout();
@@ -222,6 +227,8 @@ namespace ElectricalSim
 
         public void SetMode(SimulationMode mode)
         {
+            liquidStepAccumulator = 0;
+            if (mode != SimulationMode.Simulate) Liquid?.Pause();
             if (mode != SimulationMode.Wiring) HideRelaySchematic();
             if (mode != SimulationMode.Simulate) PausePlcSimulation();
             ReleasePanelButton();
@@ -267,6 +274,7 @@ namespace ElectricalSim
 
         public void ResetTraining()
         {
+            ResetLiquidState();
             ReleasePanelButton();
             PanelPower?.Reset();
             PushWireHistory();
@@ -571,12 +579,26 @@ namespace ElectricalSim
                 return;
             }
             var panelView = hit.collider.GetComponentInParent<PanelDeviceView>();
+            var sceneIo = hit.collider.GetComponentInParent<SceneIoView>();
+            if (sceneIo != null && port == null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate))
+            {
+                SelectSceneIo(sceneIo);
+                return;
+            }
+            if (Mode == SimulationMode.View || Mode == SimulationMode.Simulate) SelectSceneIo(null);
             if (panelView != null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate))
             {
                 PressPanelDevice(panelView);
                 return;
             }
             var deviceView = hit.collider.GetComponentInParent<ElectricalDeviceView>();
+
+            var powerBlock = hit.collider.GetComponentInParent<PowerTerminalBlockView>();
+            if (powerBlock != null && port == null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate))
+            {
+                SelectPowerTerminalBlock(powerBlock);
+                return;
+            }
 
             if (Mode == SimulationMode.Fault && port != null) HandleMeterPort(port);
             else if (Mode == SimulationMode.Simulate && deviceView != null) HandleDeviceControl(deviceView.Runtime);
@@ -658,6 +680,9 @@ namespace ElectricalSim
             }
             var thermal = hasHit && port == null ? hit.collider.GetComponentInParent<ThermalRelayView>() : null;
             if (thermal != null) { ShowThermalRelaySchematic(thermal); return; }
+
+            var powerBlock = hasHit && port == null ? hit.collider.GetComponentInParent<PowerTerminalBlockView>() : null;
+            if (powerBlock != null) { SelectPowerTerminalBlock(powerBlock); return; }
 
             if (selectedPort != null)
             {

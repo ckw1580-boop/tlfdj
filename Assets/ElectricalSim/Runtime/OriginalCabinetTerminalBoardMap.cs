@@ -26,8 +26,6 @@ namespace ElectricalSim
 
     public static class OriginalCabinetTerminalBoardMap
     {
-        private static readonly string[] TimerPorts = { "A1", "A2", "15", "16", "18" };
-
         public static readonly IReadOnlyList<OriginalCabinetTerminalBoardDefinition> Boards =
             new[]
             {
@@ -48,9 +46,9 @@ namespace ElectricalSim
                 new OriginalCabinetTerminalBoardDefinition
                 {
                     DeviceId = "DuanZiPai_3",
-                    DisplayName = "G120、交流接触器、FR及KT上端子排",
+                    DisplayName = "G120、交流接触器及FR上端子排",
                     Kind = OriginalCabinetTerminalBoardKind.DriveContactorUpper,
-                    ExpectedPortCount = 64,
+                    ExpectedPortCount = 59,
                     UsesSeparateJumperAnchors = true,
                     AlwaysUsesElectricalAnchor = true
                 },
@@ -69,7 +67,8 @@ namespace ElectricalSim
                     DisplayName = "电源端子区",
                     Kind = OriginalCabinetTerminalBoardKind.PowerDistribution,
                     ExpectedPortCount = 8,
-                    UsesSeparateJumperAnchors = true
+                    UsesSeparateJumperAnchors = true,
+                    AlwaysUsesJumperAnchor = true
                 },
                 new OriginalCabinetTerminalBoardDefinition
                 {
@@ -105,10 +104,6 @@ namespace ElectricalSim
             if (board.Kind == OriginalCabinetTerminalBoardKind.SceneIo)
                 return IsSceneIoElectricalAnchorName(name);
 
-            if (board.Kind == OriginalCabinetTerminalBoardKind.DriveContactorUpper &&
-                TryGetGenericAnchorNumber(name, out var number))
-                return name[0] == 'a' && number >= 60 && number <= 64;
-
             if (!ContainsLowercase(name)) return false;
             return name.StartsWith("G120_", StringComparison.Ordinal) ||
                    name.StartsWith("KM1_", StringComparison.Ordinal) ||
@@ -122,9 +117,6 @@ namespace ElectricalSim
         public static string GetPortName(OriginalCabinetTerminalBoardDefinition board, string electricalAnchorName)
         {
             if (board == null || string.IsNullOrWhiteSpace(electricalAnchorName)) return string.Empty;
-            if (board.Kind == OriginalCabinetTerminalBoardKind.DriveContactorUpper &&
-                TryGetGenericAnchorNumber(electricalAnchorName, out var number) && number >= 60 && number <= 64)
-                return "KT_" + TimerPorts[number - 60];
             if (board.Kind == OriginalCabinetTerminalBoardKind.PowerDistribution ||
                 board.Kind == OriginalCabinetTerminalBoardKind.Motor ||
                 board.Kind == OriginalCabinetTerminalBoardKind.SceneIo)
@@ -167,8 +159,6 @@ namespace ElectricalSim
                 return string.Empty;
             if (board.Kind == OriginalCabinetTerminalBoardKind.SceneIo)
                 return ResolveSceneIoLogicalNode(terminalName);
-            if (terminalName.StartsWith("KT_", StringComparison.Ordinal))
-                return "KT." + terminalName.Substring(3);
             if (terminalName.StartsWith("G120_", StringComparison.Ordinal))
                 return "G120." + terminalName.Substring(5);
             if (terminalName.StartsWith("FR1_", StringComparison.Ordinal) ||
@@ -206,9 +196,17 @@ namespace ElectricalSim
             if (string.IsNullOrWhiteSpace(terminalName) || terminalName.Length != 3 ||
                 terminalName[1] != '_' || terminalName[2] < '1' || terminalName[2] > '4')
                 return string.Empty;
-            if (terminalName[0] == 'V') return "POWER.L1";
-            if (terminalName[0] == 'N') return "POWER.N";
+            if (terminalName[0] == 'V') return "TERMINAL_BUS.DC_POSITIVE";
+            if (terminalName[0] == 'N') return "TERMINAL_BUS.DC_NEGATIVE";
             return string.Empty;
+        }
+
+        public static string GetDisplayName(OriginalCabinetTerminalBoardDefinition board, string portName)
+        {
+            if (board.Kind == OriginalCabinetTerminalBoardKind.SceneIo) return SceneIoCatalog.DisplayPort(portName);
+            if (board.Kind != OriginalCabinetTerminalBoardKind.PowerDistribution ||
+                string.IsNullOrEmpty(ResolvePowerDistributionLogicalNode(portName))) return portName;
+            return (portName[0] == 'V' ? "24V+" : "24V-") + portName.Substring(1);
         }
 
         private static string ResolveSceneIoLogicalNode(string terminalName)
@@ -334,14 +332,6 @@ namespace ElectricalSim
             foreach (var character in value)
                 if (char.IsLower(character)) return true;
             return false;
-        }
-
-        private static bool TryGetGenericAnchorNumber(string name, out int number)
-        {
-            number = 0;
-            return !string.IsNullOrWhiteSpace(name) && name.Length > 1 &&
-                   (name[0] == 'a' || name[0] == 'A') &&
-                   int.TryParse(name.Substring(1), out number);
         }
     }
 }
