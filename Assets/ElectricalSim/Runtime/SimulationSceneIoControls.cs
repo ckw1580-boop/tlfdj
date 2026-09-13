@@ -108,6 +108,7 @@ namespace ElectricalSim
             Liquid?.Reset();
             liquidStepAccumulator = 0;
             UpdateLiquidSensors(true);
+            liquidView?.ResetVisuals();
             liquidView?.Refresh();
         }
         private void UpdateLiquidSensors(bool reset = false)

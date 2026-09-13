@@ -1,98 +1,160 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace ElectricalSim
 {
     public sealed class LiquidTankView : MonoBehaviour
     {
+        public static readonly Color LiquidAColor = new Color(0.39f, 0.45f, 0.54f, 0.94f);
+        public static readonly Color LiquidBColor = new Color(0.53f, 0.34f, 0.35f, 0.94f);
+        public static readonly Color MixedColor = new Color(0.49f, 0.38f, 0.53f, 0.94f);
         private SimulationController controller;
         private Transform liquidRoot, space;
         private Vector3 originalScale, originalPosition;
-        private float bottom, height;
+        private float bottom, height, receiverY;
         private Renderer[] liquidRenderers;
-        private Renderer[][] streams;
-        private Material liquidMaterial;
-        private MaterialPropertyBlock properties;
-        private double flowTime;
+        private readonly List<Material> materials = new List<Material>();
+        private readonly List<Material> surfaceMaterials = new List<Material>();
+        private readonly List<LiquidPipeView> pipes = new List<LiquidPipeView>();
+        private float flowTime;
+        public IReadOnlyList<LiquidPipeView> Pipes => pipes;
         public float BottomWorldY => space.TransformPoint(new Vector3(0, bottom, 0)).y;
         public float TopWorldY => space.TransformPoint(new Vector3(0, bottom + height, 0)).y;
+
         public void Initialize(Transform environment, SimulationController source)
         {
             controller = source;
-            properties = new MaterialPropertyBlock();
             space = environment.Find(SceneIoCatalog.EnvironmentPath);
-            // The imported scene encodes its empty tank by collapsing mesh Y to zero.
-            // Restore the authored full-volume geometry before measuring its bounds.
-            var waterMesh = space.Find("rivet/5/JiaoBanWater/mesh");
-            if (waterMesh != null) waterMesh.localScale = Vector3.one;
-            liquidRoot = space.Find("rivet/5/JiaoBanWater/mesh/Water");
-            if (liquidRoot == null) throw new InvalidOperationException("混合罐液体网格缺失。");
+            var waterMesh = Require("rivet/5/JiaoBanWater/mesh");
+            waterMesh.localScale = Vector3.one;
+            liquidRoot = Require("rivet/5/JiaoBanWater/mesh/Water");
             var bounds = SceneIoView.MeshBounds(liquidRoot, space);
             bottom = bounds.min.y; height = bounds.size.y;
             if (height < 0.01f) throw new InvalidOperationException("混合罐液体网格高度无效。");
             originalScale = liquidRoot.localScale;
             originalPosition = liquidRoot.localPosition;
             liquidRenderers = liquidRoot.GetComponentsInChildren<Renderer>(true);
-            var shader = Resources.Load<Shader>("LiquidSurface");
-            if (shader == null) throw new InvalidOperationException("液体显示着色器缺失。");
-            liquidMaterial = new Material(shader) { name = "Mixed liquid (instance)" };
-            foreach (var renderer in liquidRenderers)
-                renderer.sharedMaterials = renderer.sharedMaterials.Select(_ => liquidMaterial).ToArray();
-            // The source scene also contains an old static fill representation.
-            var staticLiquid = space.Find("mesh/View/YeTiHunHe/yeti");
-            if (staticLiquid != null)
-                foreach (var renderer in staticLiquid.GetComponentsInChildren<Renderer>(true)) renderer.enabled = false;
-            var paths = new[]
+            var a = CreateSurfaceMaterial("Unmixed A", LiquidAColor);
+            var b = CreateSurfaceMaterial("Unmixed B", LiquidBColor);
+            var mixed = CreateSurfaceMaterial("Mixed liquid", MixedColor);
+            var tankColor = MixedColor; tankColor.a = 0.78f;
+            Assign(liquidRoot, CreateSurfaceMaterial("Mixing tank liquid", tankColor));
+
+            const string view = "mesh/View/YeTiHunHe/";
+            // Only the obsolete cylindrical fill layers are hidden. The three
+            // rectangular basins retain their authored surface geometry and level.
+            foreach (var path in new[] { "ORANGE02", "RED02", "YELLOW02", "yeti" }) Hide(Require(view + path));
+            Assign(Require(view + "YELLOW01"), a);
+            Assign(Require(view + "RED01"), b);
+            var receiver = Require(view + "xiang01 (1)/RED01 (1)");
+            Assign(receiver, mixed);
+            receiverY = SceneIoView.MeshBounds(receiver, space).max.y;
+
+            foreach (var path in new[] { "rivet/6/JinLiaoWater1", "rivet/7/JinLiaoWater2", "rivet/8/PaiLiaoWater",
+                "rivet/15/JinLiaoliudong_A", "rivet/16/JinLiaoliudong_B", "rivet/17/ShuiLiu_1", "rivet/18/ShuiLiu_2",
+                "rivet/19/ShuiLiu_3", "rivet/20/ShuiLiu_4", view + "guangdao" }) Hide(Require(path));
+            var wallMaterial = new Material(Resources.Load<Shader>("TransparentPipe")) { name = "Clear pipe wall" };
+            materials.Add(wallMaterial);
+            foreach (var renderer in Require(view + "guan").GetComponentsInChildren<Renderer>(true))
             {
-                new[] { "rivet/6/JinLiaoWater1", "rivet/15/JinLiaoliudong_A" },
-                new[] { "rivet/7/JinLiaoWater2", "rivet/16/JinLiaoliudong_B" },
-                new[] { "rivet/8/PaiLiaoWater" }
-            };
-            streams = paths.Select(group => group.SelectMany(path =>
-                (space.Find(path) ?? throw new InvalidOperationException("流动模型缺失：" + path)).GetComponentsInChildren<Renderer>(true)).ToArray()).ToArray();
-            foreach (var path in paths.SelectMany(p => p))
+                var slots = renderer.sharedMaterials;
+                // Retain the secondary coupling material on polySurface2007.
+                slots[0] = wallMaterial;
+                renderer.sharedMaterials = slots;
+                renderer.enabled = true;
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+            }
+            var data = Resources.Load<TextAsset>("LiquidPipeRoutes");
+            if (data == null) throw new InvalidOperationException("管路中心线数据缺失。");
+            var routes = JsonUtility.FromJson<LiquidPipeRoutes>(data.text).routes;
+            var colors = new[] { LiquidAColor, LiquidBColor, MixedColor };
+            for (var i = 0; i < routes.Length; i++)
             {
-                var root = space.Find(path);
-                foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
-                    for (var node = renderer.transform; node != root.parent; node = node.parent)
-                    {
-                        node.gameObject.SetActive(true);
-                        if (node.name == "RedWaterSuptter" && node.localScale.y == 0)
-                            node.localScale = new Vector3(node.localScale.x, 1, node.localScale.z);
-                    }
+                var root = new GameObject(routes[i].name + " pipe animation");
+                root.transform.SetParent(space, false);
+                var pipe = root.AddComponent<LiquidPipeView>();
+                pipe.Initialize(routes[i], colors[i]);
+                pipes.Add(pipe);
             }
             Refresh();
         }
+        private Transform Require(string path) => space.Find(path) ?? throw new InvalidOperationException("液体模型缺失：" + path);
+        private Material CreateSurfaceMaterial(string name, Color color)
+        {
+            var shader = Resources.Load<Shader>("LiquidSurface");
+            if (shader == null) throw new InvalidOperationException("液体显示着色器缺失。");
+            var material = new Material(shader) { name = name };
+            material.SetColor("_Color", color);
+            material.SetTexture("_BumpMap", Resources.Load<Texture2D>("WaterRippleNormal"));
+            materials.Add(material); surfaceMaterials.Add(material);
+            return material;
+        }
+        private static void Hide(Transform root)
+        {
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true)) renderer.enabled = false;
+        }
+        private void Assign(Transform root, Material material)
+        {
+            foreach (var renderer in root.GetComponentsInChildren<Renderer>(true))
+            {
+                for (var node = renderer.transform; node != space; node = node.parent) node.gameObject.SetActive(true);
+                renderer.enabled = true;
+                renderer.sharedMaterials = renderer.sharedMaterials.Select(_ => material).ToArray();
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+            }
+        }
         public float LevelAtWorldHeight(float worldY) => (worldY - BottomWorldY) / (TopWorldY - BottomWorldY);
-        private void OnDestroy() { if (liquidMaterial != null) Destroy(liquidMaterial); }
+        private void OnDestroy()
+        {
+            foreach (var pipe in pipes) if (pipe != null) Destroy(pipe.gameObject);
+            foreach (var material in materials) if (material != null) Destroy(material);
+        }
         private void LateUpdate()
         {
-            if (controller.Mode == SimulationMode.Simulate && !controller.IsFileOperationActive) flowTime += Time.deltaTime;
+            if (controller == null) return;
+            AdvanceVisuals(Time.deltaTime);
+        }
+        // Deterministic animation clock also allows scene tests to inspect front positions.
+        public void AdvanceVisuals(float seconds)
+        {
+            if (controller.IsFileOperationActive) return;
             Refresh();
+            flowTime += Mathf.Max(0, seconds);
+            foreach (var material in surfaceMaterials) material.SetFloat("_FlowTime", flowTime);
+            var simulating = controller.Mode == SimulationMode.Simulate;
+            for (var i = 0; i < pipes.Count; i++)
+            {
+                var open = controller.SceneIoDevices["SOLENOID" + (i + 1)].IsActive;
+                float speed;
+                if (i < 2)
+                {
+                    var rpm = ((ElectricalDeviceRuntime)controller.Graph.Devices[SceneIoCatalog.Pumps[i].MotorId]).ActualSpeedRpm;
+                    speed = Mathf.Max(0, rpm) / 1450f * 0.8f;
+                }
+                else speed = controller.Liquid.DrainFlow > 1e-9 ? 0.5f : 0;
+                pipes[i].Advance(seconds, speed, open, simulating, false,
+                    i < 2 ? bottom + height * (float)controller.Liquid.Level : receiverY);
+            }
+        }
+        public void ResetVisuals()
+        {
+            flowTime = 0;
+            foreach (var pipe in pipes) pipe.ResetVisuals();
+            foreach (var material in surfaceMaterials) material.SetFloat("_FlowTime", 0);
         }
         public void Refresh()
         {
-            if (liquidRoot == null || controller.Liquid == null || streams == null) return;
+            if (liquidRoot == null || controller.Liquid == null) return;
             var level = (float)controller.Liquid.Level;
             liquidRoot.localScale = new Vector3(originalScale.x, originalScale.y * Mathf.Max(level, 0.00001f), originalScale.z);
             liquidRoot.localPosition = originalPosition;
-            // Scaling about the imported pivot is corrected to leave the bottom fixed.
+            // Correct scaling about the imported pivot so the bottom remains fixed.
             var currentBottom = SceneIoView.MeshBounds(liquidRoot, space).min.y;
             liquidRoot.position += space.TransformVector(Vector3.up * (bottom - currentBottom));
             foreach (var renderer in liquidRenderers) renderer.enabled = level > 0.00001f;
-            var flows = new[] { controller.Liquid.Pump1Flow, controller.Liquid.Pump2Flow, controller.Liquid.DrainFlow };
-            for (var i = 0; i < streams.Length; i++)
-                for (var j = 0; j < streams[i].Length; j++)
-                {
-                    var renderer = streams[i][j];
-                    renderer.enabled = flows[i] > 1e-9 && controller.Mode == SimulationMode.Simulate && !controller.IsFileOperationActive;
-                    if (!renderer.enabled) continue;
-                    renderer.GetPropertyBlock(properties);
-                    var phase = (float)(flowTime * flows[i] * 30 - j * 0.17);
-                    properties.SetColor("_Color", Color.Lerp(new Color(0.08f, 0.45f, 0.65f), new Color(0.4f, 1, 1), 0.5f + 0.5f * Mathf.Sin(phase * Mathf.PI * 2)));
-                    renderer.SetPropertyBlock(properties);
-                }
         }
     }
 }
