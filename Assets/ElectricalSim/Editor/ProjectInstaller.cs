@@ -37,7 +37,8 @@ namespace ElectricalSim.Editor
         public static void BuildWindowsPlayer()
         {
             if (!File.Exists(ScenePath)) Install();
-            else EnsureSceneResources();
+            ResourceIntegrityGuard.ValidateForBuild();
+            EnsureSceneResources();
             ConfigurePlayerSettings();
             OriginalReferenceGenerator.Generate();
             var buildArgs = System.Environment.GetCommandLineArgs();
@@ -88,6 +89,8 @@ namespace ElectricalSim.Editor
             var wire = LoadOrCreateMaterial(WireMaterialPath, "ElectricalSim/Cabinet Wire");
             wire.shader = Shader.Find("ElectricalSim/Cabinet Wire");
             var serialized = new SerializedObject(bootstrap);
+            serialized.FindProperty("originalVisuals").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<OriginalVisualRegistry>(ProjectResourceFiles.RegistryPath);
             serialized.FindProperty("primitiveMaterial").objectReferenceValue = primitive;
             serialized.FindProperty("wireMaterial").objectReferenceValue = wire;
             serialized.FindProperty("cabinetBrandLogo").objectReferenceValue = AssetDatabase.LoadAssetAtPath<Texture2D>(CabinetBrandLogoPath);

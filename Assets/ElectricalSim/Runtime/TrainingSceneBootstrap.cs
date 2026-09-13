@@ -70,6 +70,16 @@ namespace ElectricalSim
 
         private void Build()
         {
+            var missing = originalVisuals == null
+                ? new List<string> { "TrainingSceneBootstrap.originalVisuals is missing." }
+                : originalVisuals.FindMissingVisuals();
+            if (missing.Count > 0)
+            {
+                enabled = false;
+                throw new InvalidOperationException("[ResourceIntegrity] 原始资源缺失，已停止创建实训场景。"
+                    + "请下载包含 Git LFS 实际资源的完整项目；详见 Docs/project-recovery.md。\n"
+                    + string.Join("\n", missing));
+            }
             Debug.Log("[OfflineBootstrap] Build started.");
             Application.targetFrameRate = 60;
             uiFont = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "Arial" }, 18);
@@ -660,7 +670,7 @@ namespace ElectricalSim
             // The original scene creates its Floor root from a removed runtime script. Rebuild the
             // same open-front training room from the measured Experiment renderer bounds.
             CreateCube("Original Floor", new Vector3(-0.067f, -0.055f, -2.62f), new Vector3(5.62f, 0.11f, 5.35f), new Color(0.08f, 0.58f, 0.49f));
-            CreateCube("Original Back Wall", new Vector3(-0.067f, 1.55f, -5.31f), new Vector3(5.62f, 3.2f, 0.10f), new Color(0.82f, 0.84f, 0.84f));
+            CreateCube("Original Back Wall", new Vector3(-0.067f, 1.55f, -5.31f), new Vector3(5.62f, 3.2f, 0.10f), new Color(0.35f, 0.35f, 0.35f));
             CreateCube("Original Left Wall", new Vector3(-2.90f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f));
             CreateCube("Original Right Wall", new Vector3(2.77f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f));
         }

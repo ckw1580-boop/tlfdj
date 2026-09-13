@@ -4,6 +4,8 @@
 
 程序跳过登录，启动后直接进入电气实训室。默认离线运行；可手动连接西门子 S7-1200、S7-1500 进行 PLC 联动。账号、在线更新、云端考试、Modbus 和原竞赛平台接口不属于当前范围。
 
+首次下载请先阅读[下载与恢复](#下载与恢复)，确认模型、贴图和字体已经下载完整，再打开 Unity。详细故障处理见[项目恢复说明](Docs/project-recovery.md)。
+
 ## 当前能力
 
 - 使用 Built-in Render Pipeline，启动场景为 `Assets/Scenes/ElectricalTraining.unity`。
@@ -23,7 +25,7 @@
 - 柜体背面 SB1–SB3 与正面同名按钮共用触点状态，使用相同的 3 mm、0.1 秒按压回弹动画；点击可查看状态、常开/常闭触点和 `DuanZiPai_5.a1–a12` 连接点属性，仿真时按下操作、松手复位。
 - 提供三相电源、断路器、按钮、旋钮、指示灯、接触器、热继电器、电机等离散电气行为。
 - 提供万用表、验电笔/探针、示波器和转速表，测量数据来自同一仿真快照。
-- 包含 10 项三相异步电动机控制实训及拓扑、动作序列联合验收。
+- 包含 9 项三相异步电动机控制实训及拓扑、动作序列联合验收。
 - 包含 A–D 本地考试包、故障注入、计时、评分、结果保存和虚拟 PLC。
 - 兼容原版 `.cc3d` 的 `element`、`customPoints`、`line`、`ropeLine` 四个根结构，并保留未知字段。
 - 截图、会话、成绩、考试进度和录屏帧序列均保存到本机；仅用户主动连接 PLC 时启动 S7 通信。
@@ -56,12 +58,23 @@ Assets/
 
 Build/
 ├─ Windows/             # Windows x64 构建产物
-└─ Reports/             # 测试、端口、视觉和构建日志
+├─ Reports/             # 测试、资源检查、视觉和构建日志
+└─ Recovery/            # 本地生成的完整项目 ZIP 和 SHA-256 校验文件
+
+Tools/
+├─ Test-ProjectResources.ps1  # 无需启动 Unity 的资源完整性检查
+└─ Build-CompleteProject.ps1  # 打包真实资源并校验压缩内容
+
+Packages/               # Unity 依赖声明与版本锁定
+ProjectSettings/        # Unity 版本与项目配置
+Docs/                   # 项目恢复、PLC 联调及验收说明
 ```
+
+`Build/` 是本地输出目录，不作为完整构建产物提交到仓库。源码下载不保证包含该目录中的 ZIP、截图或测试报告。
 
 ## 原始素材接入
 
-仓库内已有原始内容时可直接打开项目。需要重新导入资源时：
+仓库内已有完整的 `Assets/OriginalContent/` 时，通过资源检查后即可打开项目，无需重新导入。只有需要从原素材重建资源时才执行以下步骤；它们不能替代 Git LFS 下载：
 
 1. 将包含完整 `.meta` 文件的原 `Assets` 子集放到项目根目录 `OriginalAssetsSource/`。
 2. 在 Unity 菜单执行 `Electrical Sim > Import Original Assets`。
@@ -70,14 +83,63 @@ Build/
 
 不要删除原资源的 `.meta` 文件；Prefab、材质、贴图和端口 Transform 依赖原 GUID 关系。
 
+## 下载与恢复
+
+### 方式一：完整恢复包
+
+使用维护者提供的 `tlfdj-unity-complete-*.zip`，解压到新目录，保留全部 `.meta` 文件。完整包包括源码、真实资源、依赖声明和项目设置，不包括旧 `Library` 缓存。
+
+在解压后同时包含 `Assets`、`Packages`、`ProjectSettings` 的目录中打开 PowerShell，执行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\Test-ProjectResources.ps1 -ReportPath .\Build\Reports\resource-integrity.json
+```
+
+看到 `PASS` 后，按下方[Unity 编辑器](#unity-编辑器)步骤打开项目。若包内包含 `RESTORE-MANIFEST.json`，检查工具还会核对清单中文件的大小和 SHA-256；开始开发后修改文件会导致相应哈希检查失败，这是预期行为。重新打包修改后的项目时，先将旧清单另存到项目目录之外。
+
+### 方式二：GitHub Download ZIP
+
+模型、贴图、字体、资源注册表和部分 Prefab 使用 Git LFS。仓库管理员需要在 **Settings → General → Archives** 中启用 **Include Git LFS objects in archives**，再重新下载 ZIP。旧 ZIP 不会自动补齐资源。[GitHub 官方说明](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/managing-git-lfs-objects-in-archives-of-your-repository)
+
+解压后运行与方式一相同的检查命令。若下载的是不含检查工具的旧版本，可先检查以下关键资源：
+
+| 文件 | 正常内容 |
+| --- | --- |
+| `Assets/OriginalContent/OriginalVisualRegistry.asset` | Unity YAML 资源注册表，包含原始模型引用 |
+| `Assets/OriginalContent/GeneratedVisuals/OriginalLabEnvironment.prefab` | 完整实训室 Prefab；本次验收版本约 36.6 MB |
+
+如果文件只有以 `version https://git-lfs.github.com/spec/v1` 开头的几行文字，说明仍是 LFS 指针。文件名存在不代表真实内容已下载；删除 `Library`、调整画质或重新导入都无法补回这些资源。
+
+### 方式三：Git 与 Git LFS 克隆
+
+安装 Git 和 Git LFS 后，在用于存放项目的目录执行：
+
+```powershell
+git lfs install
+git clone https://github.com/ckw1580-boop/tlfdj.git tlfdj-complete
+cd tlfdj-complete
+git lfs pull
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\Test-ProjectResources.ps1
+```
+
+普通 ZIP 解压目录没有 `.git`，不能直接在那里执行 `git lfs pull`。若服务器提示对象不存在或配额问题，需要维护者补传资源或处理 LFS 服务问题，详见[项目恢复说明](Docs/project-recovery.md)。
+
+### 缺失资源时的处理
+
+编辑器打开后会自动检查实际文件和原始资源注册表；点击 Play 前还会检查当前场景的注册表引用。缺失时提示恢复方法并取消运行，自定义构建菜单和标准 Unity 构建也会进行检查。完整问题列表写入 `Build/Reports/resource-integrity.txt`。
+
+可通过 **Electrical Sim > Validate Project Resources** 手动复查。运行时如果注册表、环境或已登记的设备 Prefab 缺失，会立即报错，不再默默启动方块、圆柱组成的替代场景。重新执行 **Electrical Sim > Install Training Scene** 时会自动绑定现有原始资源注册表。
+
 ## 启动与构建
 
 ### Unity 编辑器
 
-1. 用 Unity Hub 添加本项目目录。
+1. 完成资源检查后，用 Unity Hub 添加本项目目录。
 2. 使用 Unity 2022.3.62f3c1 打开项目。
 3. 打开 `Assets/Scenes/ElectricalTraining.unity`。
 4. 点击 Play，程序直接进入实训场景。
+
+首次打开保持联网，让 Package Manager 下载依赖并完成资源导入。完整恢复包不包含依赖缓存，因此不保证全新电脑可以离线完成首次安装；构建后的默认离线运行不受影响。
 
 ### Windows x64
 
@@ -94,6 +156,18 @@ Build/Windows/ElectricalTraining.exe
 ```
 
 构建产物可断网启动；不需要原始 EXE、原 `App.dll` 或真实 PLC 服务。
+
+### 生成完整恢复包
+
+先在 Unity 中执行 **Electrical Sim > Validate Project Resources**，通过后在项目根目录运行：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\Build-CompleteProject.ps1
+```
+
+默认输出为 `Build/Recovery/tlfdj-unity-complete-时间戳.zip` 及对应的 `.sha256` 文件。工具从本地实际文件打包，先检查资源和 `.meta`，再逐个读取压缩内容并验证 SHA-256；不完整的输入会阻止打包，失败过程可能留下 `.partial` 文件，不能作为恢复包使用。
+
+发布前应将 ZIP 解压到新目录，完成资源检查及 Unity 场景运行验收，再作为 Release 附件交付。修改源码、资源或 README 后，需要重新运行打包工具，已有 ZIP 不会自动更新。
 
 ## 操作说明
 
@@ -340,7 +414,7 @@ G120 输入 `L1/L2/L3` 需要三相供电，输出 `U2/V2/W2` 经端子排、导
 - 支持 WiringSubject、DebugSubject、FaultSubject、FaultWiring 和考试时间配置。
 - 支持本地计时、故障注入、操作记录、分项评分、总分与结果恢复。
 - PLC/IO 由 `LocalPlcRuntime` 在本地模拟扫描周期和内部触点。
-- 不加载 `GXTcp`、`NetToPLCsim`、S7、Modbus 或其他外部通信服务。
+- 默认不连接外部设备；用户主动连接真实 PLC 时，通过 S7 通信进行联动。不依赖 `GXTcp` 或 `NetToPLCsim`，不支持 Modbus。
 
 ## `.cc3d` 兼容
 
@@ -399,26 +473,53 @@ Assets/ElectricalSim/Tests/PlayMode/
 
 测试和构建日志输出到 `Build/Reports/`。端子位置验收目标为世界坐标误差不超过 0.5 mm、1920×1080 下吸附中心屏幕误差不超过 2 px。
 
+### ZIP 恢复修复验收（2026-09-14）
+
+| 检查 | 结果 |
+| --- | --- |
+| 资源完整性单元测试 | 7 项通过，覆盖 LFS 指针、关键文件、`.meta` 和设备引用缺失 |
+| 完整包压缩内容及解压校验 | 5474 个文件的大小和 SHA-256 一致 |
+| 新解压项目场景运行 | 通过，原始环境加载成功，4 台电机的 24 个端子在切换视角后保持绑定 |
+| 实际画面验收 | 通过，已渲染完整电控柜、电机、端子和界面 |
+| 打包工具异常处理 | 正常打包及解压通过；修改后的文件被检出；LFS 指针输入被拒绝 |
+| 最终代码编译与构建前资源检查 | 通过；本轮没有重新构建 Windows EXE |
+| GitHub LFS 下载元数据 | 1540 个独立对象、1917 个文件引用均返回可下载状态 |
+
+上述数量是本次验收快照，后续增删文件会变化。GitHub 检查验证的是服务端下载元数据，没有重新下载全部对象；在线 ZIP 整包下载因网速过慢停止，不能视为在线 ZIP 整包验收通过。本地完整包已完成独立的文件与场景验收。
+
+本地记录位于 `Build/Reports/`，包括 `resource-tests.xml`、`restored-scene-tests.xml`、`restored-visual-tests.xml`、`resource-build-validation.log`、`restored-project-integrity.json`、`remote-lfs-availability.json` 和 `restored-project-overview.png`。这些记录不会随普通源码下载自动提供。
+
 ## Git 与大文件
 
 模型、贴图、音视频和构建资源可能超过普通 Git 文件的合理大小。提交前请确认 Git LFS 已安装并检查 GitHub 单文件 100 MB 限制：
 
 ```powershell
 git lfs install
+git lfs fsck --objects
 git lfs status
 git status
 ```
 
+从拥有真实资源的原仓库补传当前主分支及其历史引用的 LFS 对象时，执行：
+
+```powershell
+git lfs push --all origin main
+```
+
+`.gitattributes` 将 `ProjectSettings/` 保留为普通文本，避免项目配置因 LFS 指针而无法读取；规则在后续提交中生效，不会改写旧提交。`git lfs fsck --objects` 用于检查实际对象；旧历史中部分文件与当时的 LFS 跟踪规则不一致时，完整 `git lfs fsck` 的指针规则报错需与对象缺失分开处理。
+
 是否提交或推送由当前维护者决定；开发和测试过程不会自动执行 Git 提交或推送。
 
 ## 离线边界
+
+默认实训、接线保存和本地考试无需 PLC 或服务器。真实 S7-1200/S7-1500 联动是用户主动开启的可选功能，需要与 PLC 的网络连接，详见[PLC 联调说明](Docs/PLC联调说明.md)。首次安装 Unity 依赖也可能需要联网。
 
 以下功能明确不实现：
 
 - 账号登录和身份验证；
 - 联网更新和热更新；
 - 云端考试、云端成绩和竞赛平台接口；
-- 真实 PLC、S7、Modbus 和其他现场总线通信；
+- Modbus 及 S7-1200/S7-1500 联动范围之外的现场总线集成；
 - 依赖原 EXE 或原 `App.dll` 才能运行的逻辑。
 
 原资源确实缺失或损坏时应记录为阻塞项，不使用近似素材冒充像素级复刻结果。

@@ -35,6 +35,18 @@ namespace ElectricalSim
         public List<OriginalSchematicEntry> Schematics = new List<OriginalSchematicEntry>();
         public List<OriginalUiEntry> UiPrefabs = new List<OriginalUiEntry>();
 
+        public List<string> FindMissingVisuals()
+        {
+            var missing = new List<string>();
+            if (EnvironmentPrefab == null) missing.Add("OriginalVisualRegistry.EnvironmentPrefab is missing.");
+            if (CabinetPrefab == null) missing.Add("OriginalVisualRegistry.CabinetPrefab is missing.");
+            if (Entries == null || Entries.Count == 0) missing.Add("OriginalVisualRegistry has no device entries.");
+            else foreach (var entry in Entries)
+                if (entry == null || entry.Prefab == null)
+                    missing.Add("Original device prefab is missing: " + (entry == null ? "<null entry>" : entry.DeviceId + " / " + entry.TypeId));
+            return missing;
+        }
+
         public GameObject Resolve(string deviceId, string typeId)
         {
             foreach (var entry in Entries)
