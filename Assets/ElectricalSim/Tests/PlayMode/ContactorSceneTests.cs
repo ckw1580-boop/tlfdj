@@ -366,6 +366,7 @@ namespace ElectricalSim.Tests
         [UnityTest] public IEnumerator RearMeterTerminalsTakePriorityOverBodyInspection()
         {
             controller.SetMode(SimulationMode.Fault); controller.SetWireStyle(Color.red, .01f, "ElectricalWire");
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
             yield return null; Physics.SyncTransforms();
             var rear = controller.RearContactorViews[0];
             Invoke("HandleScenePointerDown", Camera.main, BodyPoint(rear.Picker));

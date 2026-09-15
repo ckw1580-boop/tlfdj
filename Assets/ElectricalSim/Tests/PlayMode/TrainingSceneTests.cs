@@ -355,7 +355,7 @@ namespace ElectricalSim.Tests
                 "Both breaker handles must have a hidden yellow outline outside drag mode");
 
             Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.False,
-                "Cabinet breakers must ignore interactions outside drag mode");
+                "Cabinet breakers must ignore interactions in view mode");
             Assert.That(breakers[0].IsClosed, Is.True);
 
             controller.SetMode(SimulationMode.Drag);
@@ -440,23 +440,80 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator TaskEvaluationDoesNotBypassAnOpenCabinetBreaker()
+        public IEnumerator SimulationPointerClicksAnimateBothCabinetBreakersAndGateTheMainCircuit()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var breakers = controller.CabinetBreakers.OrderBy(item => item.BreakerId).ToArray();
+            Assert.That(breakers.Length, Is.EqualTo(2));
+            var mainBreaker = Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Single(item => item.Runtime.DeviceId == "QF").Runtime;
+            var closedRotations = breakers.ToDictionary(item => item.BreakerId, item => item.Handle.localRotation);
+            var pointerDown = typeof(SimulationController).GetMethod("HandleScenePointerDown",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            Assert.That(pointerDown, Is.Not.Null);
+
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
+            controller.SetMode(SimulationMode.Simulate);
+            yield return null;
+            Physics.SyncTransforms();
+
+            foreach (var breaker in breakers)
+            {
+                // Keep the picker clear of the HUD even in the small batch-mode game view.
+                Camera.main.transform.LookAt(breaker.InteractionCollider.bounds.center);
+                var pointer = (Vector2)Camera.main.WorldToScreenPoint(breaker.InteractionCollider.bounds.center);
+                Assert.That(controller.IsInteractionBlocked, Is.False);
+                Assert.That(Physics.Raycast(Camera.main.ScreenPointToRay(pointer), out var hit, 100f), Is.True);
+                Assert.That(hit.collider.GetComponentInParent<CabinetBreakerInteractable>(), Is.SameAs(breaker));
+                var uiHits = new List<UnityEngine.EventSystems.RaycastResult>();
+                UnityEngine.EventSystems.EventSystem.current.RaycastAll(
+                    new UnityEngine.EventSystems.PointerEventData(UnityEngine.EventSystems.EventSystem.current)
+                    { position = pointer }, uiHits);
+                Assert.That(uiHits, Is.Empty, string.Join(", ", uiHits.Select(item => item.gameObject.name)));
+                pointerDown.Invoke(controller, new object[] { Camera.main, pointer });
+                Assert.That(breaker.IsClosed, Is.False, $"Simulation click must open breaker {breaker.BreakerId}");
+                Assert.That(mainBreaker.IsClosed, Is.False);
+                Assert.That(mainBreaker.GetConductiveLinks(), Is.Empty);
+                yield return new WaitForSecondsRealtime(breaker.AnimationDuration + 0.05f);
+                Assert.That(Quaternion.Angle(breaker.Handle.localRotation, closedRotations[breaker.BreakerId]),
+                    Is.GreaterThan(40f), "Opening must animate the physical handle");
+            }
+
+            for (var index = 0; index < breakers.Length; index++)
+            {
+                var breaker = breakers[index];
+                Physics.SyncTransforms();
+                Camera.main.transform.LookAt(breaker.InteractionCollider.bounds.center);
+                var pointer = (Vector2)Camera.main.WorldToScreenPoint(breaker.InteractionCollider.bounds.center);
+                pointerDown.Invoke(controller, new object[] { Camera.main, pointer });
+                Assert.That(breaker.IsClosed, Is.True, $"Simulation click must close breaker {breaker.BreakerId}");
+                Assert.That(mainBreaker.IsClosed, Is.EqualTo(index == breakers.Length - 1),
+                    "The main circuit must remain open until both cabinet breakers are closed");
+                yield return new WaitForSecondsRealtime(breaker.AnimationDuration + 0.05f);
+                Assert.That(Quaternion.Angle(breaker.Handle.localRotation, closedRotations[breaker.BreakerId]),
+                    Is.LessThan(0.01f), "Closing must return the handle to its original pose");
+            }
+            Assert.That(mainBreaker.GetConductiveLinks().Count(), Is.EqualTo(3));
+        }
+
+        [UnityTest]
+        public IEnumerator SchematicViewingDoesNotBypassAnOpenCabinetBreaker()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
             var breaker = controller.CabinetBreakers.Single(item => item.BreakerId == "106");
             var mainBreaker = Object.FindObjectsOfType<ElectricalDeviceView>()
                 .Single(item => item.Runtime.DeviceId == "QF").Runtime;
 
-            controller.LoadReferenceWiring();
+            ManualCircuitFixture.WireMotor(controller);
             controller.SetMode(SimulationMode.Drag);
             Assert.That(controller.TryToggleCabinetBreaker(breaker), Is.True);
-            controller.SubmitTask();
+            controller.SchematicGallery.OpenViewer();
             yield return null;
 
             Assert.That(breaker.IsClosed, Is.False);
             Assert.That(mainBreaker.IsClosed, Is.False,
-                "The task action initializer must preserve the physical breaker interlock");
-            controller.StopAllCoroutines();
+                "Viewing a schematic must preserve the physical breaker interlock");
+            controller.SchematicGallery.CloseViewer();
         }
 
         [UnityTest]
@@ -581,6 +638,7 @@ namespace ElectricalSim.Tests
             var controller = Object.FindObjectOfType<SimulationController>();
             Assert.That(controller, Is.Not.Null);
             controller.SetMode(SimulationMode.Fault);
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
             yield return null;
 
             Assert.That(labelRenderer.enabled, Is.True);
@@ -978,13 +1036,11 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator ReferenceWiringPassesCurrentTaskTopology()
+        public IEnumerator ManualWiresStayAttachedWhenCameraMoves()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
-            controller.LoadReferenceWiring();
+            ManualCircuitFixture.WireMotor(controller);
             yield return null;
-            var result = CircuitTaskEvaluator.EvaluateTopology(controller.Graph, controller.CurrentTask);
-            Assert.That(result.Passed, Is.True, result.Summary());
             Assert.That(controller.Graph.Wires.Count, Is.GreaterThan(10));
 
             var camera = Camera.main;
@@ -996,7 +1052,7 @@ namespace ElectricalSim.Tests
                 resolve.Invoke(controller, new object[] { wire.EndPort, TrainingViewPreset.WiringFront, true }) == null)
                 .Select(wire => wire.StartPort + " → " + wire.EndPort).ToArray();
             Assert.That(wireViews.Length, Is.EqualTo(controller.Graph.Wires.Count),
-                "无法生成显示的标准接线：" + string.Join("；", missing));
+                "无法生成显示的手动接线：" + string.Join("；", missing));
             var originalPaths = wireViews.ToDictionary(
                 view => view.name,
                 view => view.RenderedPoints.ToArray());
@@ -1182,7 +1238,8 @@ namespace ElectricalSim.Tests
             yield return null;
             var view = Object.FindObjectsOfType<ElectricalWireView>().Single(item => item.Connection.Id == connection.Id);
             AssertWireEndpointsMatchPorts(view);
-            Assert.That(Vector3.Distance(view.RenderPath.Trunk[10], view.Surface.Project(connection.Points[0])), Is.LessThan(0.0001f));
+            Assert.That(view.RenderPath.Trunk.Any(point =>
+                Vector3.Distance(point, view.Surface.Project(connection.Points[0])) < 0.0001f), Is.True);
             var fixedPath = view.RenderedPoints.ToArray();
             cameraController.SetWiringView();
             yield return null;
@@ -1228,7 +1285,8 @@ namespace ElectricalSim.Tests
             Assert.That(Vector3.Dot(wire.Surface.Normal, normal), Is.GreaterThan(0.9999f), "routing plane must follow the rotated rear mesh, not world Z");
             Assert.That(Vector3.Dot(wire.Surface.Origin, normal), Is.EqualTo(rearDepth + 0.003f).Within(0.0005f));
             foreach (var point in wire.RenderPath.Trunk)
-                Assert.That(Vector3.Dot(point, normal), Is.EqualTo(rearDepth + 0.003f).Within(0.0005f));
+                Assert.That(Vector3.Distance(point, wire.Surface.Project(point)), Is.LessThan(0.0005f),
+                    "The trunk follows the mounting plate with local clearance inside rear ducts");
         }
 
         [UnityTest]
@@ -1617,6 +1675,7 @@ namespace ElectricalSim.Tests
             }
 
             controller.SetMode(SimulationMode.Fault);
+            cameraController.SetFaultView();
             yield return null;
             Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.FaultBack));
             foreach (var device in faultDevices)
@@ -2077,7 +2136,7 @@ namespace ElectricalSim.Tests
         {
             var controller = Object.FindObjectOfType<SimulationController>();
             var cameraController = Object.FindObjectOfType<TrainingCameraController>();
-            var block = Object.FindObjectOfType<PowerTerminalBlockView>();
+            var block = Object.FindObjectsOfType<PowerTerminalBlockView>().Single(b => b.Runtime.DeviceId == "DuanZiPai_6");
             Assert.That(block, Is.Not.Null);
             var points = block.transform.Find("point");
             var ports = Object.FindObjectsOfType<ElectricalPortView>().Where(p => p.DeviceId == "DuanZiPai_6").ToArray();
@@ -2376,6 +2435,22 @@ namespace ElectricalSim.Tests
                 .Single(item => item.name == "MotorFaultBlocks");
             var troubleshootingButton = toolbar.GetComponentsInChildren<Button>(true)
                 .Single(item => item.name == "btn_paigu");
+            var menu = toolbar.GetComponentsInChildren<Transform>(true).Single(item => item.name == "twoChange");
+            var viewButton = toolbar.GetComponentsInChildren<Button>(true).Single(item => item.name == "btn_viewChange");
+
+            cameraController.SetWiringView();
+            cameraController.transform.position += new Vector3(0.17f, 0.12f, -0.08f);
+            cameraController.transform.rotation *= Quaternion.Euler(3f, -8f, 0f);
+            var retainedPosition = cameraController.transform.position;
+            var retainedRotation = cameraController.transform.rotation;
+            var retainedPreset = cameraController.CurrentPreset;
+
+            void AssertCameraUnchanged()
+            {
+                Assert.That(Vector3.Distance(cameraController.transform.position, retainedPosition), Is.LessThan(0.0001f));
+                Assert.That(Quaternion.Angle(cameraController.transform.rotation, retainedRotation), Is.LessThan(0.01f));
+                Assert.That(cameraController.CurrentPreset, Is.EqualTo(retainedPreset));
+            }
 
             controller.SetMode(SimulationMode.View);
             Assert.That(instrumentTools.gameObject.activeSelf, Is.False);
@@ -2394,41 +2469,122 @@ namespace ElectricalSim.Tests
             Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.True);
             // The existing tachometer workflow enters fault mode immediately so shaft targets are visible.
             Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Fault));
-            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.FaultBack));
+            AssertCameraUnchanged();
 
-            instrumentTools.GetComponentsInChildren<Button>(true)
-                .Single(item => item.name == "Instrument_Multimeter").onClick.Invoke();
+            foreach (var tool in instrumentTools.GetComponentsInChildren<Button>(true))
+            {
+                tool.onClick.Invoke();
+                yield return null;
+                Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Fault));
+                Assert.That(instrumentTools.gameObject.activeSelf, Is.True);
+                Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.True);
+                AssertCameraUnchanged();
+            }
+
+            viewButton.onClick.Invoke();
             yield return null;
-            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Fault));
-            Assert.That(instrumentTools.gameObject.activeSelf, Is.True);
-            Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.True);
+            AssertCameraUnchanged();
+            ButtonWithText(menu, "排故视角").onClick.Invoke();
+            yield return null;
+            Assert.That(cameraController.CurrentPreset, Is.EqualTo(TrainingViewPreset.FaultBack));
+            Assert.That(cameraController.transform.position, Is.EqualTo(cameraController.FaultPosition));
+
+            // A manually adjusted rear view must also survive repeated tool and mode clicks.
+            cameraController.transform.position += new Vector3(-0.13f, 0.06f, -0.19f);
+            cameraController.transform.rotation *= Quaternion.Euler(-4f, 6f, 0f);
+            retainedPosition = cameraController.transform.position;
+            retainedRotation = cameraController.transform.rotation;
+            retainedPreset = cameraController.CurrentPreset;
+            foreach (var tool in instrumentTools.GetComponentsInChildren<Button>(true))
+            {
+                tool.onClick.Invoke();
+                yield return null;
+                AssertCameraUnchanged();
+            }
 
             troubleshootingButton.onClick.Invoke();
             yield return null;
             Assert.That(controller.Mode, Is.EqualTo(SimulationMode.View));
             Assert.That(instrumentTools.gameObject.activeSelf, Is.False);
             Assert.That(motorFaultBlocks.gameObject.activeSelf, Is.False);
+            AssertCameraUnchanged();
+
+            troubleshootingButton.onClick.Invoke();
+            yield return null;
+            Assert.That(controller.Mode, Is.EqualTo(SimulationMode.Fault));
+            AssertCameraUnchanged();
         }
 
         [UnityTest]
-        public IEnumerator SchematicStaysInsideRightPanel()
+        public IEnumerator SchematicFitsBetweenLeftPanelsAtDifferentResolutions()
         {
-            var rightPanel = Object.FindObjectsOfType<RectTransform>(true)
-                .Single(item => item.name == "RightPanel");
+            var controller = Object.FindObjectOfType<SimulationController>();
+            controller.SetMode(SimulationMode.Wiring);
+            controller.ShowThermalRelaySchematic(controller.ThermalRelayViews[0]);
+            yield return null;
+            var taskPanel = GameObject.Find("TaskPanel").GetComponent<RectTransform>();
+            var statusPanel = GameObject.Find("StatusPanel").GetComponent<RectTransform>();
+            var devicePanel = controller.RelaySchematic.GetComponent<RectTransform>();
             var schematicFrame = Object.FindObjectsOfType<RectTransform>(true)
                 .Single(item => item.name == "SchematicFrame");
-            var panelCorners = new Vector3[4];
-            var schematicCorners = new Vector3[4];
-            rightPanel.GetWorldCorners(panelCorners);
-            schematicFrame.GetWorldCorners(schematicCorners);
+            var schematic = taskPanel.GetComponentsInChildren<Image>().Single(item => item.name == "TaskSchematic");
+            var canvas = taskPanel.GetComponentInParent<Canvas>();
+            var camera = Camera.main;
+            var previousMode = canvas.renderMode;
+            var previousCamera = canvas.worldCamera;
+            var previousDistance = canvas.planeDistance;
+            var previousTarget = camera.targetTexture;
+            try
+            {
+                canvas.renderMode = RenderMode.ScreenSpaceCamera;
+                canvas.worldCamera = camera;
+                canvas.planeDistance = camera.nearClipPlane + 0.05f;
+                foreach (var resolution in new[] { new Vector2Int(1920, 1080), new Vector2Int(1280, 720), new Vector2Int(1600, 1000) })
+                {
+                    var target = RenderTexture.GetTemporary(resolution.x, resolution.y, 24);
+                    try
+                    {
+                        camera.targetTexture = target;
+                        Canvas.ForceUpdateCanvases();
+                        var panel = ScreenRect(taskPanel);
+                        var frame = ScreenRect(schematicFrame);
+                        var status = ScreenRect(statusPanel);
+                        Assert.That(panel.xMin, Is.EqualTo(status.xMin).Within(1f));
+                        Assert.That(panel.xMax, Is.EqualTo(status.xMax).Within(1f));
+                        Assert.That(panel.yMin, Is.GreaterThan(status.yMax), "任务框不能遮挡底部模式框");
+                        Assert.That(panel.yMax, Is.LessThan(ScreenRect(devicePanel).yMin), "任务框不能遮挡上方器件原理图");
+                        Assert.That(frame.xMin, Is.GreaterThan(panel.xMin));
+                        Assert.That(frame.yMin, Is.GreaterThan(panel.yMin));
+                        Assert.That(frame.xMax, Is.LessThan(panel.xMax));
+                        Assert.That(frame.yMax, Is.LessThan(panel.yMax));
+                        Assert.That(frame.height, Is.GreaterThan(0f));
+                        var diagram = ScreenRect(schematic.rectTransform);
+                        Assert.That(diagram.width / diagram.height,
+                            Is.EqualTo(schematic.sprite.rect.width / schematic.sprite.rect.height).Within(0.001f));
+                        SaveRearWireFrame("left-task-panel-" + resolution.x + ".png", resolution.x, resolution.y);
+                    }
+                    finally
+                    {
+                        camera.targetTexture = previousTarget;
+                        RenderTexture.ReleaseTemporary(target);
+                    }
+                }
+            }
+            finally
+            {
+                canvas.renderMode = previousMode;
+                canvas.worldCamera = previousCamera;
+                canvas.planeDistance = previousDistance;
+            }
 
-            Assert.That(schematicFrame.offsetMin, Is.EqualTo(new Vector2(18f, -470f)));
-            Assert.That(schematicFrame.offsetMax, Is.EqualTo(new Vector2(-18f, -174f)));
-            Assert.That(schematicCorners[0].x, Is.GreaterThan(panelCorners[0].x));
-            Assert.That(schematicCorners[0].y, Is.GreaterThan(panelCorners[0].y));
-            Assert.That(schematicCorners[2].x, Is.LessThan(panelCorners[2].x));
-            Assert.That(schematicCorners[2].y, Is.LessThan(panelCorners[2].y));
-            yield return null;
+            Rect ScreenRect(RectTransform rect)
+            {
+                var corners = new Vector3[4];
+                rect.GetWorldCorners(corners);
+                var min = camera.WorldToScreenPoint(corners[0]);
+                var max = camera.WorldToScreenPoint(corners[2]);
+                return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+            }
         }
 
         [UnityTest]
@@ -2437,37 +2593,44 @@ namespace ElectricalSim.Tests
             var canvas = GameObject.Find("Simulation HUD").GetComponent<RectTransform>();
             var statusPanel = Object.FindObjectsOfType<RectTransform>(true)
                 .Single(item => item.name == "StatusPanel");
-            var rightPanel = Object.FindObjectsOfType<RectTransform>(true)
-                .Single(item => item.name == "RightPanel");
+            var taskPanel = Object.FindObjectsOfType<RectTransform>(true)
+                .Single(item => item.name == "TaskPanel");
             var statusHandle = Object.FindObjectsOfType<Button>(true)
                 .Single(item => item.name == "StatusPanelSlideHandle");
-            var rightHandle = Object.FindObjectsOfType<Button>(true)
-                .Single(item => item.name == "RightPanelSlideHandle");
+            var taskHandle = Object.FindObjectsOfType<Button>(true)
+                .Single(item => item.name == "TaskPanelSlideHandle");
             var navigation = GameObject.Find("OriginalUI_TopNavigation");
             var homeButton = navigation.GetComponentsInChildren<Button>(true)
                 .Single(item => item.name == "homeBtn");
             var scheduleButton = navigation.GetComponentsInChildren<Button>(true)
                 .Single(item => item.name == "scheduleBtn");
             var statusExpanded = statusPanel.anchoredPosition;
-            var rightExpanded = rightPanel.anchoredPosition;
+            var taskExpanded = taskPanel.anchoredPosition;
 
             statusHandle.onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.25f);
             Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded + new Vector2(-305f, 0f)), Is.LessThan(0.01f));
-            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(taskPanel.anchoredPosition, taskExpanded), Is.LessThan(0.01f));
             AssertRectStaysInside(statusHandle.GetComponent<RectTransform>(), canvas);
 
-            rightHandle.onClick.Invoke();
+            taskHandle.onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.25f);
-            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded + new Vector2(305f, 0f)), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(taskPanel.anchoredPosition, taskExpanded + new Vector2(-305f, 0f)), Is.LessThan(0.01f));
             Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded + new Vector2(-305f, 0f)), Is.LessThan(0.01f));
-            AssertRectStaysInside(rightHandle.GetComponent<RectTransform>(), canvas);
+            AssertRectStaysInside(taskHandle.GetComponent<RectTransform>(), canvas);
+            Assert.That(taskHandle.GetComponentInChildren<Text>(true).text, Is.EqualTo("▶"));
+            var collapsedCorners = new Vector3[4];
+            var canvasCorners = new Vector3[4];
+            taskPanel.GetWorldCorners(collapsedCorners);
+            canvas.GetWorldCorners(canvasCorners);
+            Assert.That(collapsedCorners[2].x, Is.EqualTo(canvasCorners[0].x).Within(0.1f), "收起后仅保留屏幕左缘的展开按钮");
 
             statusHandle.onClick.Invoke();
-            rightHandle.onClick.Invoke();
+            taskHandle.onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.25f);
             Assert.That(Vector2.Distance(statusPanel.anchoredPosition, statusExpanded), Is.LessThan(0.01f));
-            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(taskPanel.anchoredPosition, taskExpanded), Is.LessThan(0.01f));
+            Assert.That(taskHandle.GetComponentInChildren<Text>(true).text, Is.EqualTo("◀"));
 
             statusHandle.onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.08f);
@@ -2478,10 +2641,10 @@ namespace ElectricalSim.Tests
 
             homeButton.onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.25f);
-            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded + new Vector2(305f, 0f)), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(taskPanel.anchoredPosition, taskExpanded + new Vector2(-305f, 0f)), Is.LessThan(0.01f));
             scheduleButton.onClick.Invoke();
             yield return new WaitForSecondsRealtime(0.25f);
-            Assert.That(Vector2.Distance(rightPanel.anchoredPosition, rightExpanded), Is.LessThan(0.01f));
+            Assert.That(Vector2.Distance(taskPanel.anchoredPosition, taskExpanded), Is.LessThan(0.01f));
         }
 
         [UnityTest]

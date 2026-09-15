@@ -23,6 +23,8 @@ namespace ElectricalSim
             properties = obj.GetComponent<Text>();
             properties.font = status.font;
             properties.fontSize = 14;
+            properties.resizeTextMinSize = 10;
+            properties.resizeTextMaxSize = 14;
             properties.color = new Color(1f, 0.88f, 0.2f);
             properties.alignment = TextAnchor.UpperLeft;
             properties.raycastTarget = false;
@@ -57,6 +59,8 @@ namespace ElectricalSim
         private void Update() => Refresh();
         private void Refresh()
         {
+            if (properties != null && controller != null)
+                properties.resizeTextForBestFit = controller.SelectedPowerTerminalBlock != null;
             if (controller != null && controller.SelectedPanelDevice != null && !errorVisible)
                 properties.text = controller.DescribePanelDevice(controller.SelectedPanelDevice);
             else if (controller != null && controller.SelectedPowerTerminalBlock != null && !errorVisible)

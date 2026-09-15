@@ -134,7 +134,7 @@ namespace ElectricalSim.Tests
             foreach (var id in new[] { "M1", "M_DOUBLE", "M3" }) PowerMotor(id);
             PowerValve(1); PowerValve(2);
             controller.SetMode(SimulationMode.Simulate);
-            var snapshot = controller.AdvanceSimulation(0.02f);
+            var snapshot = controller.AdvanceSimulation(20);
             Assert.That(snapshot.GetMotorSpeedRpm("M2"), Is.Zero);
             Assert.That(controller.Liquid.Pump1Flow, Is.GreaterThan(0));
             Assert.That(controller.Liquid.Pump2Flow, Is.GreaterThan(0));
@@ -147,16 +147,23 @@ namespace ElectricalSim.Tests
         {
             controller.PanelPower.StartForAssessment(); PowerValve(1); PowerValve(2); PowerMotor("M_DOUBLE");
             controller.SetMode(SimulationMode.Simulate);
+            controller.AdvanceSimulation(1);
+            Assert.That(controller.Liquid.Level, Is.Zero);
+            Assert.That(controller.Liquid.Pump1Transporting, Is.True);
+            controller.AdvanceSimulation(19);
+            var delivered = controller.Liquid.Level;
             for (var i = 0; i < 50; i++) controller.AdvanceSimulation(0.02f);
-            Assert.That(controller.Liquid.Level, Is.EqualTo(1d / 30).Within(0.001));
+            Assert.That(controller.Liquid.Level - delivered, Is.EqualTo(1d / 30).Within(0.001));
             Assert.That(controller.Liquid.Pump1Flow, Is.GreaterThan(0)); Assert.That(controller.Liquid.Pump2Flow, Is.Zero);
             controller.SetMode(SimulationMode.View); var before = controller.Liquid.Level;
             controller.AdvanceSimulation(10); Assert.That(controller.Liquid.Level, Is.EqualTo(before));
             controller.SetMode(SimulationMode.Simulate); controller.AdvanceSimulation(1);
+            Assert.That(controller.Liquid.Level, Is.EqualTo(before));
+            controller.AdvanceSimulation(12);
             Assert.That(controller.Liquid.Level, Is.GreaterThan(before));
             controller.Graph.ClearWires();
             foreach (var motor in controller.Graph.Devices.Values.OfType<ElectricalDeviceRuntime>().Where(d => d.Kind == ElectricalDeviceKind.Motor)) motor.ResetMotorSpeed();
-            PowerValve(1); PowerValve(2); PowerMotor("M1"); controller.AdvanceSimulation(1);
+            PowerValve(1); PowerValve(2); PowerMotor("M1"); controller.AdvanceSimulation(15);
             Assert.That(controller.Liquid.Pump1Flow, Is.Zero); Assert.That(controller.Liquid.Pump2Flow, Is.GreaterThan(0));
             controller.SetMode(SimulationMode.View); controller.ResetLiquid(); Assert.That(controller.Liquid.Level, Is.Zero);
             Assert.That(controller.Graph.Wires, Is.Not.Empty);
@@ -231,8 +238,10 @@ namespace ElectricalSim.Tests
             foreach (var fps in new[] { 30, 60, 120 })
             {
                 controller.SetMode(SimulationMode.View); controller.ResetLiquid(); controller.SetMode(SimulationMode.Simulate);
+                controller.AdvanceSimulation(30);
+                var delivered = controller.Liquid.Level;
                 for (var i = 0; i < fps * 2; i++) controller.AdvanceSimulation(1f / fps);
-                Assert.That(controller.Liquid.Level, Is.EqualTo(1d / 30).Within(0.00001), fps + " fps");
+                Assert.That(controller.Liquid.Level - delivered, Is.EqualTo(1d / 30).Within(0.00001), fps + " fps");
             }
             rpm = -725; controller.AdvanceSimulation(0.02f); Assert.That(controller.Liquid.Pump1Flow, Is.Zero);
             rpm = 1450; controller.AdvanceSimulation(0.02f); Assert.That(controller.Liquid.Pump1Flow, Is.EqualTo(1d / 30).Within(1e-8));

@@ -7,6 +7,65 @@ namespace ElectricalSim.Tests
     public sealed class ElectricalWireViewTests
     {
         [Test]
+        public void DirectWireCrossingDuctAddsVisibleSamplesWithoutAddingBends()
+        {
+            var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                lid.transform.position = new Vector3(0f, 0f, 0.06f);
+                lid.transform.localScale = new Vector3(0.1f, 0.5f, 0.01f);
+                var flat = new WireSurfacePlane(Vector3.zero, Vector3.forward, 0.003f);
+                var profile = new WireDuctRoutingProfile(new[] { lid.GetComponent<MeshFilter>() }, flat);
+                var surface = new WireSurfacePlane(flat.SurfacePoint, flat.Normal, flat.SurfaceOffset, ducts: profile);
+                var start = new WireEndpointGeometry(new Vector3(-0.3f, 0f, 0.1f));
+                var end = new WireEndpointGeometry(new Vector3(0.3f, 0f, 0.2f));
+                var path = WireRenderPath.Build(start, end, null, surface);
+                Assert.That(path.Points.First(), Is.EqualTo(start.Position));
+                Assert.That(path.Points.Last(), Is.EqualTo(end.Position));
+                Assert.That(path.Trunk.Length, Is.GreaterThan(2), "A narrow duct between endpoints must not be skipped");
+                Assert.That(path.Trunk.Max(p => p.z), Is.EqualTo(0.045f).Within(0.00001f));
+                Assert.That(path.InsertionIndices.Length, Is.EqualTo(path.Points.Length - 1));
+                Assert.That(path.InsertionIndices.All(i => i == 0), Is.True);
+                var reversed = WireRenderPath.Build(end, start, null, surface);
+                Assert.That(reversed.Trunk.Length, Is.EqualTo(path.Trunk.Length));
+                for (var i = 0; i < path.Trunk.Length; i++)
+                    Assert.That(Vector3.Distance(path.Trunk[i], reversed.Trunk[path.Trunk.Length - 1 - i]), Is.LessThan(0.00001f));
+                Assert.That(WireRenderPath.Build(start, end, null, surface, true).Points,
+                    Is.EqualTo(WireRenderPath.Build(start, end, null, flat, true).Points), "Spatial motor jumpers bypass ducts");
+            }
+            finally { Object.DestroyImmediate(lid); }
+        }
+
+        [Test]
+        public void RotatedDuctRaycastsMatchInteriorRampsAndMountingPlate()
+        {
+            var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                var rotation = Quaternion.Euler(0f, 31f, 0f);
+                var origin = new Vector3(10f, 4f, -2f);
+                lid.transform.SetPositionAndRotation(origin + rotation * new Vector3(0f, 0f, 0.06f), rotation);
+                lid.transform.localScale = new Vector3(0.1f, 0.5f, 0.01f);
+                var flat = new WireSurfacePlane(origin, rotation * Vector3.forward, 0.003f,
+                    new Bounds(origin, Vector3.one));
+                var surface = new WireSurfacePlane(flat.SurfacePoint, flat.Normal, flat.SurfaceOffset, flat.SurfaceBounds,
+                    new WireDuctRoutingProfile(new[] { lid.GetComponent<MeshFilter>() }, flat));
+                foreach (var offset in new[] { Vector3.zero, new Vector3(0.055f, 0f, 0f),
+                    new Vector3(-0.055f, 0f, 0f), new Vector3(0f, 0.255f, 0f), new Vector3(0f, -0.255f, 0f),
+                    new Vector3(0.055f, 0.255f, 0f), new Vector3(0.2f, 0f, 0f) })
+                {
+                    var target = surface.Project(origin + rotation * offset);
+                    Assert.That(Vector3.Distance(surface.Project(target), target), Is.LessThan(0.00001f));
+                    var eye = target + surface.Normal + rotation * Vector3.right * 0.05f;
+                    Assert.That(surface.Raycast(new Ray(eye, (target - eye).normalized), out var hit), Is.True, offset.ToString());
+                    Assert.That(Vector3.Distance(hit, target), Is.LessThan(0.0001f), offset.ToString());
+                }
+                Assert.That(surface.Raycast(new Ray(origin + Vector3.up * 10f + surface.Normal, -surface.Normal), out _), Is.False);
+            }
+            finally { Object.DestroyImmediate(lid); }
+        }
+
+        [Test]
         public void MotorSoftJumperUsesWorldSagAndPreservesManualRoutes()
         {
             var a = new WireEndpointGeometry(new Vector3(0f, 2f, 1f));

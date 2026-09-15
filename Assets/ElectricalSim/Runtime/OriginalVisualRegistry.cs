@@ -13,13 +13,6 @@ namespace ElectricalSim
     }
 
     [Serializable]
-    public sealed class OriginalSchematicEntry
-    {
-        public string TaskId = string.Empty;
-        public Sprite Sprite;
-    }
-
-    [Serializable]
     public sealed class OriginalUiEntry
     {
         public string Id = string.Empty;
@@ -32,7 +25,6 @@ namespace ElectricalSim
         public GameObject EnvironmentPrefab;
         public GameObject CabinetPrefab;
         public List<OriginalVisualEntry> Entries = new List<OriginalVisualEntry>();
-        public List<OriginalSchematicEntry> Schematics = new List<OriginalSchematicEntry>();
         public List<OriginalUiEntry> UiPrefabs = new List<OriginalUiEntry>();
 
         public List<string> FindMissingVisuals()
@@ -55,13 +47,6 @@ namespace ElectricalSim
                 if (!string.IsNullOrEmpty(entry.DeviceId) && entry.DeviceId == deviceId) return entry.Prefab;
                 if (!string.IsNullOrEmpty(entry.TypeId) && entry.TypeId == typeId) return entry.Prefab;
             }
-            return null;
-        }
-
-        public Sprite ResolveSchematic(string taskId)
-        {
-            foreach (var entry in Schematics)
-                if (entry.TaskId == taskId && entry.Sprite != null) return entry.Sprite;
             return null;
         }
 

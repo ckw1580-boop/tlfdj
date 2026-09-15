@@ -24,20 +24,17 @@ namespace ElectricalSim
         private MeshRenderer body, jet;
         private Transform jetRoot;
         private Vector3 outlet;
-        public PipeFlowState State { get; private set; }
+        public LiquidStreamRuntime Stream { get; private set; }
+        public PipeFlowState State => Stream.Pipe;
         public Renderer Body => body;
         public Renderer Jet => jet;
         public Vector3 Outlet => outlet;
 
-        public void Initialize(LiquidPipeRoute route, Color color)
+        public void Initialize(LiquidPipeRoute route, Color color, LiquidStreamRuntime stream)
         {
             // Coordinates are measured in EnvironmentBench space, from the authored
             // Line001..006 mesh rings (including each elbow), not screen positions.
-            var distances = new float[route.points.Length];
-            for (var i = 1; i < distances.Length; i++)
-                distances[i] = distances[i - 1] + Vector3.Distance(route.points[i - 1], route.points[i]);
-            var valveDistance = ProjectDistance(route.points, distances, route.valve);
-            State = new PipeFlowState(distances[distances.Length - 1], valveDistance);
+            Stream = stream;
             properties = new MaterialPropertyBlock();
             material = new Material(Resources.Load<Shader>("PipeLiquid")) { name = route.name + " pipe liquid" };
             material.SetColor("_Color", color);
@@ -60,14 +57,8 @@ namespace ElectricalSim
             Refresh(outlet.y);
         }
 
-        public void Advance(float seconds, float speed, bool valveOpen, bool simulating, bool frozen, float surfaceY)
-        {
-            State.Advance(seconds, speed, valveOpen, simulating, frozen);
-            Refresh(surfaceY);
-        }
-        public void ResetVisuals() { State.Reset(); Refresh(outlet.y); }
-
-        private void Refresh(float surfaceY)
+        public void SetColor(Color color) => material.SetColor("_Color", color);
+        public void Refresh(float surfaceY)
         {
             body.enabled = State.Front > 0 && (State.UpstreamOpacity > 0 || State.DownstreamOpacity > 0);
             properties.SetFloat("_Front", State.Front);
@@ -77,28 +68,13 @@ namespace ElectricalSim
             properties.SetFloat("_UpPhase", State.UpstreamPhase);
             properties.SetFloat("_DownPhase", State.DownstreamPhase);
             body.SetPropertyBlock(properties);
-            jet.enabled = State.Front >= State.Length && State.DownstreamOpacity > 0 && outlet.y > surfaceY;
-            jetRoot.localScale = new Vector3(1, Mathf.Max(0.001f, outlet.y - surfaceY), 1);
+            jet.enabled = State.Front >= State.Length && State.DownstreamOpacity > 0 && outlet.y > surfaceY && Stream.JetFront > 0;
+            jetRoot.localScale = new Vector3(1, Mathf.Max(0.001f, Mathf.Min(Stream.JetFront, outlet.y - surfaceY)), 1);
             properties.SetFloat("_Front", 2);
             properties.SetFloat("_Valve", 2);
             properties.SetFloat("_UpOpacity", State.DownstreamOpacity);
             properties.SetFloat("_UpPhase", State.DownstreamPhase);
             jet.SetPropertyBlock(properties);
-        }
-
-        private static float ProjectDistance(Vector3[] points, float[] distances, Vector3 target)
-        {
-            var nearest = float.MaxValue; var result = 0f;
-            for (var i = 1; i < points.Length; i++)
-            {
-                var segment = points[i] - points[i - 1];
-                var t = Mathf.Clamp01(Vector3.Dot(target - points[i - 1], segment) / segment.sqrMagnitude);
-                var error = (target - points[i - 1] - segment * t).sqrMagnitude;
-                if (error >= nearest) continue;
-                nearest = error;
-                result = Mathf.Lerp(distances[i - 1], distances[i], t);
-            }
-            return result;
         }
 
         private static Mesh MakeTube(Vector3[] source, float radius)

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace ElectricalSim
 {
-    // Visual transport only. Tank volume continues to use LiquidSimulationRuntime.
+    // Pipe-front state shared by the simulation transport and its renderer.
     public sealed class PipeFlowState
     {
         public const float FadeSeconds = 0.5f;

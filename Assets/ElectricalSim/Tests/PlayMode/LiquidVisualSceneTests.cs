@@ -22,6 +22,7 @@ namespace ElectricalSim.Tests
             view = Object.FindObjectOfType<LiquidTankView>(); view.enabled = false;
             space = GameObject.Find("OriginalLabEnvironment").transform.Find(SceneIoCatalog.EnvironmentPath);
         }
+        private void Step(float seconds) { controller.AdvanceSimulation(seconds); view.AdvanceVisuals(0); }
         private void Wire(string a, string b) => controller.Graph.AddWire(a, b, Color.red);
         private void PowerMotor(string id)
         {
@@ -62,26 +63,28 @@ namespace ElectricalSim.Tests
         {
             controller.PanelPower.StartForAssessment(); PowerMotor("M_DOUBLE");
             controller.SetMode(SimulationMode.Simulate); controller.AdvanceSimulation(0.04f);
-            view.AdvanceVisuals(20);
+            Step(20);
             Assert.That(view.Pipes[0].State.IsBlocked, Is.True);
             Assert.That(view.Pipes[0].State.DownstreamOpacity, Is.Zero);
             Assert.That(view.Pipes[1].State.Front, Is.Zero);
             Assert.That(controller.Liquid.Level, Is.Zero);
             PowerValve(1); controller.AdvanceSimulation(0.04f);
             var level = controller.Liquid.Level;
-            Assert.That(level, Is.GreaterThan(0)); // No visual transport delay enters the volume calculation.
-            view.AdvanceVisuals(20);
-            Assert.That(controller.Liquid.Level, Is.EqualTo(level));
+            Assert.That(level, Is.Zero); // Opening a valve does not yet deliver to the tank.
+            view.AdvanceVisuals(20); // Rendering cannot advance transport or volume.
+            Assert.That(controller.Liquid.Level, Is.Zero);
+            Step(20);
+            Assert.That(controller.Liquid.Level, Is.GreaterThan(level));
             Assert.That(view.Pipes[0].State.Front, Is.EqualTo(view.Pipes[0].State.Length));
             Assert.That(view.Pipes[0].Jet.enabled, Is.True);
-            PowerMotor("M1"); PowerValve(2); controller.AdvanceSimulation(0.04f); view.AdvanceVisuals(20);
+            PowerMotor("M1"); PowerValve(2); controller.AdvanceSimulation(0.04f); Step(20);
             Assert.That(view.Pipes[1].Body.enabled, Is.True);
             var valveLead = controller.Graph.Wires.Single(w => w.EndPort == "DuanZiPai_8.Diancifa1_VCC");
-            controller.Graph.RemoveWire(valveLead.Id); controller.AdvanceSimulation(0.04f); view.AdvanceVisuals(0.5f);
+            controller.Graph.RemoveWire(valveLead.Id); controller.AdvanceSimulation(0.04f); Step(0.5f);
             Assert.That(view.Pipes[0].State.IsBlocked, Is.True);
             Assert.That(view.Pipes[0].State.DownstreamOpacity, Is.Zero);
             Assert.That(view.Pipes[1].State.DownstreamOpacity, Is.EqualTo(1));
-            controller.SetMode(SimulationMode.View); view.AdvanceVisuals(0.25f);
+            controller.SetMode(SimulationMode.View); Step(0.25f);
             Assert.That(view.Pipes[0].State.UpstreamOpacity, Is.EqualTo(0.5f));
             controller.ResetLiquid();
             Assert.That(view.Pipes.All(p => p.State.Front == 0 && !p.Body.enabled), Is.True);
@@ -91,18 +94,18 @@ namespace ElectricalSim.Tests
         public IEnumerator PendingFileDialogFreezesAnimationAndSuccessfulLoadClearsPipes()
         {
             controller.PanelPower.StartForAssessment(); PowerMotor("M_DOUBLE"); PowerValve(1);
-            controller.SetMode(SimulationMode.Simulate); controller.AdvanceSimulation(0.04f); view.AdvanceVisuals(4);
+            controller.SetMode(SimulationMode.Simulate); controller.AdvanceSimulation(0.04f); Step(4);
             var state = view.Pipes[0].State;
             var front = state.Front; var phase = state.UpstreamPhase;
             var dialogs = new PendingDialogs(); controller.FileDialogs = dialogs;
             controller.OpenCc3d();
             Assert.That(controller.IsFileOperationActive, Is.True);
-            view.AdvanceVisuals(10);
+            Step(10);
             Assert.That(state.Front, Is.EqualTo(front));
             Assert.That(state.UpstreamPhase, Is.EqualTo(phase));
             dialogs.Complete(UnsavedWiringChoice.Cancel);
             Assert.That(controller.IsFileOperationActive, Is.False);
-            view.AdvanceVisuals(0.2f);
+            Step(0.2f);
             Assert.That(state.Front, Is.GreaterThan(front));
             var file = Path.Combine(Application.temporaryCachePath, "liquid-visual-" + System.Guid.NewGuid().ToString("N") + ".cc3d");
             try
@@ -120,6 +123,57 @@ namespace ElectricalSim.Tests
             public string ChooseOpen(string directory) => "";
             public string ChooseSave(string directory, string fileName) => "";
             public void ConfirmUnsaved(System.Action<UnsavedWiringChoice> completed) => Complete = completed;
+        }
+        [UnityTest]
+        public IEnumerator AArrivesAtBottomThenBBlendsToPurple() { yield return CaptureColourSequence(false); }
+        [UnityTest]
+        public IEnumerator BArrivesAtBottomThenABlendsToPurple() { yield return CaptureColourSequence(true); }
+        private IEnumerator CaptureColourSequence(bool bFirst)
+        {
+            Object.FindObjectOfType<TrainingCameraController>().enabled = false;
+            foreach (var canvas in Object.FindObjectsOfType<Canvas>().Where(c => c.isRootCanvas)) canvas.enabled = false;
+            var camera = Camera.main; camera.nearClipPlane = 0.01f;
+            Position(camera, new Vector3(1.40f, 1.48f, -3.15f), new Vector3(1.40f, 0.89f, -4.84f));
+            var first = bFirst ? 1 : 0; var second = 1 - first;
+            var kind = bFirst ? LiquidContents.B : LiquidContents.A;
+            var sourceColor = bFirst ? LiquidTankView.LiquidBColor : LiquidTankView.LiquidAColor;
+            var prefix = bFirst ? "liquid-arrival-b" : "liquid-arrival-a";
+            var water = space.Find("rivet/5/JiaoBanWater/mesh/Water").GetComponentInChildren<Renderer>();
+            controller.PanelPower.StartForAssessment(); PowerMotor(SceneIoCatalog.Pumps[first].MotorId); PowerValve(first + 1);
+            controller.SetMode(SimulationMode.Simulate);
+            for (var i = 0; i < 1200 && view.Pipes[first].Stream.JetFront < 0.20f; i++) Step(0.02f);
+            Assert.That(view.Pipes[first].Stream.JetFront, Is.GreaterThanOrEqualTo(0.20f));
+            Assert.That(view.Pipes[first].Jet.enabled, Is.True);
+            Assert.That(controller.Liquid.Level, Is.Zero);
+            Assert.That(water.enabled, Is.False);
+            yield return null; Capture(camera, prefix + "-falling.png");
+            for (var i = 0; i < 300 && controller.Liquid.Level == 0; i++) Step(0.02f);
+            Assert.That(controller.Liquid.Level, Is.GreaterThan(0));
+            Assert.That(controller.Liquid.Contents, Is.EqualTo(kind));
+            yield return null; Capture(camera, prefix + "-contact.png");
+            Step(4);
+            var expected = sourceColor; expected.a = 0.78f;
+            Assert.That(water.sharedMaterial.color, Is.EqualTo(expected));
+            yield return null; Capture(camera, prefix + "-single.png");
+            var lead = controller.Graph.Wires.Single(w => w.EndPort == "DuanZiPai_8.Diancifa" + (first + 1) + "_VCC");
+            controller.Graph.RemoveWire(lead.Id);
+            PowerMotor(SceneIoCatalog.Pumps[second].MotorId); PowerValve(second + 1);
+            for (var i = 0; i < 1200 && controller.Liquid.Contents == kind; i++)
+            {
+                Assert.That(controller.Liquid.CurrentColor, Is.EqualTo(sourceColor));
+                Step(0.02f);
+            }
+            Assert.That(controller.Liquid.Contents, Is.EqualTo(LiquidContents.Mixed));
+            Assert.That(controller.Liquid.MixProgress, Is.InRange(0d, 0.021d));
+            Step(0.4f);
+            yield return null; Capture(camera, prefix + "-blending.png");
+            Step(0.65f);
+            Assert.That(controller.Liquid.CurrentColor, Is.EqualTo(LiquidTankView.MixedColor));
+            Assert.That(controller.Graph.Devices["M2"], Is.TypeOf<ElectricalDeviceRuntime>());
+            Assert.That(((ElectricalDeviceRuntime)controller.Graph.Devices["M2"]).ActualSpeedRpm, Is.Zero);
+            yield return null; Capture(camera, prefix + "-mixed.png");
+            PowerValve(3); Step(0.04f);
+            Assert.That(view.Pipes[2].Body.sharedMaterial.color, Is.EqualTo(controller.Liquid.CurrentColor));
         }
         [UnityTest]
         public IEnumerator CaptureBasinsBlockedFlowAndStoppedPipes()
@@ -142,16 +196,16 @@ namespace ElectricalSim.Tests
             yield return null; Capture(camera, "liquid-basin-mixed.png");
             Position(camera, new Vector3(0, 2.65f, -1.2f), new Vector3(-0.1f, 1.40f, -4.78f));
             controller.PanelPower.StartForAssessment(); PowerMotor("M_DOUBLE"); PowerMotor("M1");
-            controller.SetMode(SimulationMode.Simulate); controller.AdvanceSimulation(0.04f); view.AdvanceVisuals(20);
+            controller.SetMode(SimulationMode.Simulate); controller.AdvanceSimulation(0.04f); Step(20);
             yield return null; Capture(camera, "liquid-pipes-blocked.png");
             Assert.That(view.Pipes.Take(2).All(p => p.State.IsBlocked), Is.True);
             PowerValve(1); PowerValve(2); PowerValve(3); controller.AdvanceSimulation(0.04f);
-            view.AdvanceVisuals(0.35f); yield return null; Capture(camera, "liquid-pipes-opening.png");
-            view.AdvanceVisuals(20); yield return null; Capture(camera, "liquid-pipes-flowing.png");
+            Step(0.35f); yield return null; Capture(camera, "liquid-pipes-opening.png");
+            Step(20); yield return null; Capture(camera, "liquid-pipes-flowing.png");
             Assert.That(view.Pipes.All(p => p.Jet.enabled), Is.True);
-            controller.SetMode(SimulationMode.View); view.AdvanceVisuals(0.25f);
+            controller.SetMode(SimulationMode.View); Step(0.25f);
             yield return null; Capture(camera, "liquid-pipes-fading.png");
-            view.AdvanceVisuals(0.25f); yield return null; Capture(camera, "liquid-pipes-empty.png");
+            Step(0.25f); yield return null; Capture(camera, "liquid-pipes-empty.png");
             Assert.That(view.Pipes.All(p => !p.Body.enabled && !p.Jet.enabled), Is.True);
         }
         private void Position(Camera camera, Vector3 position, Vector3 target)

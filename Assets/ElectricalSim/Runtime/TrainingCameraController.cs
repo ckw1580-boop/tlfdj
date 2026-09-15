@@ -27,6 +27,14 @@ namespace ElectricalSim
 
         public TrainingViewPreset CurrentPreset { get; private set; } = TrainingViewPreset.Default;
         public bool InputBlocked { get; set; }
+        public bool InstrumentInputBlocked { get; set; }
+        public bool SchematicInputBlocked { get; private set; }
+        private int schematicInputResumeFrame = -1;
+        public void SetSchematicInputBlocked(bool blocked)
+        {
+            SchematicInputBlocked = blocked;
+            if (!blocked) schematicInputResumeFrame = Time.frameCount;
+        }
         public event Action<TrainingViewPreset> PresetChanged;
         public event Action<bool> ViewSideChanged;
 
@@ -43,7 +51,7 @@ namespace ElectricalSim
         {
             if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
                 EventSystem.current.currentSelectedGameObject.GetComponent<UnityEngine.UI.InputField>() != null) return;
-            if (InputBlocked) return;
+            if (InputBlocked || InstrumentInputBlocked || SchematicInputBlocked || Time.frameCount <= schematicInputResumeFrame) return;
             var speed = MoveSpeed * Time.unscaledDeltaTime;
             var horizontal = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
             var forward = (Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.S) ? 1f : 0f);

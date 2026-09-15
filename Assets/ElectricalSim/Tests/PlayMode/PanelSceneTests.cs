@@ -246,6 +246,7 @@ namespace ElectricalSim.Tests
             yield return null;
             var front = port.CurrentAnchorPosition;
             controller.SetMode(SimulationMode.Fault);
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
             yield return null;
             Assert.That(Vector3.Distance(front, port.CurrentAnchorPosition), Is.GreaterThan(0.01f));
             Control("SB1").Runtime.SetControl(true);

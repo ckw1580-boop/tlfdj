@@ -20,6 +20,7 @@ namespace ElectricalSim
         private readonly List<Material> surfaceMaterials = new List<Material>();
         private readonly List<LiquidPipeView> pipes = new List<LiquidPipeView>();
         private float flowTime;
+        private Material tankMaterial;
         public IReadOnlyList<LiquidPipeView> Pipes => pipes;
         public float BottomWorldY => space.TransformPoint(new Vector3(0, bottom, 0)).y;
         public float TopWorldY => space.TransformPoint(new Vector3(0, bottom + height, 0)).y;
@@ -41,7 +42,8 @@ namespace ElectricalSim
             var b = CreateSurfaceMaterial("Unmixed B", LiquidBColor);
             var mixed = CreateSurfaceMaterial("Mixed liquid", MixedColor);
             var tankColor = MixedColor; tankColor.a = 0.78f;
-            Assign(liquidRoot, CreateSurfaceMaterial("Mixing tank liquid", tankColor));
+            tankMaterial = CreateSurfaceMaterial("Mixing tank liquid", tankColor);
+            Assign(liquidRoot, tankMaterial);
 
             const string view = "mesh/View/YeTiHunHe/";
             // Only the obsolete cylindrical fill layers are hidden. The three
@@ -70,13 +72,14 @@ namespace ElectricalSim
             var data = Resources.Load<TextAsset>("LiquidPipeRoutes");
             if (data == null) throw new InvalidOperationException("管路中心线数据缺失。");
             var routes = JsonUtility.FromJson<LiquidPipeRoutes>(data.text).routes;
+            controller.Liquid.InitializeTransport(routes, bottom, height, receiverY);
             var colors = new[] { LiquidAColor, LiquidBColor, MixedColor };
             for (var i = 0; i < routes.Length; i++)
             {
                 var root = new GameObject(routes[i].name + " pipe animation");
                 root.transform.SetParent(space, false);
                 var pipe = root.AddComponent<LiquidPipeView>();
-                pipe.Initialize(routes[i], colors[i]);
+                pipe.Initialize(routes[i], colors[i], controller.Liquid.Streams[i]);
                 pipes.Add(pipe);
             }
             Refresh();
@@ -117,38 +120,32 @@ namespace ElectricalSim
             if (controller == null) return;
             AdvanceVisuals(Time.deltaTime);
         }
-        // Deterministic animation clock also allows scene tests to inspect front positions.
+        // Surface ripples use a presentation clock. Transport and mixing are advanced
+        // exclusively by SimulationController, including while rendering is disabled.
         public void AdvanceVisuals(float seconds)
         {
             if (controller.IsFileOperationActive) return;
             Refresh();
             flowTime += Mathf.Max(0, seconds);
             foreach (var material in surfaceMaterials) material.SetFloat("_FlowTime", flowTime);
-            var simulating = controller.Mode == SimulationMode.Simulate;
-            for (var i = 0; i < pipes.Count; i++)
-            {
-                var open = controller.SceneIoDevices["SOLENOID" + (i + 1)].IsActive;
-                float speed;
-                if (i < 2)
-                {
-                    var rpm = ((ElectricalDeviceRuntime)controller.Graph.Devices[SceneIoCatalog.Pumps[i].MotorId]).ActualSpeedRpm;
-                    speed = Mathf.Max(0, rpm) / 1450f * 0.8f;
-                }
-                else speed = controller.Liquid.DrainFlow > 1e-9 ? 0.5f : 0;
-                pipes[i].Advance(seconds, speed, open, simulating, false,
-                    i < 2 ? bottom + height * (float)controller.Liquid.Level : receiverY);
-            }
         }
         public void ResetVisuals()
         {
             flowTime = 0;
-            foreach (var pipe in pipes) pipe.ResetVisuals();
+            Refresh();
             foreach (var material in surfaceMaterials) material.SetFloat("_FlowTime", 0);
         }
         public void Refresh()
         {
             if (liquidRoot == null || controller.Liquid == null) return;
             var level = (float)controller.Liquid.Level;
+            var color = controller.Liquid.CurrentColor; color.a = 0.78f;
+            tankMaterial.SetColor("_Color", color);
+            for (var i = 0; i < pipes.Count; i++)
+            {
+                if (i == 2) pipes[i].SetColor(controller.Liquid.DischargeColor);
+                pipes[i].Refresh(i < 2 ? bottom + height * level : receiverY);
+            }
             liquidRoot.localScale = new Vector3(originalScale.x, originalScale.y * Mathf.Max(level, 0.00001f), originalScale.z);
             liquidRoot.localPosition = originalPosition;
             // Correct scaling about the imported pivot so the bottom remains fixed.

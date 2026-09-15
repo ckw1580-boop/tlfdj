@@ -381,7 +381,8 @@ namespace ElectricalSim
 
     public readonly struct WireSurfacePlane
     {
-        public WireSurfacePlane(Vector3 surfacePoint, Vector3 normal, float offset, Bounds? bounds = null)
+        public WireSurfacePlane(Vector3 surfacePoint, Vector3 normal, float offset, Bounds? bounds = null,
+            WireDuctRoutingProfile ducts = null)
         {
             Normal = normal.sqrMagnitude > 0.000001f ? normal.normalized : Vector3.forward;
             SurfacePoint = surfacePoint;
@@ -390,6 +391,7 @@ namespace ElectricalSim
             var up = Mathf.Abs(Vector3.Dot(Normal, Vector3.up)) > 0.98f ? Vector3.forward : Vector3.up;
             Rotation = Quaternion.LookRotation(Normal, up);
             SurfaceBounds = bounds;
+            Ducts = ducts;
         }
 
         public Vector3 SurfacePoint { get; }
@@ -398,18 +400,20 @@ namespace ElectricalSim
         public Vector3 Normal { get; }
         public Quaternion Rotation { get; }
         public Bounds? SurfaceBounds { get; }
+        public WireDuctRoutingProfile Ducts { get; }
 
         public Vector3 Project(Vector3 point)
         {
             var projected = point - Normal * Vector3.Dot(point - Origin, Normal);
-            if (!SurfaceBounds.HasValue) return projected;
+            if (!SurfaceBounds.HasValue) return Ducts != null ? Ducts.Project(projected) : projected;
             var bounds = SurfaceBounds.Value;
             var right = Rotation * Vector3.right;
             var up = Rotation * Vector3.up;
             var center = bounds.center - Normal * Vector3.Dot(bounds.center - Origin, Normal);
             var delta = projected - center;
-            return center + right * Mathf.Clamp(Vector3.Dot(delta, right), -Extent(bounds, right), Extent(bounds, right)) +
+            projected = center + right * Mathf.Clamp(Vector3.Dot(delta, right), -Extent(bounds, right), Extent(bounds, right)) +
                    up * Mathf.Clamp(Vector3.Dot(delta, up), -Extent(bounds, up), Extent(bounds, up));
+            return Ducts != null ? Ducts.Project(projected) : projected;
         }
 
         private static float Extent(Bounds bounds, Vector3 axis) =>
@@ -422,6 +426,8 @@ namespace ElectricalSim
 
         public bool Raycast(Ray ray, out Vector3 point)
         {
+            if (Ducts != null && Mathf.Abs(Vector3.Dot(ray.direction.normalized, Normal)) > 0.02f)
+                return Ducts.Raycast(ray, this, out point);
             var plane = new Plane(Normal, Origin);
             if (Mathf.Abs(Vector3.Dot(ray.direction.normalized, Normal)) > 0.02f &&
                 plane.Raycast(ray, out var distance) && distance >= 0f)

@@ -81,7 +81,7 @@ namespace ElectricalSim.Tests
         }
 
         [Test]
-        public void ResetReferenceUndoAndOpenTrackSavedStateAndClearOldHistory()
+        public void ResetEditUndoAndOpenTrackSavedStateAndClearOldHistory()
         {
             AddWire();
             Assert.That(controller.SaveCc3dToPath(PathFor("接线")), Is.EqualTo(WiringFileResult.Success));
@@ -89,7 +89,7 @@ namespace ElectricalSim.Tests
             Assert.That(controller.HasUnsavedWiring, Is.True);
             controller.UndoWiring();
             Assert.That(controller.HasUnsavedWiring, Is.False);
-            controller.LoadReferenceWiring();
+            controller.Graph.AddWire("QF.T2", "KM1.L2", Color.blue);
             Assert.That(controller.HasUnsavedWiring, Is.True);
             controller.SetMode(SimulationMode.Wiring);
             var port = Object.FindObjectsOfType<ElectricalPortView>(true).First(p => p.QualifiedPort == "FR.T1");

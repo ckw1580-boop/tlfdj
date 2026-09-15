@@ -7,16 +7,15 @@ namespace ElectricalSim
 {
     public sealed class OfflineUiTicker : MonoBehaviour
     {
-        private GameObject navigation;
         private GameObject toolbar;
-        private OfflineExamController exam;
         private float nextUpdate;
 
-        public void Initialize(GameObject navigationRoot, GameObject toolbarRoot, OfflineExamController examController)
+        public void Initialize(GameObject navigationRoot, GameObject toolbarRoot)
         {
-            navigation = navigationRoot;
             toolbar = toolbarRoot;
-            exam = examController;
+            Hide(navigationRoot, "countdownText");
+            Hide(navigationRoot, "countdownIcon");
+            Hide(toolbar, "txt_time_right");
             Refresh();
         }
 
@@ -30,10 +29,13 @@ namespace ElectricalSim
         private void Refresh()
         {
             SetText(toolbar, "txt_time_left", DateTime.Now.ToString("yyyy/M/d    HH:mm:ss"));
-            var remaining = exam?.ActiveSession?.RemainingSeconds ?? 0d;
-            var time = TimeSpan.FromSeconds(Math.Max(0d, remaining)).ToString(@"hh\:mm\:ss");
-            SetText(toolbar, "txt_time_right", time);
-            SetText(navigation, "countdownText", time);
+        }
+
+        private static void Hide(GameObject root, string name)
+        {
+            if (root == null) return;
+            foreach (var item in root.GetComponentsInChildren<Transform>(true).Where(item => item.name == name))
+                item.gameObject.SetActive(false);
         }
 
         private static void SetText(GameObject root, string name, string value)

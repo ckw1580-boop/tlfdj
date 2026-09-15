@@ -47,16 +47,14 @@ namespace ElectricalSim
         public string DescribePowerTerminalBlock()
         {
             if (SelectedPowerTerminalBlock == null) return string.Empty;
-            return "电源端子区 · 属性\n额定电压：DC 24V\n状态：" +
-                (PanelPower != null && PanelPower.Enabled ? "供电中" : "未供电") +
-                "\n24V+：1、2、3、4（正极）\n24V-：1、2、3、4（负极）\n同极端子内部连通\n连接点：端子排下方";
+            return SelectedPowerTerminalBlock.Describe(PanelPower != null && PanelPower.Enabled);
         }
 
         public void PressPanelDevice(PanelDeviceView view)
         {
-            if (view == null || !panelControls.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate) return;
+            if (view == null || !panelControls.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && !CanOperateFaultControls) return;
             SelectPanelDevice(view);
-            if (Mode != SimulationMode.Simulate || view.Definition.Control == PanelControlKind.Indicator) return;
+            if (Mode != SimulationMode.Simulate && !CanOperateFaultControls || view.Definition.Control == PanelControlKind.Indicator) return;
             ReleasePanelButton();
             if (view.Definition.Momentary)
             {
@@ -72,9 +70,9 @@ namespace ElectricalSim
             heldPanelButton = null;
         }
 
-        private void OnApplicationFocus(bool focused) { if (!focused) ReleasePanelButton(); }
-        private void OnApplicationPause(bool paused) { if (paused) ReleasePanelButton(); }
-        private void OnDisable() { ReleasePanelButton(); StopPlcConnections(); }
+        private void OnApplicationFocus(bool focused) { if (!focused) { ReleasePanelButton(); Multimeter?.SuspendPointer(); } }
+        private void OnApplicationPause(bool paused) { if (paused) { ReleasePanelButton(); Multimeter?.SuspendPointer(); } }
+        private void OnDisable() { ReleasePanelButton(); StopPlcConnections(); Multimeter?.Deselect(); }
 
         public string DescribePanelDevice(PanelDeviceView view)
         {

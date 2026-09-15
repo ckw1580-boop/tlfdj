@@ -11,6 +11,36 @@ namespace ElectricalSim
 
         public InstrumentKind Kind { get; }
 
+        // Red is the positive input; black is COM. This API leaves legacy instruments unchanged.
+        public MultimeterReading Measure(MultimeterMode mode, string redPort, string blackPort, SimulationSnapshot snapshot)
+        {
+            if (mode == MultimeterMode.Off) return new MultimeterReading(mode, MultimeterReadingState.Off);
+            if (snapshot == null || !snapshot.ContainsPort(redPort) || !snapshot.ContainsPort(blackPort))
+                return new MultimeterReading(mode, MultimeterReadingState.MissingProbe);
+            var red = snapshot.GetPotential(redPort);
+            var black = snapshot.GetPotential(blackPort);
+            if (red == ElectricalPotential.Conflict || black == ElectricalPotential.Conflict)
+                return new MultimeterReading(mode, MultimeterReadingState.Conflict);
+            if (mode == MultimeterMode.Continuity)
+            {
+                if (snapshot.HasExternalSupply(redPort) || snapshot.HasExternalSupply(blackPort))
+                    return new MultimeterReading(mode, MultimeterReadingState.Energized);
+                return snapshot.SameNet(redPort, blackPort)
+                    ? new MultimeterReading(mode, MultimeterReadingState.Valid, 1)
+                    : new MultimeterReading(mode, MultimeterReadingState.OpenCircuit, 0);
+            }
+            if (snapshot.IsVoltageUnsupported(redPort) || snapshot.IsVoltageUnsupported(blackPort))
+                return new MultimeterReading(mode, MultimeterReadingState.Unsupported);
+            if ((red == ElectricalPotential.Floating) != (black == ElectricalPotential.Floating) ||
+                red != ElectricalPotential.Floating && IsDc(red) != IsDc(black))
+                return new MultimeterReading(mode, MultimeterReadingState.UndefinedReference);
+            return new MultimeterReading(mode, MultimeterReadingState.Valid,
+                mode == MultimeterMode.AcVoltage ? snapshot.GetAcVoltage(redPort, blackPort) : snapshot.GetDcVoltage(redPort, blackPort));
+        }
+
+        private static bool IsDc(ElectricalPotential potential)
+            => potential == ElectricalPotential.DcPositive24 || potential == ElectricalPotential.DcNegative;
+
         public double Sample(MeasurementKind measurement, string portA, string portB, SimulationSnapshot snapshot)
         {
             if (snapshot == null) return double.NaN;

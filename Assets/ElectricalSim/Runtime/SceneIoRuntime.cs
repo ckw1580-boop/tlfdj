@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace ElectricalSim
 {
@@ -128,17 +129,41 @@ namespace ElectricalSim
         }
     }
 
+    public enum LiquidContents { Empty, A, B, Mixed }
+
     public sealed class LiquidSimulationRuntime
     {
+        private const double EmptyTolerance = 1e-12;
         private LiquidConfiguration configuration = new LiquidConfiguration();
+        private float tankBottom, tankHeight, receiverY;
+        private Color mixStartColor;
         public LiquidConfiguration Configuration => configuration.Copy();
-        public double Level { get; private set; }
+        public LiquidStreamRuntime[] Streams { get; private set; }
+        public double VolumeA { get; private set; }
+        public double VolumeB { get; private set; }
+        public double Level => VolumeA + VolumeB;
+        public double MixProgress { get; private set; }
+        public LiquidContents Contents => Level <= EmptyTolerance ? LiquidContents.Empty :
+            VolumeA <= EmptyTolerance ? LiquidContents.B : VolumeB <= EmptyTolerance ? LiquidContents.A : LiquidContents.Mixed;
+        public Color CurrentColor => Contents == LiquidContents.A ? LiquidTankView.LiquidAColor :
+            Contents == LiquidContents.B ? LiquidTankView.LiquidBColor : Contents == LiquidContents.Mixed ?
+            Color.Lerp(mixStartColor, LiquidTankView.MixedColor, (float)MixProgress) : LiquidTankView.MixedColor;
+        public Color DischargeColor { get; private set; } = LiquidTankView.MixedColor;
         public double OverflowVolume { get; private set; }
         public bool IsOverflowing { get; private set; }
         public double Pump1Flow { get; private set; }
         public double Pump2Flow { get; private set; }
         public double DrainFlow { get; private set; }
+        public bool Pump1Transporting { get; private set; }
+        public bool Pump2Transporting { get; private set; }
         public double NetFlow => Pump1Flow + Pump2Flow - DrainFlow;
+
+        public void InitializeTransport(LiquidPipeRoute[] routes, float bottom, float height, float receiverSurfaceY)
+        {
+            if (routes == null || routes.Length != 3 || height <= 0) throw new ArgumentException("液体输送路径或罐体尺寸无效。");
+            Streams = routes.Select(route => new LiquidStreamRuntime(route)).ToArray();
+            tankBottom = bottom; tankHeight = height; receiverY = receiverSurfaceY;
+        }
         public void Configure(LiquidConfiguration value, bool reset)
         {
             if (value == null) throw new ArgumentException("液位配置缺失。");
@@ -148,24 +173,80 @@ namespace ElectricalSim
         }
         public void Reset()
         {
-            Level = configuration.InitialLevelPercent / 100d;
+            VolumeA = VolumeB = configuration.InitialLevelPercent / 200d;
+            MixProgress = Level > EmptyTolerance ? 1 : 0;
+            mixStartColor = DischargeColor = LiquidTankView.MixedColor;
             OverflowVolume = 0;
+            if (Streams != null) foreach (var stream in Streams) stream.Reset();
             Pause();
         }
-        public void Pause() { Pump1Flow = Pump2Flow = DrainFlow = 0; IsOverflowing = false; }
+        public void Pause()
+        {
+            Pump1Flow = Pump2Flow = DrainFlow = 0; IsOverflowing = false;
+            Pump1Transporting = Pump2Transporting = false;
+        }
+        public void AdvanceIdle(double seconds)
+        {
+            Pause();
+            if (Streams == null) return;
+            for (var i = 0; i < Streams.Length; i++)
+                Streams[i].Advance(seconds, 0, false, false, i < 2 ? tankBottom + tankHeight * (float)Level : receiverY);
+        }
         public void Advance(double seconds, float rpm1, float rpm2, bool valve1, bool valve2, bool valve3)
         {
             if (seconds <= 0) return;
-            Pump1Flow = valve1 ? Math.Max(0, rpm1) / (1450d * configuration.Pump1FillSeconds) : 0;
-            Pump2Flow = valve2 ? Math.Max(0, rpm2) / (1450d * configuration.Pump2FillSeconds) : 0;
-            var incoming = Pump1Flow + Pump2Flow;
-            // Limit actual outflow by available liquid, including concurrent inflow.
-            DrainFlow = valve3 ? Math.Min(1d / configuration.DrainSeconds, Level / seconds + incoming) : 0;
-            var next = Level + NetFlow * seconds;
-            var spill = Math.Max(0, next - 1);
-            IsOverflowing = spill > 1e-10;
+            var supplyA = valve1 ? Math.Max(0, rpm1) / (1450d * configuration.Pump1FillSeconds) : 0;
+            var supplyB = valve2 ? Math.Max(0, rpm2) / (1450d * configuration.Pump2FillSeconds) : 0;
+            // Without scene geometry this remains the direct mass-balance API used
+            // by unit tests. The training scene always binds all three routes.
+            var arrivedA = seconds; var arrivedB = seconds;
+            if (Streams != null)
+            {
+                var surface = tankBottom + tankHeight * (float)Level;
+                arrivedA = Streams[0].Advance(seconds, Mathf.Max(0, rpm1) / 1450f * 0.8f, valve1, true, surface);
+                arrivedB = Streams[1].Advance(seconds, Mathf.Max(0, rpm2) / 1450f * 0.8f, valve2, true, surface);
+            }
+            Pump1Flow = supplyA * arrivedA / seconds;
+            Pump2Flow = supplyB * arrivedB / seconds;
+            Pump1Transporting = supplyA > 0 && arrivedA == 0;
+            Pump2Transporting = supplyB > 0 && arrivedB == 0;
+            DrainFlow = 0; IsOverflowing = false;
+            var startA = seconds - arrivedA; var startB = seconds - arrivedB;
+            // Split at the two contact times so first arrival, concurrent drainage,
+            // and the one-second colour transition use the same physical interval.
+            var first = Math.Min(startA, startB); var second = Math.Max(startA, startB);
+            var drained = ApplyVolumes(first, 0, 0, valve3);
+            drained += ApplyVolumes(second - first, startA <= first ? supplyA : 0, startB <= first ? supplyB : 0, valve3);
+            drained += ApplyVolumes(seconds - second, supplyA, supplyB, valve3);
+            DrainFlow = drained / seconds;
+            if (Streams != null) Streams[2].Advance(seconds, DrainFlow > 1e-9 ? 0.5f : 0, valve3, true, receiverY);
+        }
+        private double ApplyVolumes(double seconds, double rateA, double rateB, bool draining)
+        {
+            if (seconds <= 0) return 0;
+            var before = Contents;
+            var beforeColor = CurrentColor;
+            VolumeA += rateA * seconds; VolumeB += rateB * seconds;
+            if (Contents == LiquidContents.Mixed)
+            {
+                if (before != LiquidContents.Mixed)
+                {
+                    mixStartColor = before == LiquidContents.Empty ?
+                        Color.Lerp(LiquidTankView.LiquidAColor, LiquidTankView.LiquidBColor, (float)(VolumeB / Level)) : beforeColor;
+                    MixProgress = 0;
+                }
+                MixProgress = Math.Min(1, MixProgress + seconds);
+            }
+            var total = Level;
+            var removed = draining ? Math.Min(seconds / configuration.DrainSeconds, total) : 0;
+            if (removed > 0) DischargeColor = CurrentColor;
+            var spill = Math.Max(0, total - removed - 1);
+            IsOverflowing |= spill > 1e-10;
             OverflowVolume += spill;
-            Level = Math.Max(0, Math.Min(1, next));
+            var retained = total <= EmptyTolerance ? 0 : Math.Max(0, total - removed - spill) / total;
+            VolumeA *= retained; VolumeB *= retained;
+            if (Level <= EmptyTolerance) { VolumeA = VolumeB = 0; MixProgress = 0; mixStartColor = LiquidTankView.MixedColor; }
+            return removed;
         }
     }
 }

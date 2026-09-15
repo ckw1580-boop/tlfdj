@@ -162,6 +162,16 @@ namespace ElectricalSim
             for (var i = 0; i < count; i++) anchors.Add(surface.Project(bends[i]));
             anchors.Add(result.EndLead[result.EndLead.Length - 1]);
             result.Trunk = ElectricalWireView.BuildSmoothedPath(anchors);
+            var trunkIndices = new int[Mathf.Max(0, result.Trunk.Length - 1)];
+            for (var i = 0; i < trunkIndices.Length; i++)
+                trunkIndices[i] = count == 0 ? 0 : Mathf.Min(i / 10, count);
+            if (surface.Ducts != null)
+                for (var i = 0; i < trunkIndices.Length; i++)
+                {
+                    var span = trunkIndices[i];
+                    result.Trunk[i] = surface.Ducts.ConstrainSpan(result.Trunk[i], anchors[span], anchors[span + 1]);
+                }
+            surface.Ducts?.RefinePath(ref result.Trunk, ref trunkIndices);
             for (var i = 0; i < result.Trunk.Length; i++) result.Trunk[i] = surface.Project(result.Trunk[i]);
             var points = new List<Vector3>(result.StartLead);
             var indices = new List<int>();
@@ -169,7 +179,7 @@ namespace ElectricalSim
             for (var i = 1; i < result.Trunk.Length; i++)
             {
                 points.Add(result.Trunk[i]);
-                indices.Add(count == 0 ? 0 : Mathf.Min((i - 1) / 10, count));
+                indices.Add(trunkIndices[i - 1]);
             }
             for (var i = result.EndLead.Length - 2; i >= 0; i--)
             {

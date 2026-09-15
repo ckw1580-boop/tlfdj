@@ -125,7 +125,8 @@ namespace ElectricalSim
             if (Mode != SimulationMode.Simulate || IsFileOperationActive)
             {
                 liquidStepAccumulator = 0;
-                Liquid.Pause();
+                if (IsFileOperationActive) Liquid.Pause();
+                else { Liquid.AdvanceIdle(Math.Max(0, elapsedSeconds)); liquidView?.Refresh(); }
                 return graph.Solve(IsFileOperationActive ? 0 : elapsedSeconds);
             }
             liquidStepAccumulator += Math.Max(0, elapsedSeconds);
@@ -139,6 +140,7 @@ namespace ElectricalSim
                 snapshot = graph.Solve(0);
                 liquidStepAccumulator -= 0.02;
             }
+            liquidView?.Refresh();
             return snapshot ?? graph.Solve(0);
         }
 
@@ -146,7 +148,7 @@ namespace ElectricalSim
         {
             if (Liquid == null) return "";
             if (id == "TANK")
-                return $"混合罐 · 液位属性\n液位：{Liquid.Level * 100:F1}%\n泵1进液：{Liquid.Pump1Flow * 100:F2}%/秒\n泵2进液：{Liquid.Pump2Flow * 100:F2}%/秒\n重力排液：{Liquid.DrainFlow * 100:F2}%/秒\n净流量：{Liquid.NetFlow * 100:+0.00;-0.00;0.00}%/秒\n累计溢流：{Liquid.OverflowVolume * 100:F2}%罐容\n" +
+                return $"混合罐 · 液位属性\n液位：{Liquid.Level * 100:F1}%\n泵1进液：{Liquid.Pump1Flow * 100:F2}%/秒{(Liquid.Pump1Transporting ? " · 输送中" : "")}\n泵2进液：{Liquid.Pump2Flow * 100:F2}%/秒{(Liquid.Pump2Transporting ? " · 输送中" : "")}\n重力排液：{Liquid.DrainFlow * 100:F2}%/秒\n净流量：{Liquid.NetFlow * 100:+0.00;-0.00;0.00}%/秒\n累计溢流：{Liquid.OverflowVolume * 100:F2}%罐容\n" +
                     (Liquid.IsOverflowing ? "报警：满罐溢流，进液阀仍由接线控制" : Mode == SimulationMode.Simulate ? "液位仿真运行中" : "液位已暂停") +
                     "\n标定转速：1450转/分钟\n修改初始值后，点击重置液位生效。";
             if (id == SceneIoCatalog.MixerName)
@@ -161,7 +163,8 @@ namespace ElectricalSim
                 var rpm = devices[pump.MotorId].ActualSpeedRpm;
                 var valve = sceneIoDevices[pump.ValveId];
                 var flow = pump.Index == 0 ? Liquid.Pump1Flow : Liquid.Pump2Flow;
-                return $"{pump.Name} · 电机与管路属性\n柜体电机：{MotorBindingDefinition.Find(pump.MotorId).Label}（{pump.MotorId}）\n电机安装位：{MotorBindingDefinition.Find(pump.MotorId).Nut}\n场景泵安装位：{pump.Mount}\n实际转速：{rpm:F1} 转/分钟\n方向：{(rpm > 0 ? "正转" : rpm < 0 ? "反转" : "停止")}\n对应阀门：{valve.Definition.Name}\n阀门：{(valve.IsActive ? "打开" : "关闭")}\n实际进液：{flow * 100:F2}%/秒\n正向转速决定流速，阀门只控制通断。";
+                var transporting = pump.Index == 0 ? Liquid.Pump1Transporting : Liquid.Pump2Transporting;
+                return $"{pump.Name} · 电机与管路属性\n柜体电机：{MotorBindingDefinition.Find(pump.MotorId).Label}（{pump.MotorId}）\n电机安装位：{MotorBindingDefinition.Find(pump.MotorId).Nut}\n场景泵安装位：{pump.Mount}\n实际转速：{rpm:F1} 转/分钟\n方向：{(rpm > 0 ? "正转" : rpm < 0 ? "反转" : "停止")}\n对应阀门：{valve.Definition.Name}\n阀门：{(valve.IsActive ? "打开" : "关闭")}\n实际进液：{flow * 100:F2}%/秒{(transporting ? " · 输送中，尚未到达罐内" : "")}\n正向转速决定流速，阀门只控制通断。";
             }
             if (!sceneIoDevices.TryGetValue(id, out var runtime)) return "";
             var d = runtime.Definition;

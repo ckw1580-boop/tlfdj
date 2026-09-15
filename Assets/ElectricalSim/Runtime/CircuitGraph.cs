@@ -37,6 +37,8 @@ namespace ElectricalSim
         private readonly Dictionary<string, bool> activeDevices;
         private readonly Dictionary<string, MotorDirection> motorDirections;
         private readonly Dictionary<string, float> motorSpeeds;
+        private readonly HashSet<string> unsupportedVoltageRoots = new HashSet<string>();
+        private readonly HashSet<string> externalSupplyRoots = new HashSet<string>();
         internal readonly Dictionary<string, MotorDriveSample> MotorDrives = new Dictionary<string, MotorDriveSample>();
 
         public SimulationSnapshot(
@@ -57,6 +59,17 @@ namespace ElectricalSim
 
         public IReadOnlyList<string> Errors { get; }
         public bool HasShortCircuit => Errors.Count > 0;
+
+        public bool ContainsPort(string port) => port != null && roots.ContainsKey(port);
+        public bool IsVoltageUnsupported(string port) => ContainsPort(port) && unsupportedVoltageRoots.Contains(roots[port]);
+        public bool HasExternalSupply(string port) => ContainsPort(port) &&
+            (GetPotential(port) != ElectricalPotential.Floating || externalSupplyRoots.Contains(roots[port]));
+        internal void MarkUnmodeledVoltageOutput(string port, bool energized)
+        {
+            if (!ContainsPort(port)) return;
+            unsupportedVoltageRoots.Add(roots[port]);
+            if (energized) externalSupplyRoots.Add(roots[port]);
+        }
 
         public bool SameNet(string a, string b)
         {
@@ -234,6 +247,8 @@ namespace ElectricalSim
             foreach (var drive in devices.Values.OfType<InverterDriveRuntime>())
             {
                 drive.Validate(snapshot, errors);
+                foreach (var output in new[] { "U2", "V2", "W2" })
+                    snapshot.MarkUnmodeledVoltageOutput(Port(drive.DeviceId, output), drive.IsActive);
                 foreach (var motor in devices.Values.Where(d => d.Kind == ElectricalDeviceKind.Motor))
                 {
                     var sample = drive.SampleMotor(motor.DeviceId, snapshot);

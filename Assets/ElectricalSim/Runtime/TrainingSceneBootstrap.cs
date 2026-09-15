@@ -26,12 +26,11 @@ namespace ElectricalSim
         private Transform[] originalEnvironmentTransforms;
         private readonly Dictionary<string, Transform> faultButtonTerminalAnchors =
             new Dictionary<string, Transform>(StringComparer.OrdinalIgnoreCase);
-        private OfflineExamController examController;
         private LocalCaptureRecorder captureRecorder;
         private GameObject instrumentTools;
         private GameObject motorFaultBlocks;
         private SlidePanelState statusPanelSlide;
-        private SlidePanelState rightPanelSlide;
+        private SlidePanelState taskPanelSlide;
 
         private const float PanelSlideDuration = 0.2f;
 
@@ -57,15 +56,6 @@ namespace ElectricalSim
                 return;
             }
             Build();
-        }
-
-        private void Update()
-        {
-            if (controller == null || examController == null) return;
-            if (Input.GetKeyDown(KeyCode.F5)) BeginExam("A");
-            else if (Input.GetKeyDown(KeyCode.F6)) BeginExam("B");
-            else if (Input.GetKeyDown(KeyCode.F7)) BeginExam("C");
-            else if (Input.GetKeyDown(KeyCode.F8)) BeginExam("D");
         }
 
         private void Build()
@@ -95,13 +85,13 @@ namespace ElectricalSim
             CreateDevices();
             CreateOriginalTerminalBoardPorts();
             CreateOriginalCabinetTerminalBoardPorts();
+            CreateFaultPowerTerminalBlock(cameraController);
             CreateCabinetBreakerConnectionPorts();
             Debug.Log("[OfflineBootstrap] Devices ready.");
             var ui = CreateHud();
             Debug.Log("[OfflineBootstrap] HUD ready.");
 
             controller = gameObject.AddComponent<SimulationController>();
-            examController = gameObject.AddComponent<OfflineExamController>();
             captureRecorder = gameObject.AddComponent<LocalCaptureRecorder>();
             var frontWireSurface = ResolveWireSurface(cameraController.transform);
             var faultWireSurface = ResolveFaultWireSurface(frontWireSurface);
@@ -116,7 +106,15 @@ namespace ElectricalSim
                 faultWireSurface = new WireSurfacePlane(faultWireSurface.SurfacePoint, faultWireSurface.Normal,
                     faultWireSurface.SurfaceOffset, cabinetBounds.bounds);
             }
-            controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Task, ui.Description, ui.Schematic, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, originalVisuals, ui.PortHover);
+            var rearDuctLids = originalEnvironment != null
+                ? originalEnvironment.Find("Bench/ElectricBench/mesh/xiancaogai_1")
+                : null;
+            if (rearDuctLids != null)
+                faultWireSurface = new WireSurfacePlane(faultWireSurface.SurfacePoint, faultWireSurface.Normal,
+                    faultWireSurface.SurfaceOffset, faultWireSurface.SurfaceBounds,
+                    new WireDuctRoutingProfile(rearDuctLids.GetComponentsInChildren<MeshFilter>(true), faultWireSurface));
+            controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, ui.PortHover);
+            controller.RegisterSchematicGallery(ui.Gallery);
             controller.RegisterPanel(panelViews, panelPower);
             controller.RegisterPlcs(originalEnvironment, uiFont, ui.Status.canvas);
             controller.RegisterIntermediateRelays(originalEnvironment, uiFont, ui.Status.canvas);
@@ -138,6 +136,7 @@ namespace ElectricalSim
             BindUi(ui);
             BindOriginalUi(ui);
             CreateTachometer();
+            CreateMultimeter(ui);
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
             Debug.Log("[OfflineBootstrap] Build complete.");
         }
@@ -2103,42 +2102,29 @@ namespace ElectricalSim
             var mode = Label("Mode", top.transform, "当前模式：视角", 22, TextAnchor.MiddleCenter, cyan);
             SetRect(mode.rectTransform, new Vector2(0.34f, 0f), new Vector2(0.48f, 1f), Vector2.zero, Vector2.zero);
 
-            var right = Panel("RightPanel", canvas.transform, new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-305f, 18f), new Vector2(-8f, 498f), panelBlue);
-            var task = Label("TaskTitle", right.transform, "任务", 22, TextAnchor.UpperLeft, Color.white);
-            SetRect(task.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -88f), new Vector2(-18f, -18f));
-            var description = Label("TaskDescription", right.transform, "", 18, TextAnchor.UpperLeft, new Color(0.76f, 0.9f, 0.96f));
-            SetRect(description.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -200f), new Vector2(-18f, -92f));
-
-            var schematicFrame = Panel("SchematicFrame", right.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -470f), new Vector2(-18f, -174f), new Color(0.92f, 0.94f, 0.94f, 0.98f));
-            var schematicObject = new GameObject("TaskSchematic", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(AspectRatioFitter));
-            schematicObject.transform.SetParent(schematicFrame.transform, false);
-            var schematic = schematicObject.GetComponent<Image>();
-            schematic.color = Color.white;
-            schematic.preserveAspect = true;
-            schematic.raycastTarget = false;
-            var fitter = schematicObject.GetComponent<AspectRatioFitter>();
-            fitter.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
-            SetRect(schematic.rectTransform, Vector2.zero, Vector2.one, new Vector2(8f, 8f), new Vector2(-8f, -8f));
-
-            var instrument = Label("InstrumentReadout", right.transform, "万用表：请选择两个端子", 17, TextAnchor.UpperLeft, new Color(1f, 0.9f, 0.28f));
+            // Leave 20 canvas units between the task panel and each existing left panel:
+            // the device schematic ends 380 units below the top; status ends 180 above the bottom.
+            var taskPanel = Panel("TaskPanel", canvas.transform, Vector2.zero, new Vector2(0f, 1f), new Vector2(8f, 200f), new Vector2(305f, -400f), panelBlue);
+            var gallery = taskPanel.gameObject.AddComponent<SchematicGalleryPresenter>();
+            gallery.Initialize(canvas, uiFont, SchematicCatalog.Load());
+            var instrument = Label("InstrumentReadout", taskPanel.transform, "万用表：请选择两个端子", 17, TextAnchor.UpperLeft, new Color(1f, 0.9f, 0.28f));
             SetRect(instrument.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 0.42f), new Vector2(18f, 156f), new Vector2(-18f, -8f));
 
             var statusPanel = Panel("StatusPanel", canvas.transform, new Vector2(0f, 0f), new Vector2(0f, 0f), new Vector2(8f, 18f), new Vector2(305f, 180f), new Color(0.12f, 0.28f, 0.29f, 0.94f));
             var status = Label("Status", statusPanel.transform, "系统就绪", 19, TextAnchor.MiddleLeft, new Color(1f, 0.88f, 0.2f));
             SetRect(status.rectTransform, Vector2.zero, Vector2.one, new Vector2(20f, 5f), new Vector2(-20f, -5f));
 
-            rightPanelSlide = ConfigureSlidePanel(right, "RightPanelSlideHandle", new Vector2(305f, 0f), false, "▶", "◀");
+            taskPanelSlide = ConfigureSlidePanel(taskPanel, "TaskPanelSlideHandle", new Vector2(-305f, 0f), true, "◀", "▶");
             statusPanelSlide = ConfigureSlidePanel(statusPanel, "StatusPanelSlideHandle", new Vector2(-305f, 0f), true, "◀", "▶");
 
             var hoverObject = new GameObject("PortHoverPresenter");
             var portHover = hoverObject.AddComponent<PortHoverPresenter>();
             portHover.Initialize(canvas, uiFont);
 
-            var references = new HudReferences { Canvas = canvas, Top = top, Right = right, Mode = mode, Task = task, Description = description, Schematic = schematic, Status = status, Instrument = instrument, PortHover = portHover };
+            var references = new HudReferences { Canvas = canvas, Top = top, TaskPanel = taskPanel, Mode = mode, Gallery = gallery, Status = status, Instrument = instrument, PortHover = portHover };
             if (originalVisuals != null && originalVisuals.ResolveUi("TopNavigation") != null)
             {
                 top.gameObject.SetActive(false);
-                description.gameObject.SetActive(false);
                 instrument.gameObject.SetActive(false);
             }
             if (showMissingAssetNotice && originalVisuals == null)
@@ -2181,15 +2167,6 @@ namespace ElectricalSim
             var reset = Button("Reset", ui.Top.transform, "重置", controller.ResetTraining);
             SetRect(reset.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1700f, 14f), new Vector2(1792f, 74f));
 
-            var previous = Button("PreviousTask", ui.Right.transform, "◀ 上一项", controller.PreviousTask);
-            SetRect(previous.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(18f, -568f), new Vector2(175f, -518f));
-            var next = Button("NextTask", ui.Right.transform, "下一项 ▶", controller.NextTask);
-            SetRect(next.GetComponent<RectTransform>(), new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-175f, -568f), new Vector2(-18f, -518f));
-            var reference = Button("Reference", ui.Right.transform, "加载标准接线", controller.LoadReferenceWiring);
-            SetRect(reference.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -634f), new Vector2(-18f, -580f));
-            var submit = Button("Submit", ui.Right.transform, "提交：拓扑 + 动作验收", controller.SubmitTask, new Color(0.04f, 0.58f, 0.78f));
-            SetRect(submit.GetComponent<RectTransform>(), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(18f, -700f), new Vector2(-18f, -646f));
-
             var instruments = new[] { InstrumentKind.Multimeter, InstrumentKind.VoltageProbe, InstrumentKind.Oscilloscope, InstrumentKind.Tachometer };
             for (var i = 0; i < instruments.Length; i++)
             {
@@ -2214,15 +2191,13 @@ namespace ElectricalSim
                 BindNamedButton(navigation, "homeBtn", ToggleTaskPanel);
                 BindNamedButton(navigation, "scheduleBtn", ToggleTaskPanel);
                 BindNamedButton(navigation, "saveBtn", controller.SaveCc3d);
-                BindNamedButton(navigation, "submitBtn", controller.SubmitTask);
                 BindNamedButton(navigation, "resetBtn", controller.ResetTraining);
                 SetNamedButtonActive(navigation, "saveBtn", true);
-                SetNamedButtonActive(navigation, "submitBtn", true);
+                SetNamedButtonActive(navigation, "submitBtn", false);
                 SetNamedButtonActive(navigation, "downloadBtn", false);
                 SetNamedButtonActive(navigation, "mineBtn", false);
-                SetNamedButtonText(navigation, "scheduleBtn", "任务查询");
+                SetNamedButtonText(navigation, "scheduleBtn", "原理图");
                 SetNamedButtonText(navigation, "saveBtn", "保存接线");
-                SetNamedButtonText(navigation, "submitBtn", "提交");
                 SetNamedButtonText(navigation, "resetBtn", "重置");
                 foreach (var id in new[] { "EditorBtn_A", "EditorBtn_B", "EditorBtn_C", "EditorBtn_D" })
                 {
@@ -2288,9 +2263,9 @@ namespace ElectricalSim
             };
 
             var ticker = ui.Canvas.gameObject.AddComponent<OfflineUiTicker>();
-            ticker.Initialize(navigation, toolbar, examController);
+            ticker.Initialize(navigation, toolbar);
 
-            void ToggleTaskPanel() => ToggleSlidePanel(rightPanelSlide);
+            void ToggleTaskPanel() => ToggleSlidePanel(taskPanelSlide);
         }
 
         private SlidePanelState ConfigureSlidePanel(
@@ -2440,18 +2415,6 @@ namespace ElectricalSim
                 action();
                 root.gameObject.SetActive(false);
             });
-        }
-
-        private void BeginExam(string package)
-        {
-            if (!examController.Begin(package))
-            {
-                controller.ShowStatus("未找到本地考试包 " + package, true);
-                return;
-            }
-            examController.LoadFaultWiring(controller.Graph);
-            controller.SetMode(SimulationMode.Fault);
-            controller.ShowStatus($"已进入本地 {package} 套考试，时长 {examController.ActivePackage.Duration.TotalHours:0.#} 小时。", false);
         }
 
         private GameObject InstantiateUi(string id, Transform parent)
@@ -2619,11 +2582,9 @@ namespace ElectricalSim
         {
             public Canvas Canvas;
             public RectTransform Top;
-            public RectTransform Right;
+            public RectTransform TaskPanel;
             public Text Mode;
-            public Text Task;
-            public Text Description;
-            public Image Schematic;
+            public SchematicGalleryPresenter Gallery;
             public Text Status;
             public Text Instrument;
             public PortHoverPresenter PortHover;

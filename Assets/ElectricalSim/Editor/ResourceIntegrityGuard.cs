@@ -46,6 +46,8 @@ namespace ElectricalSim.Editor
             var registry = AssetDatabase.LoadAssetAtPath<OriginalVisualRegistry>(ProjectResourceFiles.RegistryPath);
             if (registry == null) problems.Add("Unity cannot load " + ProjectResourceFiles.RegistryPath);
             else problems.AddRange(registry.FindMissingVisuals());
+            try { SchematicCatalog.Load(); }
+            catch (Exception exception) { problems.Add(exception.Message); }
             return problems;
         }
 

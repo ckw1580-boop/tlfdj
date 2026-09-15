@@ -17,8 +17,6 @@ namespace ElectricalSim
         private readonly Dictionary<string, string> deviceNames = new Dictionary<string, string>();
         private readonly List<ElectricalWireView> wireViews = new List<ElectricalWireView>();
         private readonly List<CabinetBreakerInteractable> cabinetBreakers = new List<CabinetBreakerInteractable>();
-        private IReadOnlyList<CircuitTaskSpec> tasks;
-        private int taskIndex;
         private ElectricalPortView selectedPort;
         private readonly List<Vector3> pendingWirePoints = new List<Vector3>();
         private ElectricalWireDraftView wireDraftView;
@@ -40,6 +38,14 @@ namespace ElectricalSim
         private Cc3dDocument loadedDocument;
         private SimulationSnapshot lastSnapshot;
         private InstrumentKind instrumentKind = InstrumentKind.Multimeter;
+        public MultimeterController Multimeter { get; private set; }
+        public void RegisterMultimeter(MultimeterController meter)
+        {
+            Multimeter = meter;
+            Multimeter?.SetFaultMode(Mode == SimulationMode.Fault);
+        }
+        public bool CanOperateFaultControls => Mode == SimulationMode.Fault && !IsInteractionBlocked &&
+            instrumentKind != InstrumentKind.Tachometer && (Multimeter == null || !Multimeter.IsSelected || !Multimeter.IsBusy);
         public TachometerController Tachometer { get; private set; }
         public void RegisterTachometer(TachometerController tachometer)
         {
@@ -53,9 +59,6 @@ namespace ElectricalSim
         private string currentLineType = "ElectricalWire";
 
         private Text modeText;
-        private Text taskText;
-        private Text taskDescriptionText;
-        private Image taskSchematicImage;
         private Text statusText;
         private Text instrumentText;
         private TrainingCameraController trainingCamera;
@@ -64,7 +67,6 @@ namespace ElectricalSim
         private WireSurfacePlane wireSurface;
         private WireSurfacePlane frontWireSurface;
         private WireSurfacePlane faultWireSurface;
-        private OriginalVisualRegistry originalVisuals;
         private PortHoverPresenter portHover;
 
         private const float WireHitDistancePixels = 10f;
@@ -74,7 +76,6 @@ namespace ElectricalSim
 
         public SimulationMode Mode { get; private set; } = SimulationMode.View;
         public CircuitGraph Graph => graph;
-        public CircuitTaskSpec CurrentTask => tasks[taskIndex];
         public IReadOnlyList<CabinetBreakerInteractable> CabinetBreakers => cabinetBreakers;
         public bool AreCabinetBreakersClosed => cabinetBreakers.Count == 0 || cabinetBreakers.All(item => item.IsClosed);
         public bool IsRoutingWire => selectedPort != null && Mode == SimulationMode.Wiring;
@@ -106,15 +107,11 @@ namespace ElectricalSim
             TrainingCameraController cameraController,
             Transform wireContainer,
             Text modeLabel,
-            Text taskLabel,
-            Text taskDescription,
-            Image taskSchematic,
             Text statusLabel,
             Text instrumentLabel,
             Material lineMaterial,
             WireSurfacePlane frontSurface,
             WireSurfacePlane faultSurface,
-            OriginalVisualRegistry visualRegistry,
             PortHoverPresenter hoverPresenter)
         {
             trainingCamera = cameraController;
@@ -122,9 +119,6 @@ namespace ElectricalSim
             trainingCamera.ViewSideChanged += OnViewSideChanged;
             wireRoot = wireContainer;
             modeText = modeLabel;
-            taskText = taskLabel;
-            taskDescriptionText = taskDescription;
-            taskSchematicImage = taskSchematic;
             statusText = statusLabel;
             instrumentText = instrumentLabel;
             var wireShader = Resources.Load<Shader>("CabinetWire");
@@ -132,9 +126,7 @@ namespace ElectricalSim
             frontWireSurface = frontSurface;
             faultWireSurface = faultSurface;
             wireSurface = trainingCamera.IsViewingFaultSide ? faultWireSurface : frontWireSurface;
-            originalVisuals = visualRegistry;
             portHover = hoverPresenter;
-            tasks = CircuitTaskCatalog.CreateAll();
 
             foreach (var view in deviceViews)
             {
@@ -144,10 +136,9 @@ namespace ElectricalSim
                 foreach (var port in view.Ports) portViews[port.QualifiedPort] = port;
             }
 
-            UpdateTaskUi();
             SetMode(SimulationMode.View);
             ApplyPortAnchors();
-            SetStatus("系统就绪。请选择任务后进行接线，或点击“标准接线”加载参考拓扑。", false);
+            SetStatus("系统就绪。可查看原理图并自由接线、仿真或排故。", false);
         }
 
         public void RegisterCabinetBreakers(IEnumerable<CabinetBreakerInteractable> breakers)
@@ -173,7 +164,9 @@ namespace ElectricalSim
 
         public bool TryToggleCabinetBreaker(CabinetBreakerInteractable breaker)
         {
-            if (Mode != SimulationMode.Drag || breaker == null || !cabinetBreakers.Contains(breaker)) return false;
+            if (IsInteractionBlocked ||
+                (Mode != SimulationMode.Drag && Mode != SimulationMode.Simulate && !CanOperateFaultControls) ||
+                breaker == null || !cabinetBreakers.Contains(breaker)) return false;
             breaker.Toggle();
             return true;
         }
@@ -204,13 +197,14 @@ namespace ElectricalSim
         private void Update()
         {
             if (heldPanelButton != null && (!Input.GetMouseButton(0) || IsFileOperationActive)) ReleasePanelButton();
-            if (!IsFileOperationActive && Time.frameCount > fileInputResumeFrame)
+            if (!IsInteractionBlocked)
             {
                 HandleHotkeys();
                 UpdatePortHover();
                 UpdateWiringDraft();
                 HandleSceneInput();
             }
+            else Multimeter?.SuspendPointer();
             PreparePlcOutputs();
             var wasOverflowing = Liquid != null && Liquid.IsOverflowing;
             lastSnapshot = AdvanceSimulation(Time.deltaTime);
@@ -235,6 +229,7 @@ namespace ElectricalSim
             SelectPanelDevice(null);
             Mode = mode;
             if (Tachometer != null) Tachometer.SetFaultMode(mode == SimulationMode.Fault);
+            Multimeter?.SetFaultMode(mode == SimulationMode.Fault);
             if (mode != SimulationMode.Drag) setInverterPanelVisible?.Invoke(false);
             foreach (var breaker in cabinetBreakers)
                 if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
@@ -242,34 +237,11 @@ namespace ElectricalSim
             if (portHover != null) portHover.Hide();
             foreach (var port in portViews.Values) port.SetVisibleForMode(mode);
             modeText.text = $"当前模式：{ModeName(mode)}";
-            // Entering wiring mode must preserve the user's current camera pose.
-            // Connection points already follow the actual camera side, while the
-            // explicit view menu remains available for choosing a preset.
-            if (mode == SimulationMode.Fault) trainingCamera.SetFaultView();
+            // Mode and instrument changes preserve the current camera pose.
+            // Only the explicit view controls choose a camera preset.
+            ApplyPortAnchors();
             SetStatus($"已进入{ModeName(mode)}模式。", false);
             ModeChanged?.Invoke(mode);
-        }
-
-        public void PreviousTask()
-        {
-            taskIndex = (taskIndex - 1 + tasks.Count) % tasks.Count;
-            UpdateTaskUi();
-        }
-
-        public void NextTask()
-        {
-            taskIndex = (taskIndex + 1) % tasks.Count;
-            UpdateTaskUi();
-        }
-
-        public void LoadReferenceWiring()
-        {
-            PushWireHistory();
-            graph.ClearWires();
-            foreach (var pair in CurrentTask.RequiredConnections)
-                graph.AddWire(pair.A, pair.B, ColorForPort(pair.A), "JumperLine");
-            RefreshWireViews();
-            SetStatus($"已加载“{CurrentTask.Name}”标准接线，可进入仿真并提交验收。", false);
         }
 
         public void ResetTraining()
@@ -294,21 +266,18 @@ namespace ElectricalSim
             SetStatus("训练场景已重置。", false);
         }
 
-        public void SubmitTask()
-        {
-            StopAllCoroutines();
-            StartCoroutine(EvaluateCurrentTask());
-        }
-
         public void SelectInstrument(InstrumentKind kind)
         {
             foreach (var port in meterPorts) port.SetHighlighted(false);
             if (Tachometer != null) Tachometer.Deselect();
+            Multimeter?.Deselect();
             instrumentKind = kind;
             meterPorts.Clear();
             instrumentText.text = $"{InstrumentName(kind)}：请选择两个端子";
             SetMode(SimulationMode.Fault);
             if (kind == InstrumentKind.Tachometer && Tachometer != null) Tachometer.Select();
+            if (kind == InstrumentKind.Multimeter) Multimeter?.Select(Camera.main);
+            ApplyPortAnchors();
         }
 
         public void SetWireStyle(Color color, float area, string lineType)
@@ -324,6 +293,7 @@ namespace ElectricalSim
 
         private void OnDestroy()
         {
+            if (SchematicGallery != null) SchematicGallery.ViewerVisibilityChanged -= OnSchematicViewerVisibility;
             StopPlcConnections();
             if (wireMaterial != null && wireMaterial.name == "Cabinet Surface Wire") Destroy(wireMaterial);
             if (trainingCamera != null)
@@ -372,8 +342,9 @@ namespace ElectricalSim
             var effectivePreset = trainingCamera.IsViewingFaultSide
                 ? TrainingViewPreset.FaultBack
                 : TrainingViewPreset.WiringFront;
+            var measuring = Mode == SimulationMode.Fault && Multimeter != null && Multimeter.IsSelected;
             foreach (var port in portViews.Values)
-                port.ApplyOriginalAnchor(effectivePreset, jumper);
+                port.ApplyOriginalAnchor(effectivePreset, measuring ? port.JumperOnly : jumper);
             foreach (var wire in wireViews) wire.Refresh();
         }
 
@@ -450,49 +421,6 @@ namespace ElectricalSim
 
         public void ShowStatus(string message, bool error = false) => SetStatus(message, error);
 
-        private IEnumerator EvaluateCurrentTask()
-        {
-            var result = CircuitTaskEvaluator.EvaluateTopology(graph, CurrentTask);
-            if (!result.Passed)
-            {
-                SetStatus(result.Summary(), true);
-                yield break;
-            }
-
-            SetStatus("拓扑检查通过，正在执行动作序列……", false);
-            foreach (var device in devices.Values)
-            {
-                if (device.Kind == ElectricalDeviceKind.Breaker)
-                    device.SetControl(!IsMainBreaker(device) || AreCabinetBreakersClosed);
-                else if (device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);
-                else device.SetControl(false);
-            }
-
-            PanelPower?.StartForAssessment();
-            foreach (var step in CurrentTask.Actions)
-            {
-                if (!devices.TryGetValue(step.DeviceId, out var device))
-                {
-                    result.ActionErrors.Add($"找不到动作器件 {step.DeviceId}");
-                    continue;
-                }
-
-                device.SetControl(step.Active);
-                var end = Time.realtimeSinceStartup + Mathf.Max(0.05f, step.HoldSeconds);
-                while (Time.realtimeSinceStartup < end)
-                {
-                    // Update owns the simulation clock, including shaft coast-down.
-                    yield return null;
-                }
-
-                var actual = lastSnapshot.GetMotorDirection(step.ExpectedDeviceId);
-                if (actual != step.ExpectedMotorDirection)
-                    result.ActionErrors.Add($"{step.ExpectedDeviceId} 期望 {step.ExpectedMotorDirection}，实际 {actual}");
-            }
-
-            SetStatus(result.Summary(), !result.Passed);
-        }
-
         private void HandleHotkeys()
         {
             if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
@@ -510,6 +438,7 @@ namespace ElectricalSim
 
         private void HandleSceneInput()
         {
+            if (Mode == SimulationMode.Fault && Multimeter != null && Multimeter.IsSelected && Multimeter.HandleInput(Camera.main)) return;
             if (TrySelectPlcFromPointer()) return;
             if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer)
             {
@@ -537,6 +466,7 @@ namespace ElectricalSim
 
         private void HandleScenePointerDown(Camera camera, Vector2 screenPosition)
         {
+            if (IsInteractionBlocked) return;
             if (camera == null || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && Mode != SimulationMode.Fault) return;
             if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer) return;
             if (EventSystem.current != null)
@@ -579,6 +509,11 @@ namespace ElectricalSim
                 return;
             }
             var panelView = hit.collider.GetComponentInParent<PanelDeviceView>();
+            if ((Mode == SimulationMode.Simulate || CanOperateFaultControls) && port == null)
+            {
+                var breaker = hit.collider.GetComponentInParent<CabinetBreakerInteractable>();
+                if (TryToggleCabinetBreaker(breaker)) return;
+            }
             var sceneIo = hit.collider.GetComponentInParent<SceneIoView>();
             if (sceneIo != null && port == null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate))
             {
@@ -586,7 +521,7 @@ namespace ElectricalSim
                 return;
             }
             if (Mode == SimulationMode.View || Mode == SimulationMode.Simulate) SelectSceneIo(null);
-            if (panelView != null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate))
+            if (panelView != null && (Mode == SimulationMode.View || Mode == SimulationMode.Simulate || CanOperateFaultControls && port == null))
             {
                 PressPanelDevice(panelView);
                 return;
@@ -600,8 +535,11 @@ namespace ElectricalSim
                 return;
             }
 
-            if (Mode == SimulationMode.Fault && port != null) HandleMeterPort(port);
-            else if (Mode == SimulationMode.Simulate && deviceView != null) HandleDeviceControl(deviceView.Runtime);
+            if (Mode == SimulationMode.Fault && port != null)
+            {
+                if (Multimeter == null || !Multimeter.IsSelected) HandleMeterPort(port);
+            }
+            else if ((Mode == SimulationMode.Simulate || CanOperateFaultControls) && deviceView != null) HandleDeviceControl(deviceView.Runtime);
         }
 
         private void HandleWiringInput()
@@ -643,6 +581,7 @@ namespace ElectricalSim
 
         private void HandleWiringPointerDown(Camera camera, Vector2 screenPosition)
         {
+            if (IsInteractionBlocked) return;
             if (Mode != SimulationMode.Wiring || draggingWirePoint || camera == null) return;
             if (EventSystem.current != null)
             {
@@ -1015,6 +954,12 @@ namespace ElectricalSim
         private void UpdateInstrumentReadout()
         {
             if (instrumentText == null) return;
+            if (instrumentKind == InstrumentKind.Multimeter && Multimeter != null && Multimeter.IsSelected)
+            {
+                Multimeter.Refresh(lastSnapshot);
+                instrumentText.text = Multimeter.DescribeReading();
+                return;
+            }
             if (instrumentKind == InstrumentKind.Tachometer)
             {
                 if (Tachometer != null) Tachometer.Refresh(lastSnapshot);
@@ -1136,24 +1081,6 @@ namespace ElectricalSim
             wirePointDragChanged = false;
             lastWireClickId = string.Empty;
             SelectedWireChanged?.Invoke(null);
-        }
-
-        private void UpdateTaskUi()
-        {
-            taskText.text = $"{taskIndex + 1:00}/{tasks.Count:00}  {CurrentTask.Name}";
-            taskDescriptionText.text = CurrentTask.Description;
-            if (taskSchematicImage != null)
-            {
-                var sprite = originalVisuals != null ? originalVisuals.ResolveSchematic(CurrentTask.Id) : null;
-                taskSchematicImage.sprite = sprite;
-                taskSchematicImage.enabled = sprite != null;
-                if (sprite != null && sprite.rect.height > 0f)
-                {
-                    var fitter = taskSchematicImage.GetComponent<AspectRatioFitter>();
-                    if (fitter != null) fitter.aspectRatio = sprite.rect.width / sprite.rect.height;
-                }
-            }
-            SetStatus("已选择任务：" + CurrentTask.Name, false);
         }
 
         private void SetStatus(string message, bool error)

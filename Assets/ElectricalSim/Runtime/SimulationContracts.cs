@@ -115,27 +115,6 @@ namespace ElectricalSim
         }
     }
 
-    [Serializable]
-    public sealed class TaskActionStep
-    {
-        public string DeviceId = string.Empty;
-        public bool Active;
-        public float HoldSeconds = 0.1f;
-        public string ExpectedDeviceId = string.Empty;
-        public MotorDirection ExpectedMotorDirection;
-    }
-
-    [CreateAssetMenu(menuName = "Electrical Sim/Circuit Task", fileName = "CircuitTask")]
-    public sealed class CircuitTaskDefinition : ScriptableObject
-    {
-        public string TaskId = string.Empty;
-        public string DisplayName = string.Empty;
-        [TextArea] public string Description = string.Empty;
-        public List<PortPair> RequiredConnections = new List<PortPair>();
-        public List<PortPair> ForbiddenConnections = new List<PortPair>();
-        public List<TaskActionStep> ActionSteps = new List<TaskActionStep>();
-    }
-
     public interface IElectricalDevice
     {
         string DeviceId { get; }

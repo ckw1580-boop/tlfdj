@@ -28,19 +28,6 @@ namespace ElectricalSim.Editor
             "ZhiShiDeng_Red", "ZhiShiDeng_Green"
         };
 
-        private static readonly Dictionary<string, string> TaskSchematics = new Dictionary<string, string>
-        {
-            { "point", "三相异步电动机点动控制" },
-            { "single-start", "三相异步电动机单点启动控制" },
-            { "self-lock", "三相异步电动机自锁控制" },
-            { "overload", "三相异步电动机过载保护自锁控制" },
-            { "forward-reverse", "三相异步电动机联锁正反转控制" },
-            { "multi-location", "三相异步电动机两地与多地控制" },
-            { "sequence", "三相异步电动机顺序启动控制" },
-            { "reverse-brake", "三相异步电动机反接制动" },
-            { "energy-brake", "三相异步电动机能耗制动" }
-        };
-
         private static readonly string[] UiPrefabPaths =
         {
             "App/Src/UI/UIExperimentTop.prefab",
@@ -57,8 +44,6 @@ namespace ElectricalSim.Editor
         {
             { "TopNavigation", "App/Src/UI/NewUI/UITopBar.prefab" },
             { "ExperimentToolbar", "App/Src/UI/UIExperimentTop.prefab" },
-            { "Task", "App/Src/UI/UIExperimentTask.prefab" },
-            { "LineMap", "App/Src/UI/UIExperimentLineMap.prefab" },
             { "LineForm", "App/Src/UI/NewUI/UIExperimentLineForm.prefab" },
             { "LineParam", "App/Src/UI/NewUI/UIExperimentLineParam.prefab" },
             { "ElementLibrary", "App/Src/UI/UIExperimentElementLib.prefab" },
@@ -68,11 +53,7 @@ namespace ElectricalSim.Editor
             { "Multimeter", "App/Src/UI/UIMultimeterForm.prefab" },
             { "Oscilloscope", "App/Src/UI/UIExperimentShiBoQi.prefab" },
             { "Inverter", "App/Src/UI/UIExperimentInverte.prefab" },
-            { "ExamList", "App/Src/UI/UIExamList.prefab" },
-            { "ExamConfig", "App/Src/UI/NewUI/UIExamConf.prefab" },
-            { "ExamResult", "App/Src/UI/NewUI/UIExamResult.prefab" },
             { "Save", "App/Src/UI/NewUI/UISaveTip.prefab" },
-            { "Submit", "App/Src/UI/NewUI/UISubmitTip.prefab" },
             { "Recorder", "App/Src/UI/Recorder.prefab" },
             { "RecordControl", "App/Src/UI/RecordCotrol.prefab" },
             { "Audio", "App/Src/UI/UIExperimentAudioSet.prefab" },
@@ -85,7 +66,7 @@ namespace ElectricalSim.Editor
             try
             {
                 ImportCore();
-                EditorUtility.DisplayDialog("原始素材导入完成", "已迁移原实训室、器件、原理图和 UI 依赖。", "确定");
+                EditorUtility.DisplayDialog("原始素材导入完成", "已迁移原实训室、器件和 UI 依赖；六张原理图使用项目内的独立图册。", "确定");
             }
             catch (Exception exception)
             {
@@ -114,10 +95,8 @@ namespace ElectricalSim.Editor
                 AssetDatabase.CreateAsset(registry, RegistryPath);
             }
             registry.Entries.Clear();
-            registry.Schematics.Clear();
             registry.UiPrefabs.Clear();
             PopulateDeviceRegistry(registry);
-            PopulateSchematics(registry);
             PopulateUiRegistry(registry);
             EditorUtility.SetDirty(registry);
             AssetDatabase.SaveAssets();
@@ -167,11 +146,6 @@ namespace ElectricalSim.Editor
                 seeds.AddRange(Directory.GetFiles(absolute, "*.prefab", SearchOption.AllDirectories)
                     .Select(path => Relative(sourceRoot, path)));
             }
-            foreach (var schematic in TaskSchematics.Values)
-            {
-                seeds.Add("App/Src/UI/LineDrawing/" + schematic + ".png");
-                seeds.Add("App/Src/UI/LineDrawing/" + schematic + ".asset");
-            }
             return seeds.Where(relative => File.Exists(Full(sourceRoot, relative)));
         }
 
@@ -217,6 +191,7 @@ namespace ElectricalSim.Editor
         {
             var extension = Path.GetExtension(relative).ToLowerInvariant();
             return relative.StartsWith("StreamingAssets/", StringComparison.OrdinalIgnoreCase) ||
+                   relative.StartsWith("App/Src/UI/LineDrawing/", StringComparison.OrdinalIgnoreCase) ||
                    extension == ".cs" || extension == ".dll" || extension == ".bundle" ||
                    extension == ".asmdef" || extension == ".unitypackage";
         }
@@ -246,7 +221,7 @@ namespace ElectricalSim.Editor
             var source = Full(sourceRoot, "StreamingAssets");
             if (!Directory.Exists(source)) return;
             var destination = Path.GetFullPath("Assets/StreamingAssets/OfflineData");
-            foreach (var relative in new[] { "assess", "Examine", "project", "Instructions" })
+            foreach (var relative in new[] { "project", "Instructions" })
             {
                 var folder = Path.Combine(source, relative);
                 if (!Directory.Exists(folder)) continue;
@@ -309,20 +284,6 @@ namespace ElectricalSim.Editor
             var prefab = PrefabUtility.SaveAsPrefabAsset(instance, destination);
             UnityEngine.Object.DestroyImmediate(instance);
             return prefab;
-        }
-
-        private static void PopulateSchematics(OriginalVisualRegistry registry)
-        {
-            foreach (var pair in TaskSchematics)
-            {
-                var path = AssetDatabase.FindAssets(pair.Value + " t:Sprite", new[] { DestinationDirectory })
-                    .Select(AssetDatabase.GUIDToAssetPath)
-                    .FirstOrDefault(candidate => Path.GetFileNameWithoutExtension(candidate) == pair.Value);
-                if (string.IsNullOrEmpty(path)) continue;
-                var sprite = AssetDatabase.LoadAssetAtPath<Sprite>(path) ??
-                             AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>().FirstOrDefault();
-                if (sprite != null) registry.Schematics.Add(new OriginalSchematicEntry { TaskId = pair.Key, Sprite = sprite });
-            }
         }
 
         private static void PopulateUiRegistry(OriginalVisualRegistry registry)

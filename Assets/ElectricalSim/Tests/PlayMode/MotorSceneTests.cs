@@ -180,39 +180,25 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator ReferenceTaskAuditKeepsUnwiredMotorsStopped()
+        public IEnumerator ManualCircuitKeepsUnwiredMotorsStoppedWhileBrowsing()
         {
-            var rows = new System.Collections.Generic.List<string>();
-            var mismatches = 0;
-            for (var index = 0; index < 10; index++)
+            ManualCircuitFixture.WireMotor(controller);
+            controller.PanelPower.StartForAssessment();
+            controller.SetMode(SimulationMode.Simulate);
+            foreach (var pressed in new[] { true, false })
             {
-                controller.ResetTraining();
-                controller.LoadReferenceWiring();
-                controller.PanelPower.StartForAssessment();
-                controller.enabled = false;
-                var task = controller.CurrentTask;
-                var topology = CircuitTaskEvaluator.EvaluateTopology(controller.Graph, task);
-                rows.Add(task.Id + " | " + task.Name + " | topology=" + topology.Passed);
-                foreach (var step in task.Actions)
+                ((ElectricalDeviceRuntime)controller.Graph.Devices["SB1"]).SetControl(pressed);
+                controller.SchematicGallery.OpenViewer();
+                controller.SchematicGallery.Next();
+                yield return new WaitForSeconds(0.2f);
+                var snapshot = controller.Graph.Solve(0.02f);
+                foreach (var id in new[] { "M2", "M3", "M_DOUBLE" })
                 {
-                    ((ElectricalDeviceRuntime)controller.Graph.Devices[step.DeviceId]).SetControl(step.Active);
-                    SimulationSnapshot snapshot = null;
-                    var ticks = Mathf.Max(8, Mathf.CeilToInt(step.HoldSeconds / 0.02f));
-                    for (var tick = 0; tick < ticks; tick++) snapshot = controller.Graph.Solve(0.02f);
-                    var actual = snapshot.GetMotorDirection(step.ExpectedDeviceId);
-                    if (actual != step.ExpectedMotorDirection) mismatches++;
-                    rows.Add("  " + step.DeviceId + "=" + step.Active + " | " + step.ExpectedDeviceId + " expected=" + step.ExpectedMotorDirection + " actual=" + actual);
-                    foreach (var id in new[] { "M3", "M_DOUBLE" })
-                    {
-                        Assert.That(snapshot.GetMotorSpeedRpm(id), Is.Zero, task.Id + ": " + id);
-                        Assert.That(snapshot.GetMotorDirection(id), Is.EqualTo(MotorDirection.Stopped), task.Id + ": " + id);
-                    }
+                    Assert.That(snapshot.GetMotorSpeedRpm(id), Is.Zero, id);
+                    Assert.That(snapshot.GetMotorDirection(id), Is.EqualTo(MotorDirection.Stopped), id);
                 }
-                controller.NextTask();
-                yield return null;
+                controller.SchematicGallery.CloseViewer();
             }
-            rows.Add("Action mismatches: " + mismatches + "; unwired M3/M_DOUBLE remained stopped for all ten tasks.");
-            File.WriteAllLines(Path.Combine(Application.dataPath, "../Build/Reports/motor-ten-task-audit.txt"), rows);
         }
 
         [UnityTest]
