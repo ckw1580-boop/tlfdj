@@ -4,35 +4,46 @@ using UnityEngine;
 namespace ElectricalSim
 {
     // A runtime height field in cabinet coordinates. The imported lids identify
-    // each duct opening even while hidden; route 10 mm behind their inside face.
+    // each duct opening even while hidden; normally route 10 mm behind their
+    // inside face, raising locally where a mounting plate/support requires it.
     // Only rendered samples are added, never user bends or serialized circuit data.
     public sealed class WireDuctRoutingProfile
     {
         private const float LidClearance = 0.01f;
+        private const float PlateClearance = 0.003f;
         private const float Transition = 0.01f;
         private readonly List<Bounds> lanes = new List<Bounds>();
+        private readonly List<Bounds> regions = new List<Bounds>();
         private readonly Quaternion rotation;
         private readonly Quaternion inverse;
         private readonly float baseDepth;
 
-        public WireDuctRoutingProfile(IEnumerable<MeshFilter> lids, WireSurfacePlane surface)
+        public WireDuctRoutingProfile(IEnumerable<MeshFilter> lids, WireSurfacePlane surface,
+            IEnumerable<MeshFilter> mountingPlates = null)
         {
             rotation = surface.Rotation;
             inverse = Quaternion.Inverse(rotation);
             baseDepth = Vector3.Dot(surface.Origin, surface.Normal);
-            foreach (var lid in lids)
+            foreach (var lid in lids) AddRegion(lid, true);
+            if (mountingPlates != null)
+                foreach (var plate in mountingPlates) AddRegion(plate, false);
+
+            void AddRegion(MeshFilter filter, bool isLid)
             {
-                if (lid == null || lid.sharedMesh == null) continue;
-                var vertices = lid.sharedMesh.vertices;
-                if (vertices.Length == 0) continue;
-                var bounds = new Bounds(inverse * lid.transform.TransformPoint(vertices[0]), Vector3.zero);
+                if (filter == null || filter.sharedMesh == null) return;
+                var vertices = filter.sharedMesh.vertices;
+                if (vertices.Length == 0) return;
+                var bounds = new Bounds(inverse * filter.transform.TransformPoint(vertices[0]), Vector3.zero);
                 foreach (var vertex in vertices)
-                    bounds.Encapsulate(inverse * lid.transform.TransformPoint(vertex));
-                var depth = bounds.min.z - LidClearance;
-                if (depth <= baseDepth) continue;
+                    bounds.Encapsulate(inverse * filter.transform.TransformPoint(vertex));
+                var depth = isLid ? bounds.min.z - LidClearance : bounds.max.z + PlateClearance;
+                if (depth <= baseDepth) return;
                 bounds.center = new Vector3(bounds.center.x, bounds.center.y, depth);
                 bounds.size = new Vector3(bounds.size.x, bounds.size.y, 0f);
-                lanes.Add(bounds);
+                regions.Add(bounds);
+                // Only narrow ducts constrain lateral curve overshoot. Plates
+                // affect depth without changing the user's route in the plane.
+                if (isLid) lanes.Add(bounds);
             }
         }
 
@@ -40,7 +51,7 @@ namespace ElectricalSim
         {
             var local = inverse * point;
             local.z = baseDepth;
-            foreach (var lane in lanes)
+            foreach (var lane in regions)
             {
                 var edgeDistance = Mathf.Min(Mathf.Min(local.x - lane.min.x, lane.max.x - local.x),
                     Mathf.Min(local.y - lane.min.y, lane.max.y - local.y));
@@ -48,6 +59,65 @@ namespace ElectricalSim
                 local.z = Mathf.Max(local.z, baseDepth + height);
             }
             return rotation * local;
+        }
+
+        // Some imported mounting panels are faces of the cabinet shell, not
+        // separate objects. Pick the nearest parallel face behind each device,
+        // then use that face's coplanar triangles, never the entire shell AABB.
+        public void AddMountingPanelsBehind(MeshFilter shell, IEnumerable<Vector3> anchors)
+        {
+            if (shell == null || shell.sharedMesh == null) return;
+            const float tolerance = 0.00001f;
+            var mesh = shell.sharedMesh;
+            var vertices = mesh.vertices;
+            for (var i = 0; i < vertices.Length; i++)
+                vertices[i] = inverse * shell.transform.TransformPoint(vertices[i]);
+            var triangles = mesh.triangles;
+            var faces = new List<Bounds>();
+            var depths = new List<float>();
+            foreach (var anchor in anchors)
+            {
+                var p = inverse * anchor;
+                var nearest = baseDepth;
+                for (var i = 0; i < triangles.Length; i += 3)
+                {
+                    var a = vertices[triangles[i]];
+                    var b = vertices[triangles[i + 1]];
+                    var c = vertices[triangles[i + 2]];
+                    if (Mathf.Abs(a.z - b.z) > tolerance || Mathf.Abs(a.z - c.z) > tolerance ||
+                        a.z <= nearest || a.z >= p.z) continue;
+                    float Cross(Vector3 u, Vector3 v) => u.x * v.y - u.y * v.x;
+                    var area = Cross(b - a, c - a);
+                    if (Mathf.Abs(area) < 0.00000001f) continue;
+                    var u = Cross(p - a, c - a) / area;
+                    var v = Cross(b - a, p - a) / area;
+                    if (u >= -tolerance && v >= -tolerance && u + v <= 1f + tolerance) nearest = a.z;
+                }
+                if (nearest <= baseDepth || depths.Exists(depth => Mathf.Abs(depth - nearest) <= tolerance)) continue;
+                depths.Add(nearest);
+            }
+            foreach (var depth in depths)
+            {
+                faces.Clear();
+                for (var i = 0; i < triangles.Length; i += 3)
+                {
+                    var a = vertices[triangles[i]];
+                    var b = vertices[triangles[i + 1]];
+                    var c = vertices[triangles[i + 2]];
+                    if (Mathf.Abs(a.z - depth) > tolerance || Mathf.Abs(b.z - depth) > tolerance ||
+                        Mathf.Abs(c.z - depth) > tolerance) continue;
+                    var face = new Bounds(a, Vector3.zero);
+                    face.Encapsulate(b);
+                    face.Encapsulate(c);
+                    faces.Add(face);
+                }
+                if (faces.Count == 0) continue;
+                var panel = faces[0];
+                foreach (var face in faces) panel.Encapsulate(face);
+                panel.center = new Vector3(panel.center.x, panel.center.y, panel.max.z + PlateClearance);
+                panel.size = new Vector3(panel.size.x, panel.size.y, 0f);
+                regions.Add(panel);
+            }
         }
 
         public Vector3 ConstrainSpan(Vector3 point, Vector3 start, Vector3 end)
@@ -86,7 +156,7 @@ namespace ElectricalSim
                 hit = candidate;
             }
             TryPlane(Vector3.forward, Vector3.forward * baseDepth);
-            foreach (var lane in lanes)
+            foreach (var lane in regions)
             {
                 TryPlane(Vector3.forward, lane.center);
                 var slope = (lane.center.z - baseDepth) / Transition;
@@ -101,7 +171,7 @@ namespace ElectricalSim
 
         public void RefinePath(ref Vector3[] points, ref int[] insertionIndices)
         {
-            if (points.Length < 2 || lanes.Count == 0) return;
+            if (points.Length < 2 || regions.Count == 0) return;
             var refined = new List<Vector3> { Project(points[0]) };
             var indices = new List<int>();
             var cuts = new List<float>();
@@ -117,7 +187,7 @@ namespace ElectricalSim
                     var t = (boundary - start) / (end - start);
                     if (t > 0.00001f && t < 0.99999f) cuts.Add(t);
                 }
-                foreach (var lane in lanes)
+                foreach (var lane in regions)
                 {
                     // Reject lanes that cannot affect this segment.
                     if (Mathf.Max(a.x, b.x) < lane.min.x - Transition || Mathf.Min(a.x, b.x) > lane.max.x + Transition ||

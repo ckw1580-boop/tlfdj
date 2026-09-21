@@ -87,7 +87,7 @@ namespace ElectricalSim
             if (view != null)
             {
                 if (!sceneIoViews.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate) return;
-                ClearWireSelection(); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); SelectPanelDevice(null);
+                ClearWireSelection(); SelectFrontBreaker(null); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); SelectPanelDevice(null);
             }
             SelectedSceneIo = view;
             SceneIoProperties?.Show(view);

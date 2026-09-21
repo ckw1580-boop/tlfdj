@@ -252,6 +252,7 @@ namespace ElectricalSim
             PushWireHistory();
             graph.ClearWires();
             foreach (var breaker in cabinetBreakers) breaker.ResetClosed();
+            foreach (var breaker in frontBreakers) breaker.SetClosed(true, false);
             foreach (var device in devices.Values)
             {
                 if (device.Kind == ElectricalDeviceKind.Motor) device.ResetMotorSpeed();
@@ -478,6 +479,8 @@ namespace ElectricalSim
             var ray = camera.ScreenPointToRay(screenPosition);
             var hasHit = Physics.Raycast(ray, out var hit, 100f);
             var port = hasHit ? hit.collider.GetComponent<ElectricalPortView>() : null;
+
+            if (port == null && HandleFrontBreakerHit(hasHit ? hit.collider : null)) return;
 
             if (Mode == SimulationMode.View || Mode == SimulationMode.Simulate)
             {
@@ -747,6 +750,11 @@ namespace ElectricalSim
             var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
             if (Input.GetMouseButtonDown(0) && Physics.Raycast(ray, out var hit, 100f))
             {
+                if (HandleFrontBreakerHit(hit.collider))
+                {
+                    draggedDevice = null;
+                    return;
+                }
                 var cabinetBreaker = hit.collider.GetComponentInParent<CabinetBreakerInteractable>();
                 if (TryToggleCabinetBreaker(cabinetBreaker))
                 {

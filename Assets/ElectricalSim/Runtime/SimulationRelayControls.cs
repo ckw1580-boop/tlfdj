@@ -72,6 +72,7 @@ namespace ElectricalSim
             if (view != null)
             {
                 if (!relayViews.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate) return;
+                SelectFrontBreaker(null);
                 ClearWireSelection();
                 SelectPanelDevice(null);
                 SelectPlc(null);

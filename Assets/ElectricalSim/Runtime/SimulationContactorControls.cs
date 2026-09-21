@@ -80,7 +80,7 @@ namespace ElectricalSim
             if (view != null)
             {
                 if (!IsRegisteredContactor(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && !(view.IsRear && Mode == SimulationMode.Fault)) return;
-                ClearWireSelection(); SelectThermalRelay(null); SelectRelay(null); SelectPanelDevice(null); SelectPlc(null);
+                ClearWireSelection(); SelectFrontBreaker(null); SelectThermalRelay(null); SelectRelay(null); SelectPanelDevice(null); SelectPlc(null);
             }
             SelectedContactor = view;
             ContactorProperties?.Show(view);

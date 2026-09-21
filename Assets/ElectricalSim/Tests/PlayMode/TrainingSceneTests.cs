@@ -520,6 +520,8 @@ namespace ElectricalSim.Tests
         public IEnumerator CabinetBreakerConnectionPointsAppearOnlyInElectricalWiringMode()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
+            // Mode changes preserve the camera pose; inspect the rear terminals from the rear.
+            Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
             var views = Object.FindObjectsOfType<ElectricalDeviceView>();
             var breaker106 = views.Single(item => item.Runtime.DeviceId == "QF106");
             var breaker122 = views.Single(item => item.Runtime.DeviceId == "QF122");
@@ -576,7 +578,7 @@ namespace ElectricalSim.Tests
                     Is.True,
                     port.HoverLabel);
                 Assert.That(hit.collider.GetComponentInParent<ElectricalPortView>(), Is.EqualTo(port),
-                    $"The electrical wiring camera must directly hit {port.HoverLabel}");
+                    $"The rear wiring camera must directly hit {port.HoverLabel}; hit {hit.collider.name}");
             }
 
             controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
@@ -1390,7 +1392,7 @@ namespace ElectricalSim.Tests
             Assert.That(exit.z, Is.EqualTo(raised.z).Within(0.00001f));
             Assert.That(exit.x <= bounds.min.x - 0.0099f || exit.x >= bounds.max.x + 0.0099f ||
                         exit.y <= bounds.min.y - 0.0099f || exit.y >= bounds.max.y + 0.0099f, Is.True);
-            Assert.That(Mathf.Abs(surface.SignedDistance(lead[3])), Is.LessThan(0.0001f));
+            Assert.That(Vector3.Distance(lead[3], surface.Project(lead[3])), Is.LessThan(0.0001f));
         }
 
         [UnityTest]

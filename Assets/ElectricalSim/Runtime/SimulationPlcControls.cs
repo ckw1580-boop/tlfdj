@@ -53,7 +53,7 @@ namespace ElectricalSim
         private PlcSession NewPlcSession(PlcConfiguration config) => new PlcSession(config, () => PlcTransportFactory?.Invoke() ?? new S7PlcTransport());
         public void SelectPlc(PlcDeviceView view)
         {
-            if (view != null) { ClearWireSelection(); SelectPanelDevice(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); }
+            if (view != null) { ClearWireSelection(); SelectFrontBreaker(null); SelectPanelDevice(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); }
             SelectedPlc = view;
             plcProperties?.Show(view == null ? null : plcSessions[view.Runtime.DeviceId]);
         }

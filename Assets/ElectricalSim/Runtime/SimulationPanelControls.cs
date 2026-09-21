@@ -28,13 +28,14 @@ namespace ElectricalSim
             SelectSceneIo(null);
             SelectedPowerTerminalBlock = null;
             PowerTerminalSelectionChanged?.Invoke();
-            if (view != null) { ClearWireSelection(); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); }
+            if (view != null) { ClearWireSelection(); SelectFrontBreaker(null); SelectPlc(null); SelectRelay(null); SelectContactor(null); SelectThermalRelay(null); }
             SelectedPanelDevice = view;
             PanelSelectionChanged?.Invoke(view);
         }
 
         public void SelectPowerTerminalBlock(PowerTerminalBlockView view)
         {
+            if (view != null) SelectFrontBreaker(null);
             SelectPanelDevice(null);
             if (view != null)
             {

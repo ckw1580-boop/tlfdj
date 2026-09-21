@@ -66,7 +66,7 @@ namespace ElectricalSim
             if (view != null)
             {
                 if (!thermalRelayViews.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && !(view.IsRear && Mode == SimulationMode.Fault)) return;
-                ClearWireSelection(); SelectRelay(null); SelectContactor(null); SelectPanelDevice(null); SelectPlc(null);
+                ClearWireSelection(); SelectFrontBreaker(null); SelectRelay(null); SelectContactor(null); SelectPanelDevice(null); SelectPlc(null);
             }
             SelectedThermalRelay = view; ThermalRelayProperties?.Show(view);
         }

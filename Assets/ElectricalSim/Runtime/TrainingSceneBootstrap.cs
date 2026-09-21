@@ -87,6 +87,7 @@ namespace ElectricalSim
             CreateOriginalCabinetTerminalBoardPorts();
             CreateFaultPowerTerminalBlock(cameraController);
             CreateCabinetBreakerConnectionPorts();
+            CreateFrontBreakers();
             Debug.Log("[OfflineBootstrap] Devices ready.");
             var ui = CreateHud();
             Debug.Log("[OfflineBootstrap] HUD ready.");
@@ -109,10 +110,27 @@ namespace ElectricalSim
             var rearDuctLids = originalEnvironment != null
                 ? originalEnvironment.Find("Bench/ElectricBench/mesh/xiancaogai_1")
                 : null;
-            if (rearDuctLids != null)
+            var rearPlates = originalEnvironment != null
+                ? originalEnvironment.Find("Bench/ElectricBench/mesh/model/DQG")
+                    ?.GetComponentsInChildren<MeshFilter>(true)
+                    .Where(item => item.name == "DQG11" || item.name.StartsWith("DQG11 (", StringComparison.Ordinal) ||
+                        item.name == "DQG18") // Support rail immediately below the rear breakers.
+                    .ToArray() ?? Array.Empty<MeshFilter>()
+                : Array.Empty<MeshFilter>();
+            if (rearDuctLids != null || rearPlates.Length > 0)
+            {
+                var profile = new WireDuctRoutingProfile(rearDuctLids != null
+                    ? rearDuctLids.GetComponentsInChildren<MeshFilter>(true) : Array.Empty<MeshFilter>(),
+                    faultWireSurface, rearPlates);
+                profile.AddMountingPanelsBehind(
+                    originalEnvironment.Find("Bench/ElectricBench/mesh/model/DQG/DQG01")?.GetComponent<MeshFilter>(),
+                    deviceViews.SelectMany(view => view.Ports)
+                        .Where(port => port.DeviceId == "QF106" || port.DeviceId == "QF122")
+                        .Select(port => port.CurrentAnchorPosition));
                 faultWireSurface = new WireSurfacePlane(faultWireSurface.SurfacePoint, faultWireSurface.Normal,
                     faultWireSurface.SurfaceOffset, faultWireSurface.SurfaceBounds,
-                    new WireDuctRoutingProfile(rearDuctLids.GetComponentsInChildren<MeshFilter>(true), faultWireSurface));
+                    profile);
+            }
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, ui.PortHover);
             controller.RegisterSchematicGallery(ui.Gallery);
             controller.RegisterPanel(panelViews, panelPower);
@@ -133,6 +151,7 @@ namespace ElectricalSim
             controller.ModeChanged += SetCabinetWireDuctCoversForMode;
             SetCabinetWireDuctCoversForMode(controller.Mode);
             controller.RegisterCabinetBreakers(CreateCabinetBreakerInteractions());
+            controller.RegisterFrontBreakers(frontBreakerViews, ui.Status.canvas, uiFont);
             BindUi(ui);
             BindOriginalUi(ui);
             CreateTachometer();
@@ -888,6 +907,7 @@ namespace ElectricalSim
                 portRoot.transform.SetParent(originalEnvironment, false);
                 var view = portRoot.AddComponent<ElectricalDeviceView>();
                 view.Initialize(runtime, displayName + "连接点");
+                var wireBody = new WireBodyGeometry(model);
                 foreach (var anchor in anchors)
                 {
                     var portObject = CreatePrimitive(
@@ -903,6 +923,7 @@ namespace ElectricalSim
                     port.Initialize(runtimeId, anchor.name, new Color(0.12f, 0.86f, 0.36f));
                     port.ConfigureHover(anchor.name, anchor.name);
                     port.ConfigureOriginalAnchors(anchor, anchor, anchor, anchor);
+                    port.ConfigureRearWireBody(wireBody);
                     port.ConfigureElectricalOnly();
                     port.ConfigureWiringModeOnly();
                     view.AddPort(port);

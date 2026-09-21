@@ -8,6 +8,7 @@ namespace ElectricalSim
     {
         private readonly List<string> ports;
         private readonly List<PortPair> fixedLinks = new List<PortPair>();
+        private IReadOnlyList<PortPair> breakerContacts;
         private bool lastEvaluatedState;
 
         public ElectricalDeviceRuntime(string deviceId, ElectricalDeviceKind kind, IEnumerable<string> portNames)
@@ -109,9 +110,16 @@ namespace ElectricalSim
                 case ElectricalDeviceKind.Fuse:
                     if (IsClosed)
                     {
-                        yield return new PortPair("L1", "T1");
-                        yield return new PortPair("L2", "T2");
-                        yield return new PortPair("L3", "T3");
+                        if (breakerContacts != null)
+                        {
+                            foreach (var contact in breakerContacts) yield return contact;
+                        }
+                        else
+                        {
+                            yield return new PortPair("L1", "T1");
+                            yield return new PortPair("L2", "T2");
+                            yield return new PortPair("L3", "T3");
+                        }
                     }
                     break;
                 case ElectricalDeviceKind.PushButton:
@@ -213,6 +221,17 @@ namespace ElectricalSim
 
         public static ElectricalDeviceRuntime CreateBreaker(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Breaker, ThreePhasePorts());
+
+        public static ElectricalDeviceRuntime CreateBreaker(string id, IEnumerable<PortPair> contacts)
+        {
+            if (contacts == null) throw new ArgumentNullException(nameof(contacts));
+            var pairs = contacts.ToArray();
+            if (pairs.Length == 0 || pairs.Any(p => string.IsNullOrWhiteSpace(p.A) ||
+                string.IsNullOrWhiteSpace(p.B) || p.A == p.B))
+                throw new ArgumentException("Breaker contacts require distinct named terminals.", nameof(contacts));
+            return new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Breaker,
+                pairs.SelectMany(p => new[] { p.A, p.B })) { breakerContacts = Array.AsReadOnly(pairs) };
+        }
 
         public static ElectricalDeviceRuntime CreateFuse(string id)
             => new ElectricalDeviceRuntime(id, ElectricalDeviceKind.Fuse, ThreePhasePorts());

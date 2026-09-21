@@ -6,6 +6,105 @@ namespace ElectricalSim.Tests
 {
     public sealed class ElectricalWireViewTests
     {
+        [TestCase(0f)]
+        [TestCase(31f)]
+        public void ShellPanelUsesFaceBehindDeviceInsteadOfWholeCabinetBounds(float angle)
+        {
+            var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var shell = new GameObject("CombinedCabinetShell");
+            var mesh = new Mesh();
+            try
+            {
+                var cubeMesh = cube.GetComponent<MeshFilter>().sharedMesh;
+                mesh.CombineMeshes(new[]
+                {
+                    new CombineInstance { mesh = cubeMesh, transform = Matrix4x4.TRS(
+                        new Vector3(0f, 0f, 0.05f), Quaternion.identity, new Vector3(0.7f, 0.25f, 0.01f)) },
+                    new CombineInstance { mesh = cubeMesh, transform = Matrix4x4.TRS(
+                        new Vector3(0f, -1f, 0.3f), Quaternion.identity, new Vector3(1f, 0.2f, 0.1f)) }
+                });
+                var rotation = Quaternion.Euler(0f, angle, 0f);
+                var origin = new Vector3(2f, 1f, -3f);
+                shell.transform.SetPositionAndRotation(origin, rotation);
+                var filter = shell.AddComponent<MeshFilter>();
+                filter.sharedMesh = mesh;
+                var flat = new WireSurfacePlane(origin, rotation * Vector3.forward, 0.003f);
+                var profile = new WireDuctRoutingProfile(new MeshFilter[0], flat);
+                profile.AddMountingPanelsBehind(filter, new[] { origin + rotation * new Vector3(0.2f, 0f, 0.1f) });
+                var surface = new WireSurfacePlane(origin, flat.Normal, flat.SurfaceOffset, ducts: profile);
+                var raised = surface.Project(origin);
+                Assert.That(Vector3.Dot(raised - origin, flat.Normal), Is.EqualTo(0.058f).Within(0.00001f));
+                var outside = surface.Project(origin + rotation * Vector3.down * 0.3f);
+                Assert.That(Vector3.Dot(outside - origin, flat.Normal), Is.EqualTo(0.003f).Within(0.00001f));
+                Assert.That(surface.Raycast(new Ray(raised + flat.Normal, -flat.Normal), out var hit), Is.True);
+                Assert.That(Vector3.Distance(hit, raised), Is.LessThan(0.0001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(cube);
+                Object.DestroyImmediate(shell);
+                Object.DestroyImmediate(mesh);
+            }
+        }
+
+        [TestCase(0f)]
+        [TestCase(31f)]
+        public void RaisedPlatesAndDuctsKeepRoutesOutsideSolidGeometry(float angle)
+        {
+            var plate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var secondPlate = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var lid = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                var rotation = Quaternion.Euler(0f, angle, 0f);
+                var origin = new Vector3(2f, 1f, -3f);
+                void Place(GameObject obj, Vector3 position, Vector3 size)
+                {
+                    obj.transform.SetPositionAndRotation(origin + rotation * position, rotation);
+                    obj.transform.localScale = size;
+                }
+                Place(plate, new Vector3(0f, 0f, 0.03f), new Vector3(0.2f, 0.4f, 0.01f));
+                Place(secondPlate, new Vector3(0.2f, 0f, 0.02f), new Vector3(0.1f, 0.4f, 0.01f));
+                Place(lid, new Vector3(-0.15f, 0f, 0.06f), new Vector3(0.1f, 0.5f, 0.01f));
+                var flat = new WireSurfacePlane(origin, rotation * Vector3.forward, 0.003f);
+                var surface = new WireSurfacePlane(flat.SurfacePoint, flat.Normal, flat.SurfaceOffset,
+                    ducts: new WireDuctRoutingProfile(new[] { lid.GetComponent<MeshFilter>() }, flat,
+                        new[] { plate.GetComponent<MeshFilter>(), secondPlate.GetComponent<MeshFilter>() }));
+                foreach (var x in new[] { -0.15f, -0.105f, -0.1f, 0f, 0.1f, 0.105f, 0.2f, 0.3f })
+                {
+                    var point = surface.Project(origin + rotation * new Vector3(x, 0f, 0f));
+                    var local = Quaternion.Inverse(rotation) * (point - origin);
+                    if (x >= -0.1f && x <= 0.1f) Assert.That(local.z, Is.GreaterThanOrEqualTo(0.038f - 0.00001f));
+                    if (x == 0.2f) Assert.That(local.z, Is.EqualTo(0.028f).Within(0.00001f));
+                    if (x == -0.15f) Assert.That(local.z, Is.EqualTo(0.045f).Within(0.00001f));
+                    var eye = point + surface.Normal + rotation * Vector3.right * 0.02f;
+                    Assert.That(surface.Raycast(new Ray(eye, point - eye), out var hit), Is.True);
+                    Assert.That(Vector3.Distance(hit, point), Is.LessThan(0.0001f));
+                }
+                var bends = new[] { origin + rotation * new Vector3(-0.25f, 0f, 0.003f),
+                    origin + rotation * new Vector3(0.3f, 0f, 0.003f) };
+                var saved = bends.ToArray();
+                var path = WireRenderPath.Build(new WireEndpointGeometry(bends[0]),
+                    new WireEndpointGeometry(bends[1]), bends, surface);
+                for (var i = 1; i < path.Trunk.Length; i++)
+                    for (var step = 0; step <= 10; step++)
+                    {
+                        var p = Vector3.Lerp(path.Trunk[i - 1], path.Trunk[i], step / 10f);
+                        var local = Quaternion.Inverse(rotation) * (p - origin);
+                        if (local.x >= -0.1f && local.x <= 0.1f)
+                            Assert.That(local.z, Is.GreaterThanOrEqualTo(0.038f - 0.00001f));
+                    }
+                CollectionAssert.AreEqual(saved, bends);
+                Assert.That(path.InsertionIndices.Length, Is.EqualTo(path.Points.Length - 1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(plate);
+                Object.DestroyImmediate(secondPlate);
+                Object.DestroyImmediate(lid);
+            }
+        }
+
         [Test]
         public void DirectWireCrossingDuctAddsVisibleSamplesWithoutAddingBends()
         {
