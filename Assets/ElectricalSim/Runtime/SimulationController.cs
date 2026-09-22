@@ -178,7 +178,8 @@ namespace ElectricalSim
         {
             inverterModel = model;
             inverterPanel = panel;
-            graph.RegisterDevice(new InverterDriveRuntime("G120", () => panel.ActualSpeedRpm, () => panel.HasFault));
+            InverterDrive = new InverterDriveRuntime(panel);
+            graph.RegisterDevice(InverterDrive);
             setInverterPanelVisible = setVisible;
             setInverterPanelVisible?.Invoke(false);
         }
@@ -221,6 +222,7 @@ namespace ElectricalSim
 
         public void SetMode(SimulationMode mode)
         {
+            SelectInverter(false);
             liquidStepAccumulator = 0;
             if (mode != SimulationMode.Simulate) Liquid?.Pause();
             if (mode != SimulationMode.Wiring) HideRelaySchematic();
@@ -246,6 +248,8 @@ namespace ElectricalSim
 
         public void ResetTraining()
         {
+            inverterPanel?.ResetFactorySettings();
+            SelectInverter(false);
             ResetLiquidState();
             ReleasePanelButton();
             PanelPower?.Reset();
@@ -479,6 +483,13 @@ namespace ElectricalSim
             var ray = camera.ScreenPointToRay(screenPosition);
             var hasHit = Physics.Raycast(ray, out var hit, 100f);
             var port = hasHit ? hit.collider.GetComponent<ElectricalPortView>() : null;
+
+            if (Mode == SimulationMode.View || Mode == SimulationMode.Simulate)
+            {
+                var inverterHit = hasHit && IsInverterHit(hit, port);
+                SelectInverter(inverterHit);
+                if (inverterHit) return;
+            }
 
             if (port == null && HandleFrontBreakerHit(hasHit ? hit.collider : null)) return;
 

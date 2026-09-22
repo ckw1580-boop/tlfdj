@@ -12,7 +12,7 @@ namespace ElectricalSim
     }
 
     // The DC link isolates the input and output: never union their electrical nets.
-    public sealed class InverterDriveRuntime : IElectricalDevice
+    public sealed class InverterDriveRuntime : IElectricalDevice, IControlSignalSource
     {
         private static readonly string[] Terminals = { "L1", "L2", "L3", "U2", "V2", "W2", "PE" };
         private static readonly string[] Outputs = { "U2", "V2", "W2" };
@@ -20,7 +20,10 @@ namespace ElectricalSim
         private readonly Func<bool> readFault;
         public string DeviceId { get; }
         public ElectricalDeviceKind Kind => ElectricalDeviceKind.VariableFrequencyDrive;
-        public IReadOnlyCollection<string> Ports => Terminals;
+        public IReadOnlyCollection<string> Ports => Control == null ? Terminals : controlPorts;
+        private readonly string[] controlPorts = Terminals.Concat(G120TerminalCatalog.All.Select(t => t.Port))
+            .Concat(new[] { "DI0", "DI1", "DI2", "DI3", "DI4", "DI5", "DI1_COM1", "DI1_COM2", "A1" }).ToArray();
+        public G120ControlRuntime Control { get; }
         public bool IsActive { get; private set; }
         public bool HasSupply { get; private set; }
         public bool OutputValid { get; private set; }
@@ -32,9 +35,13 @@ namespace ElectricalSim
             readFault = fault;
         }
 
-        public IEnumerable<PortPair> GetConductiveLinks() { yield break; }
-        public bool Evaluate(SimulationSnapshot snapshot, float deltaTime) => false;
-        public void ApplyVisualState(SimulationSnapshot snapshot) { }
+        public InverterDriveRuntime(InverterPanelController panel) : this("G120", () => panel.ActualSpeedRpm, () => panel.HasFault)
+        { Control = new G120ControlRuntime(panel); }
+        public IEnumerable<PortPair> GetConductiveLinks() => Control != null ? Control.Links() : Enumerable.Empty<PortPair>();
+        public bool Evaluate(SimulationSnapshot snapshot, float deltaTime) => Control != null && Control.Evaluate(snapshot);
+        public void ApplyVisualState(SimulationSnapshot snapshot) => Control?.RefreshReadings(snapshot);
+        public IEnumerable<ControlSignal> GetControlSignals(SimulationSnapshot topology) => Control != null ? Control.GetSignals(topology) : Enumerable.Empty<ControlSignal>();
+        public IEnumerable<PortPair> CurrentReceivers => Control != null ? Control.CurrentReceivers : Enumerable.Empty<PortPair>();
 
         internal void Validate(SimulationSnapshot snapshot, List<string> errors)
         {

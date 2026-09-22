@@ -25,6 +25,7 @@ namespace ElectricalSim
 
         public void SelectPanelDevice(PanelDeviceView view)
         {
+            if (view != null) SelectInverter(false);
             SelectSceneIo(null);
             SelectedPowerTerminalBlock = null;
             PowerTerminalSelectionChanged?.Invoke();
@@ -35,6 +36,7 @@ namespace ElectricalSim
 
         public void SelectPowerTerminalBlock(PowerTerminalBlockView view)
         {
+            if (view != null) SelectInverter(false);
             if (view != null) SelectFrontBreaker(null);
             SelectPanelDevice(null);
             if (view != null)

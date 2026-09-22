@@ -69,6 +69,7 @@ namespace ElectricalSim
 
         public void SelectRelay(IntermediateRelayView view)
         {
+            if (view != null) SelectInverter(false);
             if (view != null)
             {
                 if (!relayViews.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate) return;

@@ -166,6 +166,7 @@ namespace ElectricalSim.Tests
         [UnityTest]
         public IEnumerator InverterPanelSupportsParametersManualRunJogReverseAndRamp()
         {
+            ConnectG120TestPower();
             var controller = Object.FindObjectOfType<SimulationController>();
             var inverter = controller.InverterPanel;
             Assert.That(inverter, Is.Not.Null);
@@ -232,7 +233,19 @@ namespace ElectricalSim.Tests
         [UnityTest]
         public IEnumerator G120TerminalMacrosDriveFixedAnalogMopAndFaultResetCommands()
         {
-            var inverter = Object.FindObjectOfType<SimulationController>().InverterPanel;
+            ConnectG120TestPower();
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var inverter = controller.InverterPanel;
+            controller.Graph.AddWire("G120.T28", "G120.T69", Color.black);
+            controller.Graph.AddWire("G120.T28", "G120.T34", Color.black);
+            System.Action<int, bool> setInput = (index, active) =>
+            {
+                var terminal = G120ControlRuntime.Terminal(G120TerminalCatalog.DigitalNumbers[index]);
+                var existing = controller.Graph.Wires.FirstOrDefault(w => w.StartPort == "G120.T09" && w.EndPort == terminal);
+                if (active) controller.Graph.AddWire("G120.T09", terminal, Color.red);
+                else if (existing != null) controller.Graph.RemoveWire(existing.Id);
+                controller.AdvanceSimulation(0);
+            };
             inverter.TrySetParameter("P0010", 1f);
             inverter.TrySetParameter("P1120", 0.01f);
             inverter.TrySetParameter("P1121", 0.01f);
@@ -243,22 +256,23 @@ namespace ElectricalSim.Tests
             inverter.TrySetParameter("P1001", 100f);
             inverter.TrySetParameter("P1002", 200f);
             inverter.TrySetParameter("P1003", 300f);
-            inverter.SetDigitalInput(0, true);
-            inverter.SetDigitalInput(1, true);
-            inverter.SetDigitalInput(4, true);
+            setInput(0, true);
+            setInput(1, true);
+            setInput(4, true);
             yield return null;
             Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(600f).Within(2f));
 
-            inverter.SetDigitalInput(0, false);
-            inverter.SetDigitalInput(1, false);
-            inverter.SetDigitalInput(4, false);
+            setInput(0, false);
+            setInput(1, false);
+            setInput(4, false);
             Assert.That(inverter.TrySetParameter("P0015", 12f), Is.True);
-            inverter.SetAnalogInputVolts(5f);
-            inverter.SetDigitalInput(0, true);
+            controller.InverterControls.Inputs[0].Simulated = true;
+            controller.InverterControls.Inputs[0].SimulatedValue = 5f;
+            setInput(0, true);
             yield return null;
             Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(500f).Within(2f));
-            inverter.SetDigitalInput(1, false);
-            inverter.SetDigitalInput(1, true);
+            setInput(1, false);
+            setInput(1, true);
             yield return null;
             Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f), "Reversal finishes deceleration before accelerating in reverse");
             yield return null;
@@ -266,18 +280,18 @@ namespace ElectricalSim.Tests
 
             inverter.SetFault(true, 123);
             Assert.That(inverter.HasFault, Is.True);
-            inverter.SetDigitalInput(2, true);
+            setInput(2, true);
             Assert.That(inverter.HasFault, Is.False);
 
-            inverter.SetDigitalInput(0, false);
+            setInput(0, false);
             Assert.That(inverter.TrySetParameter("P0015", 15f), Is.True);
-            inverter.SetDigitalInput(1, true);
-            inverter.SetDigitalInput(2, false);
-            inverter.SetDigitalInput(3, true);
-            inverter.SetDigitalInput(4, false);
-            inverter.SetDigitalInput(5, false);
+            setInput(1, true);
+            setInput(2, false);
+            setInput(3, true);
+            setInput(4, false);
+            setInput(5, false);
             inverter.SetMotorizedPotentiometer(350f);
-            inverter.SetDigitalInput(0, true);
+            setInput(0, true);
             yield return null;
             yield return null;
             Assert.That(inverter.IsLocalControl, Is.True);
@@ -287,6 +301,7 @@ namespace ElectricalSim.Tests
         [UnityTest]
         public IEnumerator G120ProfibusMacroUsesControlWordTelegramAndStatusWord()
         {
+            ConnectG120TestPower();
             var inverter = Object.FindObjectOfType<SimulationController>().InverterPanel;
             inverter.TrySetParameter("P0010", 1f);
             inverter.TrySetParameter("P1120", 0.01f);
@@ -994,14 +1009,23 @@ namespace ElectricalSim.Tests
                 Assert.That(Vector3.Distance(label.transform.localScale, orientationReference.localScale),
                     Is.LessThan(0.0001f), label.text);
 
+                var boardDefinition = OriginalCabinetTerminalBoardMap.Boards.Single(b => b.DeviceId == "DuanZiPai_4");
                 var anchors = pointRoot.Cast<Transform>()
+                    .Where(item => OriginalCabinetTerminalBoardMap.IsTerminalName(boardDefinition, item.name))
                     .Where(item => item.name.StartsWith(expected.Prefix, System.StringComparison.Ordinal))
                     .ToArray();
                 Assert.That(anchors, Is.Not.Empty, label.text);
                 var center = anchors.Aggregate(Vector3.zero, (sum, anchor) => sum + anchor.position) / anchors.Length;
                 var verticalOffset = Vector3.Dot(label.transform.position - center, label.transform.up);
-                Assert.That(verticalOffset,
-                    Is.EqualTo(renderer.bounds.size.y * -0.95f).Within(0.0005f), label.text);
+                if (expected.Prefix == "G120_")
+                {
+                    var contactorLabel = generatedRoot.Find("Terminal Annotation - Contactors KM Below Inverter");
+                    Assert.That(Vector3.Dot(label.transform.position - contactorLabel.position, label.transform.up),
+                        Is.EqualTo(0f).Within(0.0005f), "G120 and KM labels must share the same height");
+                }
+                else
+                    Assert.That(verticalOffset,
+                        Is.EqualTo(renderer.bounds.size.y * -0.95f).Within(0.0005f), label.text);
                 var horizontalOffset = Vector3.Dot(label.transform.position - center, label.transform.right);
                 Assert.That(horizontalOffset, Is.EqualTo(0f).Within(0.0005f),
                     label.text + " must be centered over its lower terminal group");
@@ -2196,7 +2220,7 @@ namespace ElectricalSim.Tests
             controller.SetMode(SimulationMode.Wiring);
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
             yield return null;
-            Assert.That(views.Single(view => view.Runtime.DeviceId == "DuanZiPai_4").Ports.Count, Is.EqualTo(48));
+            Assert.That(views.Single(view => view.Runtime.DeviceId == "DuanZiPai_4").Ports.Count, Is.EqualTo(62));
             Assert.That(views.Single(view => view.Runtime.DeviceId == "DuanZiPai_6").Ports.Count, Is.EqualTo(8));
             Assert.That(views.Single(view => view.Runtime.DeviceId == "DuanZiPai_8").Ports.Count, Is.EqualTo(18));
             foreach (var boardId in boardIds)
@@ -2904,6 +2928,13 @@ namespace ElectricalSim.Tests
                 max = Vector2.Max(max, viewport);
             }
             return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        private static void ConnectG120TestPower()
+        {
+            var controller = Object.FindObjectOfType<SimulationController>();
+            controller.PanelPower.StartForAssessment();
+            foreach (var phase in new[] { "L1", "L2", "L3" }) controller.Graph.AddWire("POWER." + phase, "G120." + phase, Color.red);
         }
 
         private static void AssertNamedBoardPort(

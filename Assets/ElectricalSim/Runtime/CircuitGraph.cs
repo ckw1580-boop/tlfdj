@@ -30,7 +30,7 @@ namespace ElectricalSim
         public bool? FaultSide;
     }
 
-    public sealed class SimulationSnapshot
+    public sealed partial class SimulationSnapshot
     {
         private readonly Dictionary<string, string> roots;
         private readonly Dictionary<string, ElectricalPotential> potentials;
@@ -63,7 +63,7 @@ namespace ElectricalSim
         public bool ContainsPort(string port) => port != null && roots.ContainsKey(port);
         public bool IsVoltageUnsupported(string port) => ContainsPort(port) && unsupportedVoltageRoots.Contains(roots[port]);
         public bool HasExternalSupply(string port) => ContainsPort(port) &&
-            (GetPotential(port) != ElectricalPotential.Floating || externalSupplyRoots.Contains(roots[port]));
+            (GetPotential(port) != ElectricalPotential.Floating || externalSupplyRoots.Contains(roots[port]) || SignalEnergized(port));
         internal void MarkUnmodeledVoltageOutput(string port, bool energized)
         {
             if (!ContainsPort(port)) return;
@@ -93,6 +93,7 @@ namespace ElectricalSim
 
         public double GetDcVoltage(string portA, string portB)
         {
+            if (TryGetSignalVoltage(portA, portB, out var signalVoltage)) return signalVoltage;
             var a = GetPotential(portA);
             var b = GetPotential(portB);
             if (a == ElectricalPotential.Conflict || b == ElectricalPotential.Conflict) return double.NaN;
@@ -213,6 +214,20 @@ namespace ElectricalSim
                 if (!changed) break;
             }
 
+            var controls = devices.Values.OfType<InverterDriveRuntime>().Where(d => d.Control != null).ToArray();
+            if (controls.Length > 0)
+            {
+                snapshot = BuildSnapshot();
+                foreach (var drive in controls) drive.Control.SampleAndAdvance(snapshot, deltaTime);
+                // Re-solve new outputs without advancing any time-dependent command twice.
+                for (var iteration = 0; iteration < maxIterations; iteration++)
+                {
+                    snapshot = BuildSnapshot();
+                    var changed = false;
+                    foreach (var device in devices.Values) changed |= device.Evaluate(snapshot, 0);
+                    if (!changed) break;
+                }
+            }
             snapshot = BuildSnapshot();
             // Time advances once, after contact convergence, never in the iteration loop.
             foreach (var motor in devices.Values.OfType<ElectricalDeviceRuntime>().Where(d => d.Kind == ElectricalDeviceKind.Motor))
@@ -241,6 +256,9 @@ namespace ElectricalSim
             var speeds = devices.Values.OfType<ElectricalDeviceRuntime>()
                 .Where(d => d.Kind == ElectricalDeviceKind.Motor).ToDictionary(d => d.DeviceId, d => d.ActualSpeedRpm);
             var snapshot = new SimulationSnapshot(rootMap, potentialsByRoot, active, directions, errors, speeds);
+            var signalSources = devices.Values.OfType<IControlSignalSource>().ToArray();
+            snapshot.ResolveControlSignals(signalSources.SelectMany(s => s.GetControlSignals(snapshot)).ToArray(),
+                signalSources.SelectMany(s => s.CurrentReceivers), errors);
             foreach (var sensor in devices.Values.OfType<SceneIoDeviceRuntime>())
                 if (sensor.Powered && sensor.Wet && sensor.SignalShortCircuit)
                     errors.Add(sensor.Definition.Name + "：SIGNAL与GND短接，输出已保护断开。");

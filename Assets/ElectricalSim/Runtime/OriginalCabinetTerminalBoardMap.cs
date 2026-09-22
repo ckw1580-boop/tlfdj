@@ -48,7 +48,7 @@ namespace ElectricalSim
                     DeviceId = "DuanZiPai_3",
                     DisplayName = "G120、交流接触器及FR上端子排",
                     Kind = OriginalCabinetTerminalBoardKind.DriveContactorUpper,
-                    ExpectedPortCount = 59,
+                    ExpectedPortCount = 71,
                     UsesSeparateJumperAnchors = true,
                     AlwaysUsesElectricalAnchor = true
                 },
@@ -57,7 +57,7 @@ namespace ElectricalSim
                     DeviceId = "DuanZiPai_4",
                     DisplayName = "G120、交流接触器及FR下端子排",
                     Kind = OriginalCabinetTerminalBoardKind.DriveContactorLower,
-                    ExpectedPortCount = 48,
+                    ExpectedPortCount = 62,
                     UsesSeparateJumperAnchors = true,
                     AlwaysUsesJumperAnchor = true
                 },
@@ -204,6 +204,8 @@ namespace ElectricalSim
         public static string GetDisplayName(OriginalCabinetTerminalBoardDefinition board, string portName)
         {
             if (board.Kind == OriginalCabinetTerminalBoardKind.SceneIo) return SceneIoCatalog.DisplayPort(portName);
+            var g120 = G120TerminalCatalog.FromBoardPort(portName);
+            if (g120 != null) return "G120 · " + g120.Label;
             if (board.Kind != OriginalCabinetTerminalBoardKind.PowerDistribution ||
                 string.IsNullOrEmpty(ResolvePowerDistributionLogicalNode(portName))) return portName;
             return (portName[0] == 'V' ? "24V+" : "24V-") + portName.Substring(1);

@@ -91,8 +91,8 @@ namespace ElectricalSim.Tests
             var power = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_6");
             var motor = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_7");
             var sceneIo = OriginalCabinetTerminalBoardMap.Boards.Single(item => item.DeviceId == "DuanZiPai_8");
-            Assert.That(upper.ExpectedPortCount, Is.EqualTo(59));
-            Assert.That(lower.ExpectedPortCount, Is.EqualTo(48));
+            Assert.That(upper.ExpectedPortCount, Is.EqualTo(71));
+            Assert.That(lower.ExpectedPortCount, Is.EqualTo(62));
             Assert.That(power.ExpectedPortCount, Is.EqualTo(8));
             Assert.That(motor.ExpectedPortCount, Is.EqualTo(18));
             Assert.That(sceneIo.ExpectedPortCount, Is.EqualTo(18));

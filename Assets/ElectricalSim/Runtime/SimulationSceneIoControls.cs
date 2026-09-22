@@ -84,6 +84,7 @@ namespace ElectricalSim
         }
         public void SelectSceneIo(SceneIoView view)
         {
+            if (view != null) SelectInverter(false);
             if (view != null)
             {
                 if (!sceneIoViews.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate) return;

@@ -32,6 +32,7 @@ namespace ElectricalSim
 
         public void SelectFrontBreaker(FrontBreakerView view)
         {
+            if (view != null) SelectInverter(false);
             if (view != null)
             {
                 if (IsInteractionBlocked || Mode == SimulationMode.Wiring || !frontBreakers.Contains(view)) return;

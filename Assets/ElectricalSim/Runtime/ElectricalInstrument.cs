@@ -19,7 +19,7 @@ namespace ElectricalSim
                 return new MultimeterReading(mode, MultimeterReadingState.MissingProbe);
             var red = snapshot.GetPotential(redPort);
             var black = snapshot.GetPotential(blackPort);
-            if (red == ElectricalPotential.Conflict || black == ElectricalPotential.Conflict)
+            if (red == ElectricalPotential.Conflict || black == ElectricalPotential.Conflict || snapshot.HasSignalConflict(redPort) || snapshot.HasSignalConflict(blackPort))
                 return new MultimeterReading(mode, MultimeterReadingState.Conflict);
             if (mode == MultimeterMode.Continuity)
             {
@@ -31,6 +31,11 @@ namespace ElectricalSim
             }
             if (snapshot.IsVoltageUnsupported(redPort) || snapshot.IsVoltageUnsupported(blackPort))
                 return new MultimeterReading(mode, MultimeterReadingState.Unsupported);
+            if (snapshot.TryGetSignalVoltage(redPort, blackPort, out var signalVoltage))
+                return new MultimeterReading(mode, double.IsNaN(signalVoltage) ? MultimeterReadingState.Conflict : MultimeterReadingState.Valid,
+                    mode == MultimeterMode.DcVoltage ? signalVoltage : 0);
+            if (snapshot.HasControlSignal(redPort) || snapshot.HasControlSignal(blackPort))
+                return new MultimeterReading(mode, MultimeterReadingState.UndefinedReference);
             if ((red == ElectricalPotential.Floating) != (black == ElectricalPotential.Floating) ||
                 red != ElectricalPotential.Floating && IsDc(red) != IsDc(black))
                 return new MultimeterReading(mode, MultimeterReadingState.UndefinedReference);

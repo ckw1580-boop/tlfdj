@@ -63,6 +63,7 @@ namespace ElectricalSim
         }
         public void SelectThermalRelay(ThermalRelayView view)
         {
+            if (view != null) SelectInverter(false);
             if (view != null)
             {
                 if (!thermalRelayViews.Contains(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && !(view.IsRear && Mode == SimulationMode.Fault)) return;

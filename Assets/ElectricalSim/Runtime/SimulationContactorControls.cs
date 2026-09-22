@@ -77,6 +77,7 @@ namespace ElectricalSim
 
         public void SelectContactor(ContactorView view)
         {
+            if (view != null) SelectInverter(false);
             if (view != null)
             {
                 if (!IsRegisteredContactor(view) || Mode != SimulationMode.View && Mode != SimulationMode.Simulate && !(view.IsRear && Mode == SimulationMode.Fault)) return;

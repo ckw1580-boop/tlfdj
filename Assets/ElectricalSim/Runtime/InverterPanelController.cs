@@ -70,7 +70,7 @@ namespace ElectricalSim
         {
             Numeric("SP", "手动速度设定", "0", "1/min", -1425f, 1425f),
             Option("P0010", "调试参数过滤器", "0", "0", "1"),
-            Option("P0015", "宏程序选择", "7", "1", "2", "3", "4", "5", "6", "7", "8", "9", "12", "13", "14", "15", "17", "18", "19", "20", "21"),
+            Option("P0015", "宏程序选择", "1", "1", "2", "3", "4", "5", "6", "7", "8", "9", "12", "13", "14", "15", "17", "18", "19", "20", "21"),
             Option("P100", "电机标准 IEC/NEMA", "0", "0", "1", "2"),
             Numeric("P304", "电机额定电压", "400", "V", 0f, 20000f),
             Numeric("P305", "电机额定电流", "3.1", "A", 0f, 10000f, 0.1f),
@@ -82,6 +82,11 @@ namespace ElectricalSim
             Numeric("P758.0", "模拟输入曲线 Y1", "0", "%", -1000f, 1000f),
             Numeric("P759.0", "模拟输入曲线 X2", "10", "V", -50f, 160f),
             Numeric("P760.0", "模拟输入曲线 Y2", "100", "%", -1000f, 1000f),
+            Option("P756.1", "模拟输入 AI1 类型", "4", "0", "1", "2", "3", "4"),
+            Numeric("P757.1", "AI1 标定 X1", "0", "V/mA", -50f, 160f, 0.1f),
+            Numeric("P758.1", "AI1 标定 Y1", "0", "%", -1000f, 1000f, 0.1f),
+            Numeric("P759.1", "AI1 标定 X2", "10", "V/mA", -50f, 160f, 0.1f),
+            Numeric("P760.1", "AI1 标定 Y2", "100", "%", -1000f, 1000f, 0.1f),
             Numeric("P1001", "固定转速 1", "0", "1/min", -210000f, 210000f),
             Numeric("P1002", "固定转速 2", "200", "1/min", -210000f, 210000f),
             Numeric("P1003", "固定转速 3", "300", "1/min", -210000f, 210000f),
@@ -141,6 +146,7 @@ namespace ElectricalSim
         private int parameterIndex;
         private bool editingValue;
         private bool runCommand;
+        private bool driveAvailable = true;
         private float requestedSpeedRpm;
         private float lastPublishedSpeed = float.NaN;
         private float analogInputNormalized;
@@ -182,6 +188,12 @@ namespace ElectricalSim
             Macro == 15 && digitalInputs[3];
         public IReadOnlyList<string> ParameterKeys => Definitions.Select(item => item.Key).ToArray();
         public event Action<float> OutputSpeedChanged;
+        public bool UseExternalClock { get; set; }
+        public bool OperationEnabled => driveAvailable && runCommand && !HasFault;
+        public Func<bool> CanResetFault { get; set; }
+        public event Action FactorySettingsReset;
+        private float? calibratedAnalogPercent;
+
 
         public void Initialize(GameObject panel, Action onClose)
         {
@@ -252,7 +264,12 @@ namespace ElectricalSim
                 var option = value.ToString("0", CultureInfo.InvariantCulture);
                 return definition.Options.Contains(option) && TrySetParameter(key, option);
             }
-            values[definition.Key] = Format(Mathf.Clamp(value, definition.Min, definition.Max), definition.Step);
+            var bounded = Mathf.Clamp(value, definition.Min, definition.Max);
+            // Calibration is entered numerically in the property panel; a BOP button
+            // step must not silently round two distinct calibration points together.
+            var calibration = definition.Key.StartsWith("P757.") || definition.Key.StartsWith("P758.") ||
+                definition.Key.StartsWith("P759.") || definition.Key.StartsWith("P760.");
+            values[definition.Key] = calibration ? bounded.ToString("G9", CultureInfo.InvariantCulture) : Format(bounded, definition.Step);
             if (string.Equals(definition.Key, "P1080", StringComparison.OrdinalIgnoreCase) &&
                 GetNumericValue("P1082") < GetNumericValue("P1080"))
                 values["P1082"] = values["P1080"];
@@ -286,38 +303,46 @@ namespace ElectricalSim
         public void SetDigitalInput(int index, bool active)
         {
             if (index < 0 || index >= digitalInputs.Length) return;
-            var risingEdge = !digitalInputs[index] && active;
-            digitalInputs[index] = active;
+            var next = (bool[])digitalInputs.Clone(); next[index] = active;
             digitalInputWritten[index] = true;
+            ApplyDigitalInputs(next, false);
+        }
 
-            if (risingEdge && IsFaultResetInput(index)) SetFault(false);
-            if (Macro == 19)
+        public void SetDigitalInputs(IReadOnlyList<bool> inputs) => ApplyDigitalInputs(inputs, true);
+        private void ApplyDigitalInputs(IReadOnlyList<bool> inputs, bool markAll)
+        {
+            if (inputs == null || inputs.Count != digitalInputs.Length) throw new ArgumentException("Six digital inputs are required.");
+            var rising = new bool[digitalInputs.Length];
+            for (var i = 0; i < digitalInputs.Length; i++)
             {
-                if (index == 0 && !active) threeWireRunning = false;
-                if (risingEdge && index == 1 && digitalInputs[0])
+                rising[i] = inputs[i] && !digitalInputs[i];
+                digitalInputs[i] = inputs[i];
+                if (markAll) digitalInputWritten[i] = true;
+            }
+            for (var i = 0; i < rising.Length; i++) if (rising[i] && IsFaultResetInput(i)) SetFault(false);
+            if (Macro == 19 || Macro == 20)
+            {
+                if (!digitalInputs[0]) threeWireRunning = false;
+                else
                 {
-                    latchedDirection = 1;
-                    threeWireRunning = true;
-                }
-                if (risingEdge && index == 2 && digitalInputs[0])
-                {
-                    latchedDirection = -1;
-                    threeWireRunning = true;
+                    if (rising[1]) { latchedDirection = 1; threeWireRunning = true; }
+                    if (Macro == 19 && rising[2]) { latchedDirection = -1; threeWireRunning = true; }
                 }
             }
-            else if (Macro == 20)
-            {
-                if (index == 0 && !active) threeWireRunning = false;
-                if (risingEdge && index == 1 && digitalInputs[0]) threeWireRunning = true;
-            }
+            if ((Macro == 14 || Macro == 15) && digitalInputWritten[1] && !digitalInputs[1] && !HasFault) SetFault(true, 85);
+            if (!IsManualMode) RefreshAutomaticCommand();
+        }
 
-            if ((Macro == 14 || Macro == 15) && index == 1 && !active)
-                SetFault(true, 85);
+        public void SetAnalogPercentage(float percentage)
+        {
+            calibratedAnalogPercent = float.IsNaN(percentage) || float.IsInfinity(percentage) ? 0 : percentage;
+            analogInputNormalized = Mathf.Clamp(percentage / 100f, -1, 1);
             if (!IsManualMode) RefreshAutomaticCommand();
         }
 
         public void SetAnalogInput(float normalizedValue)
         {
+            calibratedAnalogPercent = null;
             analogInputNormalized = Mathf.Clamp(normalizedValue, -1f, 1f);
             if (!IsManualMode) RefreshAutomaticCommand();
         }
@@ -360,6 +385,7 @@ namespace ElectricalSim
 
         public void SetFault(bool active, int number)
         {
+            if (!active && CanResetFault != null && !CanResetFault()) return;
             HasFault = active;
             faultNumber = active ? Mathf.Max(1, number) : 0;
             if (active) PressStop();
@@ -420,6 +446,10 @@ namespace ElectricalSim
 
         public void ResetFactorySettings()
         {
+            FactorySettingsReset?.Invoke();
+            calibratedAnalogPercent = null;
+            IsManualMode = false;
+            OutputSpeedRpm = 0;
             foreach (var definition in Definitions) values[definition.Key] = definition.DefaultValue;
             Array.Clear(digitalInputs, 0, digitalInputs.Length);
             Array.Clear(digitalInputWritten, 0, digitalInputWritten.Length);
@@ -441,19 +471,27 @@ namespace ElectricalSim
 
         private void Update()
         {
+            if (!UseExternalClock) Advance(Time.unscaledDeltaTime);
+        }
+
+        public void Advance(float deltaTime, bool driveEnabled = true)
+        {
+            driveAvailable = driveEnabled;
+            deltaTime = Mathf.Max(0, deltaTime);
             if (!IsManualMode)
             {
-                UpdateMotorizedPotentiometer();
+                if (driveEnabled) UpdateMotorizedPotentiometer(deltaTime);
                 RefreshAutomaticCommand();
             }
-            var target = HasFault ? 0f : requestedSpeedRpm;
+            var target = HasFault || !driveEnabled ? 0f : requestedSpeedRpm;
+            if (!driveEnabled) OutputSpeedRpm = 0;
             // A direction change must finish deceleration before reverse acceleration.
             if (OutputSpeedRpm * target < 0f) target = 0f;
             var accelerating = Mathf.Abs(target) > Mathf.Abs(OutputSpeedRpm);
             var rampKey = accelerating ? "P1120" : "P1121";
             var rampSeconds = Mathf.Max(0.01f, GetNumericValue(rampKey));
             var maximum = Mathf.Max(1f, GetNumericValue("P1082"));
-            OutputSpeedRpm = Mathf.MoveTowards(OutputSpeedRpm, target, maximum / rampSeconds * Time.unscaledDeltaTime);
+            OutputSpeedRpm = Mathf.MoveTowards(OutputSpeedRpm, target, maximum / rampSeconds * deltaTime);
 
             if (float.IsNaN(lastPublishedSpeed) || Mathf.Abs(OutputSpeedRpm - lastPublishedSpeed) > 0.01f)
             {
@@ -591,7 +629,7 @@ namespace ElectricalSim
             requestedSpeedRpm = 0f;
         }
 
-        private void UpdateMotorizedPotentiometer()
+        private void UpdateMotorizedPotentiometer(float deltaTime)
         {
             var increase = false;
             var decrease = false;
@@ -609,7 +647,7 @@ namespace ElectricalSim
 
             var fullRange = Mathf.Max(1f, GetNumericValue("P1037") - GetNumericValue("P1038"));
             var ramp = Mathf.Max(0.01f, increase ? GetNumericValue("P1120") : GetNumericValue("P1121"));
-            var delta = fullRange / ramp * Time.unscaledDeltaTime * (increase ? 1f : -1f);
+            var delta = fullRange / ramp * deltaTime * (increase ? 1f : -1f);
             motorizedPotentiometerRpm = Mathf.Clamp(
                 motorizedPotentiometerRpm + delta, GetNumericValue("P1038"), GetNumericValue("P1037"));
         }
@@ -625,7 +663,7 @@ namespace ElectricalSim
                 ? y1
                 : y1 + (volts - x1) / (x2 - x1) * (y2 - y1);
             var reference = Mathf.Min(GetNumericValue("P1082"), GetNumericValue("P311"));
-            return percentage * 0.01f * reference;
+            return (calibratedAnalogPercent ?? percentage) * 0.01f * reference;
         }
 
         private bool IsFieldbusRunEnabled()
@@ -672,9 +710,9 @@ namespace ElectricalSim
         private void UpdateStatusWord()
         {
             ushort status = 0;
-            status |= 1 << 0;
-            if (!HasFault) status |= 1 << 1;
-            if (runCommand && !HasFault) status |= 1 << 2;
+            if (driveAvailable) status |= 1 << 0;
+            if (driveAvailable && !HasFault) status |= 1 << 1;
+            if (OperationEnabled) status |= 1 << 2;
             if (HasFault) status |= 1 << 3;
             if ((fieldbusControlWord & 0x0002) == 0) status |= 1 << 4;
             if ((fieldbusControlWord & 0x0004) == 0) status |= 1 << 5;
@@ -1013,7 +1051,7 @@ namespace ElectricalSim
 
         private void RefreshIndicators()
         {
-            SetActive(runIndicator, runCommand || IsRunning);
+            SetActive(runIndicator, OperationEnabled || IsRunning);
             SetActive(handIndicator, IsManualMode);
             SetActive(jogIndicator, IsJogMode);
             SetActive(errorIndicator, HasFault);
@@ -1082,10 +1120,15 @@ namespace ElectricalSim
             if (string.Equals(normalized, "P15", StringComparison.OrdinalIgnoreCase)) return "P0015";
             if (string.Equals(normalized, "P10", StringComparison.OrdinalIgnoreCase)) return "P0010";
             if (string.Equals(normalized, "P0756.0", StringComparison.OrdinalIgnoreCase)) return "P756.0";
+            if (string.Equals(normalized, "P0756.1", StringComparison.OrdinalIgnoreCase)) return "P756.1";
             if (string.Equals(normalized, "P0757.0", StringComparison.OrdinalIgnoreCase)) return "P757.0";
+            if (string.Equals(normalized, "P0757.1", StringComparison.OrdinalIgnoreCase)) return "P757.1";
             if (string.Equals(normalized, "P0758.0", StringComparison.OrdinalIgnoreCase)) return "P758.0";
+            if (string.Equals(normalized, "P0758.1", StringComparison.OrdinalIgnoreCase)) return "P758.1";
             if (string.Equals(normalized, "P0759.0", StringComparison.OrdinalIgnoreCase)) return "P759.0";
+            if (string.Equals(normalized, "P0759.1", StringComparison.OrdinalIgnoreCase)) return "P759.1";
             if (string.Equals(normalized, "P0760.0", StringComparison.OrdinalIgnoreCase)) return "P760.0";
+            if (string.Equals(normalized, "P0760.1", StringComparison.OrdinalIgnoreCase)) return "P760.1";
             return normalized;
         }
 

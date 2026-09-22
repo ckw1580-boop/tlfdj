@@ -77,6 +77,7 @@ namespace ElectricalSim
             CreateEnvironment();
             var cameraController = CreateCamera();
             cameraController.ResetView();
+            CreateG120ControlAnchors();
             RefreshTerminalBoardAnnotations(cameraController.transform);
             CreateFaultButtonTerminalConnections(cameraController);
             Debug.Log("[OfflineBootstrap] Environment ready.");
@@ -546,6 +547,15 @@ namespace ElectricalSim
                 lowerAnchors.Where(item => item.name.StartsWith("FR", StringComparison.Ordinal)).ToArray(),
                 "FR端子区",
                 "FR " + objectNameSuffix, verticalOffsetInGlyphHeights);
+
+            if (boardName == "DuanZiPai_4")
+            {
+                var inverterLabel = root.Find("Terminal Annotation - G120 Inverter " + objectNameSuffix);
+                var contactorLabel = root.Find("Terminal Annotation - Contactors KM " + objectNameSuffix);
+                if (inverterLabel != null && contactorLabel != null)
+                    inverterLabel.position += inverterLabel.up *
+                        Vector3.Dot(contactorLabel.position - inverterLabel.position, inverterLabel.up);
+            }
         }
 
         private void CreateWholeTerminalBoardAnnotation(
@@ -2270,6 +2280,7 @@ namespace ElectricalSim
                         inverterPanel.SetActive(visible);
                         if (visible) inverterPanel.transform.SetAsLastSibling();
                     });
+                    controller.CreateInverterProperties(ui.Canvas, uiFont);
                 }
                 else
                 {
