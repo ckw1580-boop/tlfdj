@@ -385,8 +385,20 @@ namespace ElectricalSim.Tests
                     Is.LessThan(0.001f),
                     $"Breaker {breaker.BreakerId} must retain its original blue material");
             }
-            Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True);
-            yield return new WaitForSecondsRealtime(breakers[0].AnimationDuration * 0.25f);
+            // StartCoroutine advances immediately using this frame's unscaled delta.
+            // Inspect the first step synchronously so a slow next frame cannot skip it.
+            var durationField = typeof(CabinetBreakerInteractable).GetField(
+                "animationDuration", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            var originalDuration = breakers[0].AnimationDuration;
+            try
+            {
+                durationField.SetValue(breakers[0], Mathf.Max(Time.unscaledDeltaTime * 4f, 0.0001f));
+                Assert.That(controller.TryToggleCabinetBreaker(breakers[0]), Is.True);
+            }
+            finally
+            {
+                durationField.SetValue(breakers[0], originalDuration);
+            }
             var midAnimationAngle = Quaternion.Angle(
                 breakers[0].Handle.localRotation,
                 closedRotations[breakers[0].BreakerId]);
@@ -1654,7 +1666,8 @@ namespace ElectricalSim.Tests
             var terminalBoardIds = new HashSet<string>(
                 OriginalCabinetTerminalBoardMap.Boards.Select(item => item.DeviceId))
             {
-                OriginalTerminalBoardMap.DeviceId
+                OriginalTerminalBoardMap.DeviceId,
+                FaultPowerTerminalBlock.DeviceId
             };
             var faultDevices = new[]
             {
@@ -1665,8 +1678,9 @@ namespace ElectricalSim.Tests
             };
             var faultDeviceIds = new HashSet<string>(faultDevices.Select(item => item.Id));
             // Cabinet breakers now expose their own physical connection points in normal views.
-            var breakerIds = new HashSet<string> { "QF106", "QF122" };
-            foreach (var breaker in new[] { new { Id = "QF106", Count = 6 }, new { Id = "QF122", Count = 8 } })
+            var breakerIds = new HashSet<string> { "QF106", "QF122", "QFFRONT1", "QFFRONT2", "QFFRONT3" };
+            foreach (var breaker in new[] { new { Id = "QF106", Count = 6 }, new { Id = "QF122", Count = 8 },
+                new { Id = "QFFRONT1", Count = 8 }, new { Id = "QFFRONT2", Count = 8 }, new { Id = "QFFRONT3", Count = 8 } })
                 Assert.That(Object.FindObjectsOfType<ElectricalDeviceView>().Single(view => view.Runtime.DeviceId == breaker.Id).Ports.Count,
                     Is.EqualTo(breaker.Count));
             var deviceViews = Object.FindObjectsOfType<ElectricalDeviceView>()
@@ -1687,9 +1701,17 @@ namespace ElectricalSim.Tests
                              breakerIds.Contains(port.DeviceId) ||
                              new[] { "M1", "M_DOUBLE", "M2", "M3" }.Contains(port.DeviceId)), Is.True);
 
+            cameraController.SetWiringView();
             controller.SetMode(SimulationMode.Wiring);
             controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
             yield return null;
+            foreach (var breaker in Object.FindObjectsOfType<ElectricalDeviceView>()
+                .Where(view => view.Runtime.DeviceId.StartsWith("QFFRONT")))
+                foreach (var port in breaker.Ports)
+                {
+                    Assert.That(port.CurrentAnchor, Is.Not.Null, port.QualifiedPort);
+                    Assert.That(port.IsVisible && port.GetComponent<Collider>().enabled, Is.True, port.QualifiedPort);
+                }
             foreach (var device in faultDevices)
             {
                 var ports = Object.FindObjectsOfType<ElectricalDeviceView>()
@@ -2068,37 +2090,37 @@ namespace ElectricalSim.Tests
         public IEnumerator LineTypeShowsTheCorrectConnectionPointGroups()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
-
-            controller.SetMode(SimulationMode.Wiring);
-            controller.SetWireStyle(Color.red, 0.01f, "ElectricalWire");
-            yield return null;
-
+            var camera = Object.FindObjectOfType<TrainingCameraController>();
             var ports = Object.FindObjectsOfType<ElectricalPortView>();
-            var jumperPorts = ports.Where(port => port.JumperOnly).ToArray();
-            var electricalPorts = ports.Where(port => port.ElectricalOnly).ToArray();
-            var faultDeviceIds = new HashSet<string> { "KMBACK1", "KMBACK2", "KMBACK3", "FR" };
-            var faultBodyPorts = electricalPorts.Where(port => faultDeviceIds.Contains(port.DeviceId)).ToArray();
-            var terminalElectricalPorts = electricalPorts.Where(port => !faultDeviceIds.Contains(port.DeviceId)).ToArray();
-            var motorBoardPorts = ports.Where(port => port.DeviceId == "DuanZiPai_7").ToArray();
-            Assert.That(jumperPorts.Length, Is.EqualTo(24));
-            Assert.That(jumperPorts.Select(port => port.DeviceId).Distinct(),
-                Is.EquivalentTo(new[] { "M1", "M_DOUBLE", "M2", "M3" }));
-            Assert.That(electricalPorts.Length, Is.GreaterThan(0));
-            Assert.That(motorBoardPorts.Length, Is.EqualTo(18));
-            Assert.That(motorBoardPorts.All(port => !port.JumperOnly && !port.ElectricalOnly), Is.True);
-            Assert.That(jumperPorts.All(port => !port.IsVisible), Is.True);
-            Assert.That(terminalElectricalPorts.All(port => port.IsVisible), Is.True);
-            Assert.That(faultBodyPorts.All(port => !port.IsVisible), Is.True);
-            Assert.That(motorBoardPorts.All(port => port.IsVisible && !port.UsesJumperAnchor), Is.True);
-
-            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
-            yield return null;
-
-            Assert.That(jumperPorts.All(port => port.IsVisible), Is.True);
-            Assert.That(electricalPorts.All(port => !port.IsVisible), Is.True);
-            Assert.That(motorBoardPorts.All(port => port.IsVisible && port.UsesJumperAnchor), Is.True);
+            var motors = ports.Where(p => p.JumperOnly).ToArray();
+            Assert.That(motors.Length, Is.EqualTo(24));
+            Assert.That(motors.Select(p => p.DeviceId).Distinct(), Is.EquivalentTo(new[] { "M1", "M_DOUBLE", "M2", "M3" }));
+            var board = ports.Where(p => p.DeviceId == "DuanZiPai_7").ToArray();
+            Assert.That(board.Length, Is.EqualTo(18));
+            controller.SetMode(SimulationMode.Wiring);
+            foreach (var back in new[] { false, true })
+            foreach (var jumper in new[] { false, true })
+            {
+                if (back) camera.SetFaultView(); else camera.SetWiringView();
+                controller.SetWireStyle(Color.red, 0.01f, jumper ? "JumperLine" : "ElectricalWire");
+                yield return null;
+                foreach (var port in ports)
+                {
+                    var preset = back ? TrainingViewPreset.FaultBack : TrainingViewPreset.WiringFront;
+                    var anchor = port.GetOriginalAnchor(preset, jumper);
+                    var expected = anchor != null && (!port.JumperOnly || jumper) && (!port.ElectricalOnly || !jumper);
+                    Assert.That(port.IsVisible, Is.EqualTo(expected), $"{port.QualifiedPort}: back={back}, jumper={jumper}");
+                    Assert.That(port.GetComponent<Collider>().enabled, Is.EqualTo(expected), port.QualifiedPort);
+                    if (expected)
+                        Assert.That(Vector3.Distance(port.transform.position, anchor.position), Is.LessThan(0.0005f), port.QualifiedPort);
+                }
+                Assert.That(motors.All(p => p.IsVisible == jumper), Is.True);
+                Assert.That(board.All(p => p.IsVisible && p.UsesJumperAnchor == jumper), Is.True);
+                var fr = ports.Where(p => p.DeviceId == "FR" && new[] { "T1", "T2", "T3" }.Contains(p.PortName)).ToArray();
+                Assert.That(fr.Length, Is.EqualTo(3));
+                Assert.That(fr.All(p => p.IsVisible == back), Is.True, "FR motor outputs support both line types on the rear.");
+            }
         }
-
         [UnityTest]
         public IEnumerator ArrowedMotorTerminalStripAppearsInBothLineModes()
         {
@@ -2342,47 +2364,40 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
-        public IEnumerator CabinetBrandingCoversBothOriginalHeaderLogos()
+        public IEnumerator CabinetBrandingKeepsCurrentCabinetMaterialsAndBothFaces()
         {
             var environment = GameObject.Find("OriginalLabEnvironment");
-            var cameraController = Object.FindObjectOfType<TrainingCameraController>();
+            var camera = Object.FindObjectOfType<TrainingCameraController>();
             Assert.That(environment, Is.Not.Null);
-            var cabinet = environment.GetComponentsInChildren<Transform>(true)
-                .Single(item => item.name == "wanggui");
-            var mesh = cabinet.GetComponent<MeshFilter>().sharedMesh;
-            var front = cabinet.Find("Cabinet WCK Logo Front");
-            var back = cabinet.Find("Cabinet WCK Logo Back");
-
-            Assert.That(front, Is.Not.Null);
-            Assert.That(back, Is.Not.Null);
-            Assert.That(front.localPosition.y, Is.GreaterThan(mesh.bounds.center.y + mesh.bounds.extents.y * 0.8f));
-            Assert.That(back.localPosition.y, Is.EqualTo(front.localPosition.y).Within(0.0001f));
-            Assert.That(front.localPosition.z, Is.GreaterThan(mesh.bounds.max.z));
-            Assert.That(back.localPosition.z, Is.LessThan(mesh.bounds.min.z));
-            Assert.That(front.GetComponentInChildren<MeshRenderer>().enabled, Is.True);
-            Assert.That(back.GetComponentInChildren<MeshRenderer>().enabled, Is.True);
-
-            cameraController.SetWiringView();
-            yield return null;
-            var frontScreen = Camera.main.WorldToScreenPoint(front.position);
-            Debug.Log($"[CabinetBranding] front local={front.localPosition}, world={front.position}, screen={frontScreen}");
-            foreach (var renderer in environment.GetComponentsInChildren<Renderer>(true)
-                         .Where(item => item.enabled && item.bounds.max.y > 2.6f)
-                         .OrderByDescending(item => item.bounds.max.y)
-                         .Take(30))
+            var cabinets = environment.GetComponentsInChildren<MeshRenderer>(true)
+                .Where(r => r.name == "DQG01").ToArray();
+            Assert.That(cabinets, Is.Not.Empty);
+            var deadline = Time.realtimeSinceStartup + 5f;
+            bool Cleaned() => cabinets.All(r => r.sharedMaterials.Where(m => m != null && m.name.Contains("bq"))
+                .Any(m => m.mainTexture != null && m.mainTexture.name.Contains("Logo Removed")));
+            while (!Cleaned() && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(Cleaned(), Is.True, "Cabinet texture cleanup did not finish within 5 seconds.");
+            foreach (var cabinet in cabinets)
             {
-                var screen = Camera.main.WorldToScreenPoint(renderer.bounds.center);
-                Debug.Log($"[CabinetHeaderCandidate] {HierarchyPath(renderer.transform)} bounds={renderer.bounds} screen={screen}");
+                Assert.That(cabinet.enabled, Is.True);
+                Assert.That(cabinet.transform.Find("Cabinet WCK Logo Front"), Is.Null,
+                    "DQG01 intentionally uses its cleaned original header, without added WCK panels.");
+                Assert.That(cabinet.transform.Find("Cabinet WCK Logo Back"), Is.Null);
+                var mesh = cabinet.GetComponent<MeshFilter>().sharedMesh;
+                Assert.That(cabinet.sharedMaterials.Length, Is.EqualTo(mesh.subMeshCount));
+                var texture = (Texture2D)cabinet.sharedMaterials.First(m => m != null && m.name.Contains("bq")).mainTexture;
+                var masked = texture.GetPixel(Mathf.RoundToInt(texture.width * 0.05f), Mathf.RoundToInt(texture.height * 0.95f));
+                Assert.That(masked.a, Is.LessThan(0.01f), "The old embedded logo should be cleared.");
             }
-            Assert.That(frontScreen.z, Is.GreaterThan(0f));
-
-            cameraController.SetFaultView();
-            yield return null;
-            var backScreen = Camera.main.WorldToScreenPoint(back.position);
-            Debug.Log($"[CabinetBranding] back local={back.localPosition}, world={back.position}, screen={backScreen}");
-            Assert.That(backScreen.z, Is.GreaterThan(0f));
+            foreach (var back in new[] { false, true })
+            {
+                if (back) camera.SetFaultView(); else camera.SetWiringView();
+                yield return null;
+                var planes = GeometryUtility.CalculateFrustumPlanes(Camera.main);
+                Assert.That(cabinets.Any(r => GeometryUtility.TestPlanesAABB(planes, r.bounds)), Is.True,
+                    "The cabinet must remain in frame from both training views.");
+            }
         }
-
         [UnityTest]
         public IEnumerator WiringToolbarKeepsCameraAndPlacesLineFormBelowToolbar()
         {

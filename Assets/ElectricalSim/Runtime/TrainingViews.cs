@@ -460,6 +460,17 @@ namespace ElectricalSim
         private readonly List<GameObject> nodeHandles = new List<GameObject>();
         private bool selected;
         private int selectedPointIndex = -1;
+        private bool geometryDirty = true;
+        private WireEndpointGeometry cachedStart, cachedEnd;
+        private Bounds cachedStartBounds, cachedEndBounds;
+        private readonly List<Vector3> cachedBends = new List<Vector3>();
+        private string cachedStartPort, cachedEndPort, cachedLineType;
+        private int cachedDuctRevision;
+        private Color cachedColor;
+        private float cachedArea;
+        private Matrix4x4 cachedMatrix;
+        private MaterialPropertyBlock nodeBlock;
+        public int GeometryBuildCount { get; private set; }
 
         public WireConnection Connection => wire;
         public bool IsSelected => selected;
@@ -497,17 +508,64 @@ namespace ElectricalSim
             Refresh();
         }
 
-        public void Refresh()
+        public void Rebind(WireConnection connection, Func<string, Vector3> portResolver,
+            WireSurfacePlane surface, Func<string, WireEndpointGeometry> endpointResolver = null)
+        {
+            wire = connection;
+            resolvePort = portResolver;
+            resolveEndpoint = endpointResolver;
+            SetSurface(surface);
+        }
+
+        public void Refresh() => Refresh(false);
+
+        public void Refresh(bool force)
         {
             if (line == null || wire == null) return;
-            renderPath = WireRenderPath.Build(
-                resolveEndpoint != null ? resolveEndpoint(wire.StartPort) : new WireEndpointGeometry(resolvePort(wire.StartPort)),
-                resolveEndpoint != null ? resolveEndpoint(wire.EndPort) : new WireEndpointGeometry(resolvePort(wire.EndPort)),
-                wire.Points, wireSurface, WireRenderPath.IsMotorJumper(wire.StartPort, wire.EndPort, wire.LineType));
-            renderedPoints = renderPath.Points;
-            var linePoints = renderPath.HasSpatialLeads ? renderPath.Trunk : renderedPoints;
-            ApplyPositions(line, linePoints);
-            ApplyPositions(highlightLine, linePoints);
+            var start = resolveEndpoint != null ? resolveEndpoint(wire.StartPort) : new WireEndpointGeometry(resolvePort(wire.StartPort));
+            var end = resolveEndpoint != null ? resolveEndpoint(wire.EndPort) : new WireEndpointGeometry(resolvePort(wire.EndPort));
+            var startBounds = default(Bounds);
+            var endBounds = default(Bounds);
+            start.Body?.TryGetBounds(wireSurface, out startBounds);
+            end.Body?.TryGetBounds(wireSurface, out endBounds);
+            var ductRevision = wireSurface.Ducts?.Revision ?? 0;
+            var changed = force || geometryDirty || renderPath == null ||
+                !SameEndpoint(start, cachedStart) || !SameEndpoint(end, cachedEnd) ||
+                !startBounds.Equals(cachedStartBounds) || !endBounds.Equals(cachedEndBounds) ||
+                cachedStartPort != wire.StartPort || cachedEndPort != wire.EndPort || cachedLineType != wire.LineType ||
+                cachedDuctRevision != ductRevision || cachedBends.Count != wire.Points.Count;
+            if (!changed)
+                for (var i = 0; i < cachedBends.Count; i++)
+                    if (!cachedBends[i].Equals(wire.Points[i])) { changed = true; break; }
+            var styleChanged = GeometryBuildCount == 0 || cachedColor != wire.Color || cachedArea != wire.Area;
+            var matrix = transform.localToWorldMatrix;
+            if (!changed && !styleChanged && cachedMatrix == matrix) return;
+            if (!changed && selected && cachedMatrix != matrix) RefreshNodeHandles();
+            if (changed)
+            {
+                renderPath = WireRenderPath.Build(start, end, wire.Points, wireSurface,
+                    WireRenderPath.IsMotorJumper(wire.StartPort, wire.EndPort, wire.LineType));
+                GeometryBuildCount++;
+                renderedPoints = renderPath.Points;
+                var linePoints = renderPath.HasSpatialLeads ? renderPath.Trunk : renderedPoints;
+                ApplyPositions(line, linePoints);
+                ApplyPositions(highlightLine, linePoints);
+                cachedStart = start; cachedEnd = end;
+                cachedStartBounds = startBounds; cachedEndBounds = endBounds;
+                cachedStartPort = wire.StartPort; cachedEndPort = wire.EndPort; cachedLineType = wire.LineType;
+                cachedDuctRevision = ductRevision;
+                cachedBends.Clear(); cachedBends.AddRange(wire.Points);
+                geometryDirty = false;
+                RefreshNodeHandles();
+            }
+            if (styleChanged)
+            {
+                line.startColor = line.endColor = wire.Color;
+                line.startWidth = line.endWidth = WidthForArea(wire.Area);
+                highlightLine.startWidth = highlightLine.endWidth = line.startWidth * SelectionWidthMultiplier;
+                cachedColor = wire.Color; cachedArea = wire.Area;
+            }
+            cachedMatrix = matrix;
             if (renderPath.HasSpatialLeads)
             {
                 if (leadMesh == null) leadMesh = CreateLeadMesh("WireEndpointLeads", 201);
@@ -517,8 +575,11 @@ namespace ElectricalSim
             }
             if (leadMesh != null) leadMesh.Renderer.enabled = renderPath.HasSpatialLeads;
             if (leadHighlight != null) leadHighlight.Renderer.enabled = selected && renderPath.HasSpatialLeads;
-            RefreshNodeHandles();
         }
+
+        private static bool SameEndpoint(WireEndpointGeometry a, WireEndpointGeometry b) =>
+            a.Position.Equals(b.Position) && ReferenceEquals(a.Body, b.Body) && a.MotorId == b.MotorId &&
+            a.MotorOutward.Equals(b.MotorOutward);
 
         private WireLeadMesh CreateLeadMesh(string objectName, int order)
         {
@@ -532,6 +593,10 @@ namespace ElectricalSim
 
         public void SetSurface(WireSurfacePlane surface)
         {
+            geometryDirty |= !wireSurface.SurfacePoint.Equals(surface.SurfacePoint) ||
+                !wireSurface.Normal.Equals(surface.Normal) || wireSurface.SurfaceOffset != surface.SurfaceOffset ||
+                !Nullable.Equals(wireSurface.SurfaceBounds, surface.SurfaceBounds) ||
+                !ReferenceEquals(wireSurface.Ducts, surface.Ducts);
             wireSurface = surface;
             transform.rotation = wireSurface.Rotation;
             Refresh();
@@ -725,10 +790,10 @@ namespace ElectricalSim
                     wireSurface.Rotation);
                 var renderer = handle.GetComponent<MeshRenderer>();
                 if (renderer == null) continue;
-                var block = new MaterialPropertyBlock();
-                renderer.GetPropertyBlock(block);
-                block.SetColor("_Color", i == selectedPointIndex ? Color.white : new Color(1f, 0.86f, 0.05f, 1f));
-                renderer.SetPropertyBlock(block);
+                nodeBlock ??= new MaterialPropertyBlock();
+                renderer.GetPropertyBlock(nodeBlock);
+                nodeBlock.SetColor("_Color", i == selectedPointIndex ? Color.white : new Color(1f, 0.86f, 0.05f, 1f));
+                renderer.SetPropertyBlock(nodeBlock);
             }
         }
 

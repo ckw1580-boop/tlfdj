@@ -36,6 +36,16 @@ namespace ElectricalSim.Tests
             return Camera.main.WorldToScreenPoint(box.transform.TransformPoint(box.center + Vector3.forward * box.size.z * 0.5f));
         }
         private WireConnection Wire(string a, string b) => controller.Graph.AddWire(a, b, Color.red, "ElectricalWire");
+        private IEnumerator WaitForContactor(ContactorView view, bool active, bool? lampActive = null)
+        {
+            var expectedLamp = lampActive ?? active;
+            var deadline = Time.realtimeSinceStartup + 2f;
+            while ((view.Runtime.IsActive != active || controller.Graph.Devices["HL1"].IsActive != expectedLamp) &&
+                   Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(view.Runtime.IsActive, Is.EqualTo(active), "Contactor did not settle within two seconds.");
+            Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.EqualTo(expectedLamp));
+            yield return null; // Let the property presenter consume the same simulation snapshot.
+        }
         private ElectricalPortView[] VisibleRearPorts(ContactorView rear)
             => rear.Bindings.Values.Where(port => port.IsVisible &&
                 Physics.Raycast(Camera.main.ScreenPointToRay(Camera.main.WorldToScreenPoint(port.CurrentAnchorPosition)), out var hit, 100f) &&
@@ -167,14 +177,16 @@ namespace ElectricalSim.Tests
         [UnityTest] public IEnumerator PhysicalWiringControlsLoadAndSurvivesSaveReload()
         {
             var view = controller.ContactorViews[0];
-            var supply = Object.FindObjectsOfType<ElectricalPortView>().Single(p => p.DeviceId == "DuanZiPai_6" && p.PortName == "V_1");
-            var neutral = Object.FindObjectsOfType<ElectricalPortView>().Single(p => p.DeviceId == "DuanZiPai_6" && p.PortName == "N_1");
+            // DuanZiPai_6 V/N are 24 V DC; these AC coils use the original three-phase board.
+            var supply = Object.FindObjectsOfType<ElectricalPortView>().Single(p => p.DeviceId == "DuanZiPai_0" && p.PortName == "a2");
+            var neutral = Object.FindObjectsOfType<ElectricalPortView>().Single(p => p.DeviceId == "DuanZiPai_0" && p.PortName == "a4");
             Wire(supply.QualifiedPort, view.Bindings["A1"].QualifiedPort);
             Wire(neutral.QualifiedPort, view.Bindings["A2"].QualifiedPort);
             Wire("TERMINAL_BUS.DC_POSITIVE", view.Bindings["53"].QualifiedPort);
             Wire(view.Bindings["54"].QualifiedPort, "HL1.L"); Wire("HL1.N", "TERMINAL_BUS.DC_NEGATIVE");
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate);
-            controller.SelectContactor(view); yield return null; yield return null;
+            controller.SelectContactor(view); yield return WaitForContactor(view, true);
+            Assert.That(Field<SimulationSnapshot>("lastSnapshot").GetAcVoltage(view.Bindings["A1"].QualifiedPort, view.Bindings["A2"].QualifiedPort), Is.EqualTo(220));
             Assert.That(view.Runtime.IsActive, Is.True);
             Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
             Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("220 V AC").And.Contain("53–54 辅助 常开：闭合").And.Contain("61–62 辅助 常闭：断开"));
@@ -183,10 +195,10 @@ namespace ElectricalSim.Tests
             Assert.That(controller.SaveCc3dToPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
             Assert.That(controller.OpenCc3dFromPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate); controller.SelectContactor(view);
-            yield return null; yield return null;
+            yield return WaitForContactor(view, true);
             Assert.That(view.Runtime.IsActive, Is.True);
             var wire = controller.Graph.Wires.Single(w => w.EndPort == view.Bindings["A1"].QualifiedPort);
-            controller.Graph.RemoveWire(wire.Id); yield return null; yield return null;
+            controller.Graph.RemoveWire(wire.Id); yield return WaitForContactor(view, false);
             Assert.That(view.Runtime.IsActive, Is.False);
             Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.False);
             Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("已释放").And.Contain("61–62 辅助 常闭：闭合"));
@@ -333,13 +345,14 @@ namespace ElectricalSim.Tests
         [UnityTest] public IEnumerator RearCoilAndContactsStayIndependentFromFrontAndSurviveReload()
         {
             var rear = controller.RearContactorViews[0]; var front = controller.ContactorViews[0];
-            Wire("DuanZiPai_6.V_1", rear.Bindings["A1"].QualifiedPort);
-            Wire("DuanZiPai_6.N_1", rear.Bindings["A2"].QualifiedPort);
+            Wire("DuanZiPai_0.a2", rear.Bindings["A1"].QualifiedPort);
+            Wire("DuanZiPai_0.a4", rear.Bindings["A2"].QualifiedPort);
             Wire("TERMINAL_BUS.DC_POSITIVE", rear.Bindings["53"].QualifiedPort);
             Wire(rear.Bindings["54"].QualifiedPort, "HL1.L"); Wire("HL1.N", "TERMINAL_BUS.DC_NEGATIVE");
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate);
             Object.FindObjectOfType<TrainingCameraController>().SetFaultView();
-            controller.SelectContactor(rear); yield return null; yield return null;
+            controller.SelectContactor(rear); yield return WaitForContactor(rear, true);
+            Assert.That(Field<SimulationSnapshot>("lastSnapshot").GetAcVoltage(rear.Bindings["A1"].QualifiedPort, rear.Bindings["A2"].QualifiedPort), Is.EqualTo(220));
             Assert.That(rear.Runtime.IsActive, Is.True); Assert.That(front.Runtime.IsActive, Is.False);
             Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
             Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("KM5").And.Contain("已吸合").And.Contain("KMBACK1.53").And.Not.Contain("DuanZiPai_3.KM1_53NO"));
@@ -348,18 +361,18 @@ namespace ElectricalSim.Tests
             Assert.That(controller.SaveCc3dToPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
             Assert.That(controller.OpenCc3dFromPath(savePath), Is.EqualTo(WiringFileResult.Success), controller.LastFileError);
             controller.PanelPower.StartForAssessment(); controller.SetMode(SimulationMode.Simulate); controller.SelectContactor(front);
-            yield return null; yield return null;
+            yield return WaitForContactor(rear, true);
             Assert.That(rear.Runtime.IsActive, Is.True); Assert.That(front.Runtime.IsActive, Is.False);
             Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.True);
             Assert.That(controller.ContactorProperties.DisplayedText, Does.Contain("柜体正面").And.Contain("已释放"));
             controller.Graph.RemoveWire(controller.Graph.Wires.Single(w => w.EndPort == "KMBACK1.A1").Id);
-            yield return null; yield return null;
+            yield return WaitForContactor(rear, false);
             Assert.That(rear.Runtime.IsActive, Is.False); Assert.That(front.Runtime.IsActive, Is.False);
             Assert.That(controller.Graph.Devices["HL1"].IsActive, Is.False);
 
-            Wire("DuanZiPai_6.V_1", front.Bindings["A1"].QualifiedPort);
-            Wire("DuanZiPai_6.N_1", front.Bindings["A2"].QualifiedPort);
-            yield return null; yield return null;
+            Wire("DuanZiPai_0.a2", front.Bindings["A1"].QualifiedPort);
+            Wire("DuanZiPai_0.a4", front.Bindings["A2"].QualifiedPort);
+            yield return WaitForContactor(front, true, false);
             Assert.That(front.Runtime.IsActive, Is.True); Assert.That(rear.Runtime.IsActive, Is.False);
         }
 

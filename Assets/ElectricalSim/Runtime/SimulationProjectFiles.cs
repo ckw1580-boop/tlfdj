@@ -157,8 +157,7 @@ namespace ElectricalSim
                 }
                 SetMode(SimulationMode.Wiring);
                 RefreshWireViews();
-                undoWires.Clear();
-                redoWires.Clear();
+                wireHistory.Clear();
                 loadedDocument = document;
                 savedWires = SnapshotWires();
                 RememberProjectPath(path);

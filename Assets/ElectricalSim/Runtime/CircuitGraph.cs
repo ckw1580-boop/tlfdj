@@ -58,6 +58,8 @@ namespace ElectricalSim
         }
 
         public IReadOnlyList<string> Errors { get; }
+        public bool IsConverged { get; internal set; } = true;
+        public int IterationCount { get; internal set; }
         public bool HasShortCircuit => Errors.Count > 0;
 
         public bool ContainsPort(string port) => port != null && roots.ContainsKey(port);
@@ -127,6 +129,22 @@ namespace ElectricalSim
     {
         private readonly List<WireConnection> wires = new List<WireConnection>();
         private readonly Dictionary<string, IElectricalDevice> devices = new Dictionary<string, IElectricalDevice>();
+        private bool deviceCacheDirty = true;
+        private IElectricalDevice[] allDevices = Array.Empty<IElectricalDevice>();
+        private IElectricalSource[] sources = Array.Empty<IElectricalSource>();
+        private IControlSignalSource[] signalSources = Array.Empty<IControlSignalSource>();
+        private InverterDriveRuntime[] drives = Array.Empty<InverterDriveRuntime>();
+        private SceneIoDeviceRuntime[] sensors = Array.Empty<SceneIoDeviceRuntime>();
+        private IElectricalDevice[] motors = Array.Empty<IElectricalDevice>();
+        private ElectricalDeviceRuntime[] runtimeMotors = Array.Empty<ElectricalDeviceRuntime>();
+        private readonly Dictionary<string, HashSet<string>> localPorts = new Dictionary<string, HashSet<string>>();
+        private readonly List<string> qualifiedPorts = new List<string>();
+        private readonly List<(string start, string end)> cachedEndpoints = new List<(string, string)>();
+        private readonly DisjointSet wiringUnion = new DisjointSet();
+        private readonly DisjointSet workingUnion = new DisjointSet();
+        private readonly List<ControlSignal> signalBuffer = new List<ControlSignal>();
+        private readonly List<PortPair> receiverBuffer = new List<PortPair>();
+        private static readonly string[] DriveOutputPorts = { "U2", "V2", "W2" };
 
         public IReadOnlyList<WireConnection> Wires => wires;
         public IReadOnlyDictionary<string, IElectricalDevice> Devices => devices;
@@ -134,9 +152,10 @@ namespace ElectricalSim
         public void RegisterDevice(IElectricalDevice device)
         {
             devices[device.DeviceId] = device;
+            deviceCacheDirty = true;
         }
 
-        public void ClearDevices() => devices.Clear();
+        public void ClearDevices() { devices.Clear(); deviceCacheDirty = true; }
 
         public WireConnection AddWire(string startPort, string endPort, Color color, string lineType = "JumperLine", float area = 0.01f)
         {
@@ -198,42 +217,54 @@ namespace ElectricalSim
 
         public bool AreConnectedByWiring(string portA, string portB)
         {
-            var union = BuildUnion(includeDeviceContacts: false);
+            PrepareTopology();
+            var union = wiringUnion;
             return union.Contains(portA) && union.Contains(portB) && union.Find(portA) == union.Find(portB);
         }
 
         public SimulationSnapshot Solve(float deltaTime = 0.02f, int maxIterations = 16)
         {
+            if (maxIterations < 1) throw new ArgumentOutOfRangeException(nameof(maxIterations));
+            PrepareTopology();
             SimulationSnapshot snapshot = null;
+            var converged = false;
+            var iterationCount = 0;
             for (var iteration = 0; iteration < maxIterations; iteration++)
             {
                 snapshot = BuildSnapshot();
                 var changed = false;
-                foreach (var device in devices.Values)
+                foreach (var device in allDevices)
                     changed |= device.Evaluate(snapshot, deltaTime);
-                if (!changed) break;
+                iterationCount++;
+                if (!changed) { converged = true; break; }
             }
 
-            var controls = devices.Values.OfType<InverterDriveRuntime>().Where(d => d.Control != null).ToArray();
-            if (controls.Length > 0)
+            var hasControls = false;
+            foreach (var drive in drives) hasControls |= drive.Control != null;
+            if (hasControls)
             {
                 snapshot = BuildSnapshot();
-                foreach (var drive in controls) drive.Control.SampleAndAdvance(snapshot, deltaTime);
+                foreach (var drive in drives) drive.Control?.SampleAndAdvance(snapshot, deltaTime);
+                var controlsConverged = false;
                 // Re-solve new outputs without advancing any time-dependent command twice.
                 for (var iteration = 0; iteration < maxIterations; iteration++)
                 {
                     snapshot = BuildSnapshot();
                     var changed = false;
-                    foreach (var device in devices.Values) changed |= device.Evaluate(snapshot, 0);
-                    if (!changed) break;
+                    foreach (var device in allDevices) changed |= device.Evaluate(snapshot, 0);
+                    iterationCount++;
+                    if (!changed) { controlsConverged = true; break; }
                 }
+                converged &= controlsConverged;
             }
             snapshot = BuildSnapshot();
             // Time advances once, after contact convergence, never in the iteration loop.
-            foreach (var motor in devices.Values.OfType<ElectricalDeviceRuntime>().Where(d => d.Kind == ElectricalDeviceKind.Motor))
+            foreach (var motor in runtimeMotors)
                 if (deltaTime > 0) motor.AdvanceMotorSpeed(snapshot, deltaTime);
             snapshot = BuildSnapshot();
-            foreach (var device in devices.Values) device.ApplyVisualState(snapshot);
+            snapshot.IsConverged = converged;
+            snapshot.IterationCount = iterationCount;
+            foreach (var device in allDevices) device.ApplyVisualState(snapshot);
             return snapshot;
         }
 
@@ -243,31 +274,40 @@ namespace ElectricalSim
             var potentialsByRoot = new Dictionary<string, ElectricalPotential>();
             var errors = new List<string>();
 
-            foreach (var source in devices.Values.OfType<IElectricalSource>())
+            foreach (var source in sources)
             {
                 foreach (var output in source.GetSourcePotentials())
                     AddPotential(union, potentialsByRoot, output.Key, output.Value, errors);
             }
 
-            var rootMap = union.Items.ToList().ToDictionary(item => item, union.Find);
-            var active = devices.Values.ToDictionary(d => d.DeviceId, d => d.IsActive);
-            var directions = devices.Values.ToDictionary(d => d.DeviceId, d =>
-                d is ElectricalDeviceRuntime runtime ? runtime.MotorDirection : MotorDirection.Stopped);
-            var speeds = devices.Values.OfType<ElectricalDeviceRuntime>()
-                .Where(d => d.Kind == ElectricalDeviceKind.Motor).ToDictionary(d => d.DeviceId, d => d.ActualSpeedRpm);
+            var rootMap = new Dictionary<string, string>(union.Items.Count);
+            foreach (var item in union.Items) rootMap.Add(item, union.Find(item));
+            var active = new Dictionary<string, bool>(allDevices.Length);
+            var directions = new Dictionary<string, MotorDirection>(allDevices.Length);
+            foreach (var device in allDevices)
+            {
+                active.Add(device.DeviceId, device.IsActive);
+                directions.Add(device.DeviceId, device is ElectricalDeviceRuntime runtime ? runtime.MotorDirection : MotorDirection.Stopped);
+            }
+            var speeds = new Dictionary<string, float>(runtimeMotors.Length);
+            foreach (var motor in runtimeMotors) speeds.Add(motor.DeviceId, motor.ActualSpeedRpm);
             var snapshot = new SimulationSnapshot(rootMap, potentialsByRoot, active, directions, errors, speeds);
-            var signalSources = devices.Values.OfType<IControlSignalSource>().ToArray();
-            snapshot.ResolveControlSignals(signalSources.SelectMany(s => s.GetControlSignals(snapshot)).ToArray(),
-                signalSources.SelectMany(s => s.CurrentReceivers), errors);
-            foreach (var sensor in devices.Values.OfType<SceneIoDeviceRuntime>())
+            signalBuffer.Clear(); receiverBuffer.Clear();
+            foreach (var source in signalSources)
+            {
+                signalBuffer.AddRange(source.GetControlSignals(snapshot));
+                receiverBuffer.AddRange(source.CurrentReceivers);
+            }
+            snapshot.ResolveControlSignals(signalBuffer, receiverBuffer, errors);
+            foreach (var sensor in sensors)
                 if (sensor.Powered && sensor.Wet && sensor.SignalShortCircuit)
                     errors.Add(sensor.Definition.Name + "：SIGNAL与GND短接，输出已保护断开。");
-            foreach (var drive in devices.Values.OfType<InverterDriveRuntime>())
+            foreach (var drive in drives)
             {
                 drive.Validate(snapshot, errors);
-                foreach (var output in new[] { "U2", "V2", "W2" })
+                foreach (var output in DriveOutputPorts)
                     snapshot.MarkUnmodeledVoltageOutput(Port(drive.DeviceId, output), drive.IsActive);
-                foreach (var motor in devices.Values.Where(d => d.Kind == ElectricalDeviceKind.Motor))
+                foreach (var motor in motors)
                 {
                     var sample = drive.SampleMotor(motor.DeviceId, snapshot);
                     if (sample.Connected) snapshot.MotorDrives[motor.DeviceId] = sample;
@@ -278,22 +318,51 @@ namespace ElectricalSim
 
         private DisjointSet BuildUnion(bool includeDeviceContacts)
         {
-            var union = new DisjointSet();
-            foreach (var device in devices.Values)
-                foreach (var port in device.Ports)
-                    union.Add(Port(device.DeviceId, port));
-
-            foreach (var wire in wires)
-                union.Union(wire.StartPort, wire.EndPort);
+            var union = workingUnion;
+            union.CopyFrom(wiringUnion);
 
             if (includeDeviceContacts)
             {
-                foreach (var device in devices.Values)
+                foreach (var device in allDevices)
                     foreach (var link in device.GetConductiveLinks())
                         union.Union(Qualify(device.DeviceId, link.A), Qualify(device.DeviceId, link.B));
             }
 
             return union;
+        }
+
+        private void PrepareTopology()
+        {
+            var changed = deviceCacheDirty || cachedEndpoints.Count != wires.Count;
+            if (deviceCacheDirty)
+            {
+                allDevices = devices.Values.ToArray();
+                sources = allDevices.OfType<IElectricalSource>().ToArray();
+                signalSources = allDevices.OfType<IControlSignalSource>().ToArray();
+                drives = allDevices.OfType<InverterDriveRuntime>().ToArray();
+                sensors = allDevices.OfType<SceneIoDeviceRuntime>().ToArray();
+                motors = allDevices.Where(d => d.Kind == ElectricalDeviceKind.Motor).ToArray();
+                runtimeMotors = motors.OfType<ElectricalDeviceRuntime>().ToArray();
+                qualifiedPorts.Clear(); localPorts.Clear();
+                foreach (var device in allDevices)
+                {
+                    localPorts[device.DeviceId] = new HashSet<string>(device.Ports);
+                    foreach (var port in device.Ports) qualifiedPorts.Add(Port(device.DeviceId, port));
+                }
+                deviceCacheDirty = false;
+            }
+            if (!changed)
+                for (var i = 0; i < wires.Count; i++)
+                    if (cachedEndpoints[i].start != wires[i].StartPort || cachedEndpoints[i].end != wires[i].EndPort)
+                    { changed = true; break; }
+            if (!changed) return;
+            wiringUnion.Clear(); cachedEndpoints.Clear();
+            foreach (var port in qualifiedPorts) wiringUnion.Add(port);
+            foreach (var wire in wires)
+            {
+                wiringUnion.Union(wire.StartPort, wire.EndPort);
+                cachedEndpoints.Add((wire.StartPort, wire.EndPort));
+            }
         }
 
         private static void AddPotential(
@@ -324,20 +393,28 @@ namespace ElectricalSim
         {
             // PLC local terminal names (Q0.0 / PLC_1_M0.0) contain dots too.
             // Registered local ports take precedence over the cross-device notation.
-            if (devices.TryGetValue(deviceId, out var device) && device.Ports.Contains(port)) return Port(deviceId, port);
+            if (localPorts.TryGetValue(deviceId, out var ports) && ports.Contains(port)) return Port(deviceId, port);
             return port.Contains(".") ? port : Port(deviceId, port);
         }
 
         private sealed class DisjointSet
         {
             private readonly Dictionary<string, string> parents = new Dictionary<string, string>();
-            public IEnumerable<string> Items => parents.Keys;
+            private readonly List<string> items = new List<string>();
+            public List<string> Items => items;
+            public void Clear() { parents.Clear(); items.Clear(); }
+            public void CopyFrom(DisjointSet source)
+            {
+                Clear();
+                foreach (var pair in source.parents) parents.Add(pair.Key, pair.Value);
+                items.AddRange(source.items);
+            }
 
             public bool Contains(string item) => parents.ContainsKey(item);
 
             public void Add(string item)
             {
-                if (!parents.ContainsKey(item)) parents[item] = item;
+                if (!parents.ContainsKey(item)) { parents[item] = item; items.Add(item); }
             }
 
             public string Find(string item)

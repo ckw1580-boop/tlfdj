@@ -200,6 +200,7 @@ namespace ElectricalSim
         private Matrix4x4 previousMatrix;
         private float previousWidth;
         private Color previousColor;
+        private Color[] colors = Array.Empty<Color>();
         public MeshRenderer Renderer => meshRenderer;
 
         public void Initialize(Material material, int order)
@@ -219,8 +220,17 @@ namespace ElectricalSim
             // The controller refreshes wires each frame. Rebuild tubes only when
             // their geometry/style changes, not when merely looking at the cabinet.
             var matrix = transform.localToWorldMatrix;
-            if (previousPath != null && previousWidth == width && previousColor == color && previousMatrix == matrix &&
-                SamePoints(previousPath.StartLead, path.StartLead) && SamePoints(previousPath.EndLead, path.EndLead)) return;
+            if (previousPath != null && previousWidth == width && previousMatrix == matrix &&
+                SamePoints(previousPath.StartLead, path.StartLead) && SamePoints(previousPath.EndLead, path.EndLead))
+            {
+                if (previousColor != color)
+                {
+                    for (var i = 0; i < colors.Length; i++) colors[i] = color;
+                    mesh.colors = colors;
+                    previousColor = color;
+                }
+                return;
+            }
             previousPath = path;
             previousWidth = width;
             previousColor = color;
@@ -232,7 +242,7 @@ namespace ElectricalSim
             mesh.Clear();
             mesh.SetVertices(vertices);
             mesh.SetTriangles(triangles, 0);
-            var colors = new Color[vertices.Count];
+            if (colors.Length != vertices.Count) colors = new Color[vertices.Count];
             for (var i = 0; i < colors.Length; i++) colors[i] = color;
             mesh.colors = colors;
             mesh.RecalculateNormals();

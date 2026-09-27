@@ -38,10 +38,14 @@ namespace ElectricalSim.Editor
         {
             if (!File.Exists(ScenePath)) Install();
             ResourceIntegrityGuard.ValidateForBuild();
-            EnsureSceneResources();
-            ConfigurePlayerSettings();
-            OriginalReferenceGenerator.Generate();
             var buildArgs = System.Environment.GetCommandLineArgs();
+            // Verification builds should compile the exact checked-in scene and assets.
+            if (System.Array.IndexOf(buildArgs, "-trainingPreserveAssets") < 0)
+            {
+                EnsureSceneResources();
+                ConfigurePlayerSettings();
+                OriginalReferenceGenerator.Generate();
+            }
             var outputOption = System.Array.IndexOf(buildArgs, "-trainingBuildOutput");
             var outputDirectory = Path.GetFullPath(outputOption >= 0 && outputOption + 1 < buildArgs.Length
                 ? buildArgs[outputOption + 1] : "Build/Windows");

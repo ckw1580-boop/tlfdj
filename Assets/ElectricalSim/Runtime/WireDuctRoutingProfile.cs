@@ -17,6 +17,7 @@ namespace ElectricalSim
         private readonly Quaternion rotation;
         private readonly Quaternion inverse;
         private readonly float baseDepth;
+        public int Revision { get; private set; }
 
         public WireDuctRoutingProfile(IEnumerable<MeshFilter> lids, WireSurfacePlane surface,
             IEnumerable<MeshFilter> mountingPlates = null)
@@ -67,6 +68,7 @@ namespace ElectricalSim
         public void AddMountingPanelsBehind(MeshFilter shell, IEnumerable<Vector3> anchors)
         {
             if (shell == null || shell.sharedMesh == null) return;
+            Revision++;
             const float tolerance = 0.00001f;
             var mesh = shell.sharedMesh;
             var vertices = mesh.vertices;

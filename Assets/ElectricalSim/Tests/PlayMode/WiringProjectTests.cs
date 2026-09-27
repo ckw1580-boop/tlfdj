@@ -213,6 +213,34 @@ namespace ElectricalSim.Tests
             Assert.That(controller.Graph.Wires.Count, Is.EqualTo(1));
         }
 
+        [UnityTest]
+        public IEnumerator WireViewsSurviveEditingUndoAndReloadWithoutIdleRebuilds()
+        {
+            var wire = AddWire();
+            controller.AddBendPointToLastWire(new Vector3(.1f, 1.1f, -1));
+            var view = Object.FindObjectsOfType<ElectricalWireView>().Single(v => v.Connection.Id == wire.Id);
+            var instance = view.GetInstanceID();
+            yield return null;
+            var builds = view.GeometryBuildCount;
+            for (var i = 0; i < 300; i++) yield return null;
+            Assert.That(view.GeometryBuildCount, Is.EqualTo(builds));
+            controller.AddBendPointToLastWire(new Vector3(.2f, 1.2f, -1));
+            controller.UndoWiring();
+            controller.RedoWiring();
+            Assert.That(view.GetInstanceID(), Is.EqualTo(instance));
+            Assert.That(view.Connection, Is.SameAs(controller.Graph.Wires.Single()));
+            Assert.That(controller.SaveCc3dToPath(PathFor("优化回归")), Is.EqualTo(WiringFileResult.Success));
+            Assert.That(controller.OpenCc3dFromPath(PathFor("优化回归")), Is.EqualTo(WiringFileResult.Success));
+            Assert.That(view.GetInstanceID(), Is.EqualTo(instance));
+            Assert.That(view.Connection, Is.SameAs(controller.Graph.Wires.Single()));
+            controller.ResetTraining();
+            yield return null;
+            Assert.That(view == null, Is.True);
+            controller.UndoWiring();
+            yield return null;
+            Assert.That(Object.FindObjectsOfType<ElectricalWireView>().Count(v => v.Connection.Id == wire.Id), Is.EqualTo(1));
+        }
+
         private sealed class FakeDialogs : IWiringFileDialogs
         {
             public string OpenPath = "";

@@ -15,7 +15,7 @@ namespace ElectricalSim
         private readonly Dictionary<string, ElectricalDeviceRuntime> devices = new Dictionary<string, ElectricalDeviceRuntime>();
         private readonly Dictionary<string, ElectricalPortView> portViews = new Dictionary<string, ElectricalPortView>();
         private readonly Dictionary<string, string> deviceNames = new Dictionary<string, string>();
-        private readonly List<ElectricalWireView> wireViews = new List<ElectricalWireView>();
+        private readonly WireViewCollection wireViews = new WireViewCollection();
         private readonly List<CabinetBreakerInteractable> cabinetBreakers = new List<CabinetBreakerInteractable>();
         private ElectricalPortView selectedPort;
         private readonly List<Vector3> pendingWirePoints = new List<Vector3>();
@@ -52,8 +52,7 @@ namespace ElectricalSim
             Tachometer = tachometer;
             if (Tachometer != null) Tachometer.SetFaultMode(Mode == SimulationMode.Fault);
         }
-        private readonly Stack<List<WireConnection>> undoWires = new Stack<List<WireConnection>>();
-        private readonly Stack<List<WireConnection>> redoWires = new Stack<List<WireConnection>>();
+        private readonly WireHistory wireHistory = new WireHistory();
         private Color currentWireColor = Color.red;
         private float currentWireArea = 0.01f;
         private string currentLineType = "ElectricalWire";
@@ -218,6 +217,8 @@ namespace ElectricalSim
             UpdateInstrumentReadout();
             if (lastSnapshot.HasShortCircuit)
                 SetStatus(lastSnapshot.Errors[0], true);
+            else if (!lastSnapshot.IsConverged)
+                SetStatus("电路未收敛：请检查触点反馈或振荡连接。", true);
         }
 
         public void SetMode(SimulationMode mode)
@@ -406,20 +407,18 @@ namespace ElectricalSim
 
         public void UndoWiring()
         {
-            if (undoWires.Count == 0) return;
+            if (!wireHistory.Undo(graph.Wires, out var previous)) return;
             ClearWireSelection();
-            redoWires.Push(SnapshotWires());
-            graph.ReplaceWires(undoWires.Pop());
+            graph.ReplaceWires(previous);
             RefreshWireViews();
             SetStatus("已撤销接线操作。", false);
         }
 
         public void RedoWiring()
         {
-            if (redoWires.Count == 0) return;
+            if (!wireHistory.Redo(graph.Wires, out var next)) return;
             ClearWireSelection();
-            undoWires.Push(SnapshotWires());
-            graph.ReplaceWires(redoWires.Pop());
+            graph.ReplaceWires(next);
             RefreshWireViews();
             SetStatus("已恢复接线操作。", false);
         }
@@ -1007,8 +1006,7 @@ namespace ElectricalSim
         private void RefreshWireViews()
         {
             ClearWireSelection();
-            foreach (var view in wireViews) if (view != null) Destroy(view.gameObject);
-            wireViews.Clear();
+            wireViews.BeginUpdate();
             foreach (var wire in graph.Wires)
             {
                 wire.FaultSide ??= trainingCamera.IsViewingFaultSide;
@@ -1019,30 +1017,20 @@ namespace ElectricalSim
                 var endAnchor = ResolveWireAnchor(wire.EndPort, preset, jumper);
                 // Unknown imported logical nodes must never produce a wire to world origin.
                 if (startAnchor == null || endAnchor == null) continue;
-                var gameObject = new GameObject("Wire_" + wire.Id);
-                gameObject.transform.SetParent(wireRoot, false);
-                var view = gameObject.AddComponent<ElectricalWireView>();
-                view.Initialize(wire, port => port == wire.StartPort ? startAnchor.position : endAnchor.position,
+                wireViews.Bind(wire, wireRoot, port => port == wire.StartPort ? startAnchor.position : endAnchor.position,
                     wireMaterial, wire.FaultSide.Value ? faultWireSurface : frontWireSurface,
                     port => portViews.TryGetValue(port, out var endpoint)
                         ? endpoint.EndpointGeometry(port == wire.StartPort ? startAnchor.position : endAnchor.position, wire.FaultSide.Value)
                         : new WireEndpointGeometry(port == wire.StartPort ? startAnchor.position : endAnchor.position));
-                wireViews.Add(view);
             }
+            wireViews.EndUpdate();
         }
 
         private List<WireConnection> SnapshotWires() => graph.Wires.Select(CircuitGraph.CloneWire).ToList();
 
         private void PushWireHistory()
         {
-            undoWires.Push(SnapshotWires());
-            redoWires.Clear();
-            while (undoWires.Count > 64)
-            {
-                var keep = undoWires.Reverse().Take(64).Reverse().ToArray();
-                undoWires.Clear();
-                foreach (var item in keep) undoWires.Push(item);
-            }
+            wireHistory.Record(graph.Wires);
         }
 
         private Vector3 ResolvePortPosition(string qualifiedPort)
