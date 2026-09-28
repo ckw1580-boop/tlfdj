@@ -69,6 +69,9 @@ namespace ElectricalSim.Tests
                 "POWER.L1", "SB1.COM", "SB1.NO", "KM1.A1", "KM1.A2", "POWER.N"
             };
             for (var i = 0; i < ports.Length; i += 2) graph.AddWire(ports[i], ports[i + 1], Color.red);
+            graph.AddWire("M1.U", "M1.W2", Color.red);
+            graph.AddWire("M1.V", "M1.U2", Color.red);
+            graph.AddWire("M1.W", "M1.V2", Color.red);
             return graph;
         }
 

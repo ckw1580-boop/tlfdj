@@ -6,6 +6,15 @@ namespace ElectricalSim.Tests
     // Explicit wiring for physical-wire regression tests, independent of any task or scoring system.
     internal static class ManualCircuitFixture
     {
+        public static void CompleteMotor(CircuitGraph graph, string id, bool ratedLoad = true)
+        {
+            var motor = (ElectricalDeviceRuntime)graph.Devices[id];
+            if (ratedLoad) { var config = motor.MotorConfiguration.Clone(); config.LoadFactor = 1; motor.ConfigureMotor(config); }
+            if (id == "M_DOUBLE") return;
+            graph.AddWire(id + ".U", id + ".W2", Color.red);
+            graph.AddWire(id + ".V", id + ".U2", Color.red);
+            graph.AddWire(id + ".W", id + ".V2", Color.red);
+        }
         public static void WireMotor(SimulationController controller)
         {
             var ports = new[]
@@ -18,6 +27,7 @@ namespace ElectricalSim.Tests
             };
             for (var i = 0; i < ports.Length; i += 2)
                 controller.Graph.AddWire(ports[i], ports[i + 1], Color.red, "JumperLine");
+            CompleteMotor(controller.Graph, "M1");
             typeof(SimulationController).GetMethod("RefreshWireViews", BindingFlags.Instance | BindingFlags.NonPublic)
                 .Invoke(controller, null);
         }

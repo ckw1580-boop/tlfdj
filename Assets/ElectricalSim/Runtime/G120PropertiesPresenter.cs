@@ -17,7 +17,7 @@ namespace ElectricalSim
         private readonly InputField[] scale = new InputField[2];
         private InputField motorCurrent;
         private readonly Text[] sourceLabels = new Text[2], typeLabels = new Text[2], aoLabels = new Text[2];
-        private Text selectedLabel, ptcEnableLabel, ptcStateLabel;
+        private Text selectedLabel, ptcEnableLabel, ptcStateLabel, motorCurrentSourceLabel;
         public string DisplayedText => details != null ? details.text : "";
         public bool IsVisible => gameObject.activeSelf;
         public void Initialize(SimulationController source, Canvas canvas, Font uiFont)
@@ -56,7 +56,8 @@ namespace ElectricalSim
                 Label(content, i == 0 ? "转速满量程（rpm）" : "电流满量程（A，0=额定值）", 10, y + 40, 300, 30);
                 scale[i] = Input(content, "AO" + i + "FullScale", 318, y + 40, 175);
             }
-            Label(content, "模拟电机电流（A，模拟值）", 10, 602, 300, 30); motorCurrent = Input(content, "SimulatedMotorCurrent", 318, 602, 175);
+            motorCurrentSourceLabel = Button(content, "", 10, 602, 300, () => { var c = controller.InverterControls; c.UseSimulatedMotorCurrent = !c.UseSimulatedMotorCurrent; RefreshLabels(); });
+            motorCurrent = Input(content, "SimulatedMotorCurrent", 318, 602, 175);
             ptcEnableLabel = Button(content, "", 10, 646, 205, () => { controller.InverterControls.PtcEnabled = !controller.InverterControls.PtcEnabled; RefreshLabels(); });
             ptcStateLabel = Button(content, "", 225, 646, 268, () => { var c = controller.InverterControls; c.PtcState = (G120PtcState)(((int)c.PtcState + 1) % 4); RefreshLabels(); });
             Button(content, "应用输入与标定", 10, 690, 190, Apply);
@@ -104,7 +105,7 @@ namespace ElectricalSim
                     controller.InverterControls.Inputs[i].SimulatedValue = values[i, 0]; controller.InverterControls.Outputs[i].FullScale = scales[i];
                     for (var j = 1; j < 5; j++) controller.InverterPanel.TrySetParameter("P" + (756 + j) + "." + i, values[i, j]);
                 }
-                controller.InverterControls.SimulatedMotorCurrent = current; notice.text = "已应用。模拟值仅在选择“模拟输入”后生效。";
+                controller.InverterControls.SimulatedMotorCurrent = current; notice.text = "已应用。电流默认由负载计算；测试值须启用电流测试覆盖。";
             }
             catch (ArgumentException e) { notice.text = e.Message; }
         }
@@ -126,7 +127,7 @@ namespace ElectricalSim
             var c = controller.InverterControls;
             summary.text = "宏 " + controller.InverterPanel.Macro + "：" + controller.InverterPanel.ActiveMacroName + "\n控制供电：" +
                 (c.Powered ? "正常" : "未供电") + "  ·  主电源：" + (c.MainSupply ? "正常" : "未接齐") +
-                "  ·  " + controller.InverterPanel.ActualSpeedRpm.ToString("F1") + " rpm";
+                "  ·  命令 " + controller.InverterPanel.OutputSpeedRpm.ToString("F1") + " rpm";
             details.text = controller.DescribeInverter(); RefreshLayout();
             RefreshLabels();
         }
@@ -141,6 +142,8 @@ namespace ElectricalSim
                 aoLabels[i].text = "AO" + i + " 输出：" + (c.Outputs[i].Mode == G120AnalogOutputMode.Voltage10 ? "0–10V" : c.Outputs[i].Mode == G120AnalogOutputMode.Current20 ? "0–20mA" : "4–20mA") + "（点击切换）";
             }
             selectedLabel.text = "模拟调速来源：AI" + c.SelectedAnalogInput + "（点击切换）";
+            motorCurrentSourceLabel.text = c.UseSimulatedMotorCurrent ? "电流：测试覆盖（A） · 点击关闭" : "电流：负载计算 · 点击启用测试";
+            motorCurrent.interactable = c.UseSimulatedMotorCurrent;
             ptcEnableLabel.text = "PTC 监测：" + (c.PtcEnabled ? "启用" : "关闭");
             ptcStateLabel.text = "模拟 PTC：" + new[] { "正常", "过热", "断线", "短路" }[(int)c.PtcState];
         }

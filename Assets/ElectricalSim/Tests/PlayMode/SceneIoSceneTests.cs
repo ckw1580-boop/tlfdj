@@ -36,12 +36,13 @@ namespace ElectricalSim.Tests
         private void PowerMotor(string id)
         {
             for (var i = 0; i < 3; i++) Wire("POWER.L" + (i + 1), id + "." + new[] { "U", "V", "W" }[i]);
+            ManualCircuitFixture.CompleteMotor(controller.Graph, id);
         }
         [UnityTest]
         public IEnumerator ExactModelsAndAllPortsAreBoundWithOrderedProbeHeights()
         {
             Assert.That(controller.SceneIoDevices.Count, Is.EqualTo(7));
-            Assert.That(controller.SceneIoViews.Count, Is.EqualTo(14));
+            Assert.That(controller.SceneIoViews.Count, Is.EqualTo(15));
             var ports = Object.FindObjectsOfType<ElectricalPortView>();
             foreach (var d in SceneIoCatalog.Devices)
             {
@@ -91,13 +92,15 @@ namespace ElectricalSim.Tests
             controller.Graph.RegisterDevice(new InverterDriveRuntime("MIXER_TEST_DRIVE", () => rpm, () => false));
             foreach (var phase in new[] { "L1", "L2", "L3" }) Wire("POWER." + phase, "MIXER_TEST_DRIVE." + phase);
             for (var i = 0; i < 3; i++) Wire("MIXER_TEST_DRIVE." + new[] { "U2", "V2", "W2" }[i], "M2." + new[] { "U", "V", "W" }[i]);
+            ManualCircuitFixture.CompleteMotor(controller.Graph, "M2");
             controller.SetMode(SimulationMode.Simulate);
             foreach (var speed in new[] { 0f, 60f, 120f, -60f, 1450f })
             {
                 rpm = speed;
-                var snapshot = controller.AdvanceSimulation(0.04f);
-                Assert.That(snapshot.GetMotorSpeedRpm("M2"), Is.EqualTo(speed));
-                var expected = Quaternion.AngleAxis(speed * 6f * Time.deltaTime, mixer.up) * paddles.rotation;
+                var snapshot = controller.AdvanceSimulation(2);
+                var actual = snapshot.GetMotorSpeedRpm("M2");
+                Assert.That(actual, Is.EqualTo(speed).Within(2));
+                var expected = Quaternion.AngleAxis(actual * 6f * Time.deltaTime, mixer.up) * paddles.rotation;
                 update.Invoke(rotor, null);
                 Assert.That(Quaternion.Angle(paddles.rotation, expected), Is.LessThan(0.1f), speed + " rpm");
                 Assert.That(Vector3.Distance(paddles.position, position), Is.LessThan(0.00001f));
@@ -109,10 +112,10 @@ namespace ElectricalSim.Tests
                 var text = controller.SceneIoProperties.DisplayedText;
                 controller.SelectSceneIo(cabinet.GetComponent<SceneIoView>());
                 Assert.That(controller.SceneIoProperties.DisplayedText, Is.EqualTo(text));
-                Assert.That(text, Does.Contain("正面左侧").And.Contain("M2").And.Contain(speed.ToString("F1")));
+                Assert.That(text, Does.Contain("正面左侧").And.Contain("M2").And.Contain(actual.ToString("F1")));
             }
-            controller.Graph.RemoveWire(controller.Graph.Wires.Single(w => w.EndPort == "M2.U").Id);
-            var coast = controller.AdvanceSimulation(0.5f).GetMotorSpeedRpm("M2");
+            foreach (var lead in controller.Graph.Wires.Where(w => w.StartPort.StartsWith("MIXER_TEST_DRIVE.") && w.EndPort.StartsWith("M2.")).ToArray()) controller.Graph.RemoveWire(lead.Id);
+            var coast = controller.AdvanceSimulation(0.02f).GetMotorSpeedRpm("M2");
             Assert.That(coast, Is.GreaterThan(0).And.LessThan(1450));
             var coastingRotation = Quaternion.AngleAxis(coast * 6f * Time.deltaTime, mixer.up) * paddles.rotation;
             update.Invoke(rotor, null);
@@ -235,6 +238,7 @@ namespace ElectricalSim.Tests
             controller.Graph.RegisterDevice(new InverterDriveRuntime("PUMP_TEST_DRIVE", () => rpm, () => false));
             foreach (var phase in new[] { "L1", "L2", "L3" }) Wire("POWER." + phase, "PUMP_TEST_DRIVE." + phase);
             for (var i = 0; i < 3; i++) Wire("PUMP_TEST_DRIVE." + new[] { "U2", "V2", "W2" }[i], "M_DOUBLE." + new[] { "U", "V", "W" }[i]);
+            ManualCircuitFixture.CompleteMotor(controller.Graph, "M_DOUBLE");
             foreach (var fps in new[] { 30, 60, 120 })
             {
                 controller.SetMode(SimulationMode.View); controller.ResetLiquid(); controller.SetMode(SimulationMode.Simulate);
@@ -243,10 +247,13 @@ namespace ElectricalSim.Tests
                 for (var i = 0; i < fps * 2; i++) controller.AdvanceSimulation(1f / fps);
                 Assert.That(controller.Liquid.Level - delivered, Is.EqualTo(1d / 30).Within(0.00001), fps + " fps");
             }
-            rpm = -725; controller.AdvanceSimulation(0.02f); Assert.That(controller.Liquid.Pump1Flow, Is.Zero);
-            rpm = 1450; controller.AdvanceSimulation(0.02f); Assert.That(controller.Liquid.Pump1Flow, Is.EqualTo(1d / 30).Within(1e-8));
-            var lead = controller.Graph.Wires.Single(w => w.EndPort == "M_DOUBLE.U"); controller.Graph.RemoveWire(lead.Id);
-            controller.AdvanceSimulation(0.5f);
+            rpm = -725; controller.AdvanceSimulation(2); Assert.That(controller.Liquid.Pump1Flow, Is.Zero);
+            rpm = 1450;
+            // Reversal drains the transport front; allow liquid to traverse the authored pipe again.
+            for (var i = 0; i < 200 && controller.Liquid.Pump1Flow < .03; i++) controller.AdvanceSimulation(.1f);
+            Assert.That(controller.Liquid.Pump1Flow, Is.EqualTo(1d / 30).Within(0.00005), controller.DescribeMotor("M_DOUBLE"));
+            foreach (var lead in controller.Graph.Wires.Where(w => w.StartPort.StartsWith("PUMP_TEST_DRIVE.") && w.EndPort.StartsWith("M_DOUBLE.")).ToArray()) controller.Graph.RemoveWire(lead.Id);
+            controller.AdvanceSimulation(0.02f);
             Assert.That(controller.Liquid.Pump1Flow, Is.InRange(0.02, 1d / 30));
             var valveLead = controller.Graph.Wires.Single(w => w.EndPort == "DuanZiPai_8.Diancifa1_VCC"); controller.Graph.RemoveWire(valveLead.Id);
             controller.AdvanceSimulation(0.02f); Assert.That(controller.Liquid.Pump1Flow, Is.Zero);
@@ -302,7 +309,7 @@ namespace ElectricalSim.Tests
             {
                 controller.SelectSceneIo(null);
                 var target = view.Picker.bounds.center;
-                camera.transform.position = target + environment.Find("Bench").forward * (view.Picker.bounds.extents.magnitude + 0.1f);
+                camera.transform.position = target + environment.Find("Bench").forward * (view.Picker.bounds.extents.magnitude + 0.1f) * (view.Id == "M3" ? -1 : 1);
                 camera.transform.LookAt(target);
                 Physics.SyncTransforms();
                 var screen = (Vector2)camera.WorldToScreenPoint(target);

@@ -17,6 +17,7 @@ namespace ElectricalSim
             Kind = kind;
             ports = portNames.Distinct().ToList();
             IsClosed = kind == ElectricalDeviceKind.Breaker || kind == ElectricalDeviceKind.Fuse;
+            if (kind == ElectricalDeviceKind.Motor) MotorConfiguration = MotorConfiguration.CreateDefault(deviceId);
         }
 
         public string DeviceId { get; }
@@ -34,38 +35,45 @@ namespace ElectricalSim
         public float ActualSpeedRpm { get; private set; }
         public float CoastStopSeconds { get; set; } = 3f;
         public float BrakeStopSeconds { get; set; } = 1f;
-        private float stoppingRate;
-        private bool wasStopping;
-        private bool wasBraking;
+        public MotorConfiguration MotorConfiguration { get; private set; }
+        public MotorRuntimeState MotorState { get; private set; } = new MotorRuntimeState();
+
+        public void ConfigureMotor(MotorConfiguration configuration)
+        {
+            if (Kind != ElectricalDeviceKind.Motor) throw new InvalidOperationException("Only motors have a motor configuration.");
+            if (configuration == null) throw new ArgumentNullException(nameof(configuration));
+            if (!configuration.Validate(out var error)) throw new ArgumentException(error, nameof(configuration));
+            MotorConfiguration = configuration.Clone();
+            ResetMotorSpeed();
+        }
+
+        public void SetMotorLoad(float factor)
+        {
+            if (Kind != ElectricalDeviceKind.Motor || float.IsNaN(factor) || float.IsInfinity(factor) || factor < 0f)
+                throw new ArgumentOutOfRangeException(nameof(factor));
+            MotorConfiguration.LoadFactor = factor;
+        }
+
+        public void SetMotorStalled(bool stalled)
+        {
+            if (Kind != ElectricalDeviceKind.Motor) throw new InvalidOperationException("Only motors can be stalled.");
+            MotorState.IsStalled = stalled;
+            if (stalled) MotorState.SpeedRpm = ActualSpeedRpm = 0f;
+        }
 
         public void ResetMotorSpeed()
         {
             ActualSpeedRpm = 0f;
-            wasStopping = false;
+            MotorState = new MotorRuntimeState();
             MotorDirection = MotorDirection.Stopped;
         }
 
         internal void AdvanceMotorSpeed(SimulationSnapshot snapshot, float deltaTime)
         {
-            var braking = MotorDirection == MotorDirection.Braking;
-            var drive = snapshot.MotorDrives.TryGetValue(DeviceId, out var sample) ? sample : default;
-            if (!braking && drive.HasDrive)
-            {
-                ActualSpeedRpm = drive.SpeedRpm;
-                wasStopping = false;
-                return;
-            }
-            if (!braking && !drive.Connected && MotorDirection != MotorDirection.Stopped)
-            {
-                ActualSpeedRpm = MotorDirection == MotorDirection.Reverse ? -1450f : 1450f;
-                wasStopping = false;
-                return;
-            }
-            if (!wasStopping || braking != wasBraking)
-                stoppingRate = Math.Abs(ActualSpeedRpm) / Math.Max(0.01f, braking ? BrakeStopSeconds : CoastStopSeconds);
-            wasStopping = true;
-            wasBraking = braking;
-            ActualSpeedRpm = UnityEngine.Mathf.MoveTowards(ActualSpeedRpm, 0f, stoppingRate * Math.Max(0f, deltaTime));
+            MotorState.Connection = MotorConnectionResolver.Resolve(DeviceId, MotorConfiguration, snapshot);
+            MotorPhysics.Advance(MotorConfiguration, MotorState, deltaTime,
+                MotorDirection == MotorDirection.Braking, CoastStopSeconds, BrakeStopSeconds);
+            ActualSpeedRpm = MotorState.SpeedRpm;
         }
         public Action<ElectricalDeviceRuntime> VisualStateChanged;
 
@@ -90,7 +98,7 @@ namespace ElectricalSim
                     IsClosed = active;
                     break;
                 case ElectricalDeviceKind.ThermalRelay:
-                    IsTripped = active;
+                    TrySetThermalTripped(active);
                     break;
             }
         }
@@ -173,9 +181,11 @@ namespace ElectricalSim
                     IsActive = snapshot.HasControlVoltage(Port("L"), Port("N"));
                     break;
                 case ElectricalDeviceKind.Motor:
+                    MotorState.Connection = MotorConnectionResolver.Resolve(DeviceId, MotorConfiguration, snapshot);
                     var nextDirection = ResolveMotorDirection(snapshot);
                     IsActive = nextDirection != MotorDirection.Stopped;
                     MotorDirection = nextDirection;
+                    MotorPhysics.Refresh(MotorConfiguration, MotorState, nextDirection == MotorDirection.Braking);
                     break;
                 case ElectricalDeviceKind.Breaker:
                 case ElectricalDeviceKind.Fuse:
@@ -201,17 +211,10 @@ namespace ElectricalSim
         {
             if (DeviceId == "M1" && (snapshot.IsDeviceActive("KB") || snapshot.IsDeviceActive("KMB")))
                 return MotorDirection.Braking;
-            if (snapshot.MotorDrives.TryGetValue(DeviceId, out var drive) && drive.Connected)
-                return !drive.HasDrive || Math.Abs(drive.SpeedRpm) < 0.1f ? MotorDirection.Stopped :
-                    drive.SpeedRpm < 0f ? MotorDirection.Reverse : MotorDirection.Forward;
-            var u = snapshot.GetPotential(Port("U"));
-            var v = snapshot.GetPotential(Port("V"));
-            var w = snapshot.GetPotential(Port("W"));
-            if (u == ElectricalPotential.PhaseL1 && v == ElectricalPotential.PhaseL2 && w == ElectricalPotential.PhaseL3)
-                return MotorDirection.Forward;
-            if (u == ElectricalPotential.PhaseL2 && v == ElectricalPotential.PhaseL1 && w == ElectricalPotential.PhaseL3)
-                return MotorDirection.Reverse;
-            return MotorDirection.Stopped;
+            var connection = MotorState.Connection;
+            if (!connection.IsValid || !connection.Energized || connection.DirectionSign == 0 ||
+                connection.PhaseLoss && Math.Abs(ActualSpeedRpm) < 1f) return MotorDirection.Stopped;
+            return connection.DirectionSign < 0 ? MotorDirection.Reverse : MotorDirection.Forward;
         }
 
         private string Port(string name) => CircuitGraph.Port(DeviceId, name);

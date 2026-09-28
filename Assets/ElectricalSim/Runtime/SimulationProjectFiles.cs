@@ -41,6 +41,8 @@ namespace ElectricalSim
             {
                 if (plcSessions.Count > 0 && savedPlcConfiguration != PlcConfigurationSignature()) return true;
                 if (Liquid != null && savedLiquidConfiguration != LiquidConfigurationSignature()) return true;
+                if (savedMotorConfigurations != null && savedMotorConfigurations != MotorConfigurationSignature()) return true;
+                if (savedThermalConfigurations != null && savedThermalConfigurations != ThermalConfigurationSignature()) return true;
                 if (savedWires.Count != graph.Wires.Count) return true;
                 var current = graph.Wires.OrderBy(w => w.Id, StringComparer.Ordinal).ToArray();
                 var saved = savedWires.OrderBy(w => w.Id, StringComparer.Ordinal).ToArray();
@@ -113,12 +115,15 @@ namespace ElectricalSim
                 var document = Cc3dCircuitAdapter.Export(staged, states, loadedDocument);
                 ExportPlcConfigurations(document);
                 ExportLiquidConfiguration(document);
+                ExportMotorAndThermalConfigurations(document);
                 ValidateProjectWires(Cc3dCircuitAdapter.ReadWires(document));
                 Cc3dSerializer.Save(path, document);
                 loadedDocument = document;
                 savedWires = snapshot;
                 savedPlcConfiguration = PlcConfigurationSignature();
                 savedLiquidConfiguration = LiquidConfigurationSignature();
+                savedMotorConfigurations = MotorConfigurationSignature();
+                savedThermalConfigurations = ThermalConfigurationSignature();
                 RememberProjectPath(path);
                 ClearWireSelection();
                 SetStatus($"已保存接线：{path}\n共 {snapshot.Count} 条导线。", false);
@@ -147,8 +152,11 @@ namespace ElectricalSim
                 ValidateProjectWires(incoming);
                 var incomingPlcs = ReadPlcConfigurations(document);
                 var incomingLiquid = ReadLiquidConfiguration(document);
+                var incomingMotors = ReadMotorConfigurations(document);
+                var incomingThermals = ReadThermalConfigurations(document);
                 ReplacePlcConfigurations(incomingPlcs);
                 graph.ReplaceWires(incoming);
+                ReplaceMotorAndThermalConfigurations(incomingMotors, incomingThermals);
                 if (Liquid != null)
                 {
                     Liquid.Configure(incomingLiquid, true);

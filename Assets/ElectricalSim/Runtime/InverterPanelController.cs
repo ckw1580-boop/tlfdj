@@ -68,15 +68,15 @@ namespace ElectricalSim
 
         private static readonly ParameterDefinition[] Definitions =
         {
-            Numeric("SP", "手动速度设定", "0", "1/min", -1425f, 1425f),
+            Numeric("SP", "手动速度设定", "0", "1/min", -1450f, 1450f),
             Option("P0010", "调试参数过滤器", "0", "0", "1"),
             Option("P0015", "宏程序选择", "1", "1", "2", "3", "4", "5", "6", "7", "8", "9", "12", "13", "14", "15", "17", "18", "19", "20", "21"),
             Option("P100", "电机标准 IEC/NEMA", "0", "0", "1", "2"),
-            Numeric("P304", "电机额定电压", "400", "V", 0f, 20000f),
-            Numeric("P305", "电机额定电流", "3.1", "A", 0f, 10000f, 0.1f),
-            Numeric("P307", "电机额定功率", "1.1", "kW", 0f, 100000f, 0.1f),
-            Numeric("P310", "电机额定频率", "50", "Hz", 0f, 1000f, 0.1f),
-            Numeric("P311", "电机额定转速", "1425", "1/min", 0f, 210000f),
+            Numeric("P304", "电机额定电压", "380", "V", 1f, 20000f),
+            Numeric("P305", "电机额定电流", "3.1", "A", 0.1f, 10000f, 0.1f),
+            Numeric("P307", "电机额定功率", "1.1", "kW", 0.1f, 100000f, 0.1f),
+            Numeric("P310", "电机额定频率", "50", "Hz", 0.1f, 1000f, 0.1f),
+            Numeric("P311", "电机额定转速", "1450", "1/min", 1f, 210000f),
             Option("P756.0", "模拟输入 AI0 类型", "4", "0", "1", "2", "3", "4"),
             Numeric("P757.0", "模拟输入曲线 X1", "0", "V", -50f, 160f),
             Numeric("P758.0", "模拟输入曲线 Y1", "0", "%", -1000f, 1000f),
@@ -158,6 +158,7 @@ namespace ElectricalSim
         private bool hasAlarm;
         private int faultNumber;
         private int alarmNumber;
+        private readonly Dictionary<string, float> connectedMotorSpeeds = new Dictionary<string, float>();
 
         public MenuMode CurrentMode { get; private set; } = MenuMode.Monitor;
         public MenuDepth CurrentDepth { get; private set; } = MenuDepth.List;
@@ -169,7 +170,11 @@ namespace ElectricalSim
         public bool IsEditingValue => editingValue;
         public float OutputSpeedRpm { get; private set; }
         public float SetpointRpm => GetNumericValue("SP");
-        public float ActualSpeedRpm => OutputSpeedRpm;
+        public bool HasSingleMotorFeedback => connectedMotorSpeeds.Count == 1;
+        public float ActualSpeedRpm => HasSingleMotorFeedback ? connectedMotorSpeeds.Values.First() : 0f;
+        public IReadOnlyDictionary<string, float> ConnectedMotorSpeeds => connectedMotorSpeeds;
+        public string MotorFeedbackSummary => connectedMotorSpeeds.Count == 0 ? "未连接电机" : string.Join(" / ",
+            connectedMotorSpeeds.Select(m => m.Key + " " + m.Value.ToString("F1") + " rpm"));
         public int Macro => Mathf.RoundToInt(GetNumericOrOptionValue("P0015"));
         public string ActiveMacroName => G120MacroCatalog.Get(Macro).Name;
         public IReadOnlyList<string> ActiveMacroParameterMappings => G120MacroCatalog.Get(Macro).AutomaticSettings;
@@ -193,6 +198,16 @@ namespace ElectricalSim
         public Func<bool> CanResetFault { get; set; }
         public event Action FactorySettingsReset;
         private float? calibratedAnalogPercent;
+
+        internal void SetMotorFeedback(IEnumerable<KeyValuePair<string, float>> feedback)
+        {
+            var next = feedback.ToArray();
+            var changed = next.Length != connectedMotorSpeeds.Count || next.Any(m =>
+                !connectedMotorSpeeds.TryGetValue(m.Key, out var speed) || Mathf.Abs(speed - m.Value) > 0.01f);
+            connectedMotorSpeeds.Clear();
+            foreach (var motor in next) connectedMotorSpeeds[motor.Key] = motor.Value;
+            if (changed && (CurrentMode == MenuMode.Monitor || CurrentMode == MenuMode.Control)) RefreshDisplay();
+        }
 
 
         public void Initialize(GameObject panel, Action onClose)
@@ -256,6 +271,7 @@ namespace ElectricalSim
 
         public bool TrySetParameter(string key, float value)
         {
+            if (float.IsNaN(value) || float.IsInfinity(value)) return false;
             key = ResolveParameterKey(key);
             var definition = Definition(key);
             if (definition == null) return false;
@@ -747,7 +763,7 @@ namespace ElectricalSim
 
         private float ClampOperatingSpeed(float speed)
         {
-            var maximum = Mathf.Min(GetNumericValue("P1082"), GetNumericValue("P311"));
+            var maximum = GetNumericValue("P1082");
             var magnitude = Mathf.Min(Mathf.Abs(speed), Mathf.Max(0f, maximum));
             var minimum = Mathf.Min(GetNumericValue("P1080"), Mathf.Max(0f, maximum));
             if (magnitude > 0f) magnitude = Mathf.Max(magnitude, minimum);
@@ -928,8 +944,8 @@ namespace ElectricalSim
             switch (CurrentMode)
             {
                 case MenuMode.Monitor:
-                    Show("SP " + SetpointRpm.ToString("0.0"), OutputSpeedRpm.ToString("0.0"), "1/min", "1/min",
-                        "速度监视：显示电机设定速度与当前实际速度。");
+                    Show("OUT " + OutputSpeedRpm.ToString("0.0"), HasSingleMotorFeedback ? ActualSpeedRpm.ToString("0.0") : "--", "1/min", "1/min",
+                        "上行：变频器斜坡命令；下行：单台电机实际转速。" + MotorFeedbackSummary);
                     break;
                 case MenuMode.Control:
                     RefreshControlDisplay();
@@ -991,7 +1007,7 @@ namespace ElectricalSim
             }
             else if (itemIndex == 0)
             {
-                Show("SP " + SetpointRpm.ToString("0.0"), OutputSpeedRpm.ToString("0.0"), "1/min", "1/min",
+                Show("SP " + SetpointRpm.ToString("0.0"), HasSingleMotorFeedback ? ActualSpeedRpm.ToString("0.0") : "--", "1/min", "1/min",
                     editingValue ? "正在修改手动速度，按 OK 保存。" : "手动运行速度设置；按 OK 后用上下键修改。");
             }
             else if (itemIndex == 1)

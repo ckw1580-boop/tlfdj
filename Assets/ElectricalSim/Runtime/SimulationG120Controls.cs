@@ -50,11 +50,17 @@ namespace ElectricalSim
             {
                 "G120 · CU240E-2 控制端子", "宏 " + inverterPanel.Macro + "：" + inverterPanel.ActiveMacroName,
                 "控制电源：" + (control.Powered ? "已供电" : "未供电") + "  三相主电源：" + (control.MainSupply ? "正常" : "未接齐"),
-                "实际转速：" + inverterPanel.ActualSpeedRpm.ToString("F1") + " rpm",
+                "斜坡命令：" + inverterPanel.OutputSpeedRpm.ToString("F1") + " rpm（用于换算输出频率）",
+                "电机实际转速：" + control.MotorFeedbackStatus,
                 "故障：" + (inverterPanel.HasFault ? inverterPanel.FaultNumber.ToString() : "无") + "  报警：" + (inverterPanel.HasAlarm ? inverterPanel.AlarmNumber.ToString() : "无"),
-                "PTC：" + control.PtcStatus, "模拟电机电流：" + control.SimulatedMotorCurrent.ToString("F2") + " A（模拟值）",
+                "PTC：" + control.PtcStatus, "合计电机电流：" + control.ComputedMotorCurrent.ToString("F2") + " A（负载计算）",
+                "AO 电流来源：" + (control.UseSimulatedMotorCurrent ? "测试覆盖 " + control.SimulatedMotorCurrent.ToString("F2") + " A" : "负载计算"),
                 "模拟调速来源：AI" + control.SelectedAnalogInput
             };
+            if (graph.Devices.TryGetValue("G120", out var source) && source is InverterDriveRuntime inverterDrive)
+                rows.Add("输出：" + inverterDrive.OutputFrequencyHz.ToString("F2") + " Hz / " + inverterDrive.OutputLineVoltage.ToString("F1") + " V（V/f 教学模型）");
+            if (!inverterPanel.HasSingleMotorFeedback) rows.Add("AO0 转速反馈无单一轴速，输出悬空；各电机速度分别显示。");
+            rows.AddRange(control.MotorParameterDiagnostics);
             var snapshot = control.LastSnapshot;
             if (snapshot != null)
             {
@@ -91,7 +97,7 @@ namespace ElectricalSim
             }
             rows.Add("\n旧 DI1_COM1 / DI1_COM2 分别兼容 69 / 34。");
             rows.Add("G120_A1：旧模拟量端子，请改接 AI0+/AI0−。原接线保留，端子独立。");
-            rows.Add("PTC 使用状态模拟；模拟电流为人工设定，不计算负载及热积累。测试输入不写入接线存档。");
+            rows.Add("PTC 使用状态模拟；电机电流默认由各电机负载计算。人工电流仅在测试覆盖启用后作用于 AO，不改变电机发热。测试输入不写入接线存档。");
             return string.Join("\n", rows);
         }
     }

@@ -71,7 +71,8 @@ namespace ElectricalSim.Tests
                 controller.Graph.ClearWires();
                 foreach (var motor in motors) motor.Runtime.ResetMotorSpeed();
                 for (var i = 0; i < 3; i++) controller.Graph.AddWire("POWER.L" + (i + 1), binding.Id + "." + new[] { "U", "V", "W" }[i], Color.red);
-                controller.Graph.Solve();
+                ManualCircuitFixture.CompleteMotor(controller.Graph, binding.Id);
+                controller.Graph.Solve(2);
                 var before = discs.ToDictionary(p => p.Key, p => p.Value.Select(t => t.rotation).ToArray());
                 if (binding.Id == "M3") CaptureMotor(binding.Id, "motor-M3-powered-before");
                 var moved = false;
@@ -90,7 +91,7 @@ namespace ElectricalSim.Tests
                 if (binding.Id == "M3") CaptureMotor(binding.Id, "motor-M3-powered-after");
                 var snapshot = controller.Graph.Solve(0);
                 foreach (var target in controller.Tachometer.Targets)
-                    Assert.That(snapshot.GetMotorSpeedRpm(target.MotorId), Is.EqualTo(target.MotorId == binding.Id ? 1450 : 0));
+                    Assert.That(snapshot.GetMotorSpeedRpm(target.MotorId), Is.EqualTo(target.MotorId == binding.Id ? 1450 : 0).Within(2));
                 for (var i = 0; i < stationary.Length; i++)
                 {
                     Assert.That(Vector3.Distance(positions[i], stationary[i].position), Is.LessThan(0.00001f), stationary[i].name);
@@ -219,11 +220,12 @@ namespace ElectricalSim.Tests
                         controller.Graph.AddWire("POWER.L" + (i + 1), terminal, Color.blue, "ElectricalWire");
                         jumperIds.Add(controller.Graph.AddWire(terminal, target + "." + motorPorts[i], Color.blue).Id);
                     }
-                    var snapshot = controller.Graph.Solve();
+                    ManualCircuitFixture.CompleteMotor(controller.Graph, target);
+                    var snapshot = controller.Graph.Solve(2);
                     rows.Add(group + " -> " + target + ": " + string.Join(", ", motors.Select(m => m.Runtime.DeviceId + "=" + snapshot.GetMotorSpeedRpm(m.Runtime.DeviceId))));
                     File.WriteAllLines(Path.Combine(Application.dataPath, "../Build/Reports/motor-cabinet-jumper-audit.txt"), rows);
                     foreach (var motor in motors)
-                        Assert.That(snapshot.GetMotorSpeedRpm(motor.Runtime.DeviceId), Is.EqualTo(motor.Runtime.DeviceId == target ? 1450 : 0), group + " -> " + target + ": " + motor.Runtime.DeviceId);
+                        Assert.That(snapshot.GetMotorSpeedRpm(motor.Runtime.DeviceId), Is.EqualTo(motor.Runtime.DeviceId == target ? 1450 : 0).Within(2), group + " -> " + target + ": " + motor.Runtime.DeviceId);
                     var environment = GameObject.Find("OriginalLabEnvironment").transform;
                     var rotors = MotorBindingDefinition.All.ToDictionary(b => b.Id, b => environment.Find(b.ModelPath + "/mesh/zhuanpan"));
                     var before = rotors.ToDictionary(p => p.Key, p => p.Value.rotation);
@@ -234,6 +236,7 @@ namespace ElectricalSim.Tests
                         var saved = Path.Combine(Application.dataPath, "../Build/Reports/motor-cabinet-C-to-M1.cc3d");
                         Assert.That(controller.SaveCc3dToPath(saved), Is.EqualTo(WiringFileResult.Success));
                         Assert.That(controller.OpenCc3dFromPath(saved), Is.EqualTo(WiringFileResult.Success));
+                        controller.Graph.Solve(2);
                         CaptureMotor("M1", "motor-cabinet-single-wired-before", true);
                     }
                     var moved = false;

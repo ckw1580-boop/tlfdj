@@ -65,7 +65,7 @@ namespace ElectricalSim
         public bool ContainsPort(string port) => port != null && roots.ContainsKey(port);
         public bool IsVoltageUnsupported(string port) => ContainsPort(port) && unsupportedVoltageRoots.Contains(roots[port]);
         public bool HasExternalSupply(string port) => ContainsPort(port) &&
-            (GetPotential(port) != ElectricalPotential.Floating || externalSupplyRoots.Contains(roots[port]) || SignalEnergized(port));
+            (GetPotential(port) != ElectricalPotential.Floating || externalSupplyRoots.Contains(roots[port]) || SignalEnergized(port) || HasWindingSupply(port));
         internal void MarkUnmodeledVoltageOutput(string port, bool energized)
         {
             if (!ContainsPort(port)) return;
@@ -125,7 +125,7 @@ namespace ElectricalSim
             => deviceId != null && motorSpeeds.TryGetValue(deviceId, out var speed) ? speed : 0f;
     }
 
-    public sealed class CircuitGraph
+    public sealed partial class CircuitGraph
     {
         private readonly List<WireConnection> wires = new List<WireConnection>();
         private readonly Dictionary<string, IElectricalDevice> devices = new Dictionary<string, IElectricalDevice>();
@@ -224,6 +224,21 @@ namespace ElectricalSim
 
         public SimulationSnapshot Solve(float deltaTime = 0.02f, int maxIterations = 16)
         {
+            if (float.IsNaN(deltaTime) || float.IsInfinity(deltaTime)) throw new ArgumentOutOfRangeException(nameof(deltaTime));
+            if (deltaTime <= 0) return SolveStep(0, maxIterations);
+            SimulationSnapshot result = null;
+            var remaining = (double)deltaTime;
+            while (remaining > 1e-8)
+            {
+                var step = (float)Math.Min(0.02, remaining);
+                result = SolveStep(step, maxIterations);
+                remaining -= step;
+            }
+            return result ?? SolveStep(0, maxIterations);
+        }
+
+        private SimulationSnapshot SolveStep(float deltaTime, int maxIterations)
+        {
             if (maxIterations < 1) throw new ArgumentOutOfRangeException(nameof(maxIterations));
             PrepareTopology();
             SimulationSnapshot snapshot = null;
@@ -262,6 +277,20 @@ namespace ElectricalSim
             foreach (var motor in runtimeMotors)
                 if (deltaTime > 0) motor.AdvanceMotorSpeed(snapshot, deltaTime);
             snapshot = BuildSnapshot();
+            if (AdvanceThermalRelays(snapshot, deltaTime))
+            {
+                var protectionConverged = false;
+                for (var iteration = 0; iteration < maxIterations; iteration++)
+                {
+                    snapshot = BuildSnapshot();
+                    var changed = false;
+                    foreach (var device in allDevices) changed |= device.Evaluate(snapshot, 0);
+                    iterationCount++;
+                    if (!changed) { protectionConverged = true; break; }
+                }
+                converged &= protectionConverged;
+            }
+            snapshot = BuildSnapshot();
             snapshot.IsConverged = converged;
             snapshot.IterationCount = iterationCount;
             foreach (var device in allDevices) device.ApplyVisualState(snapshot);
@@ -292,6 +321,8 @@ namespace ElectricalSim
             var speeds = new Dictionary<string, float>(runtimeMotors.Length);
             foreach (var motor in runtimeMotors) speeds.Add(motor.DeviceId, motor.ActualSpeedRpm);
             var snapshot = new SimulationSnapshot(rootMap, potentialsByRoot, active, directions, errors, speeds);
+            snapshot.CaptureMotorData(runtimeMotors);
+            snapshot.CaptureThermalData(allDevices.OfType<ElectricalDeviceRuntime>());
             signalBuffer.Clear(); receiverBuffer.Clear();
             foreach (var source in signalSources)
             {
@@ -310,7 +341,15 @@ namespace ElectricalSim
                 foreach (var motor in motors)
                 {
                     var sample = drive.SampleMotor(motor.DeviceId, snapshot);
-                    if (sample.Connected) snapshot.MotorDrives[motor.DeviceId] = sample;
+                    if (sample.Connected)
+                    {
+                        if (snapshot.MotorDrives.TryGetValue(motor.DeviceId, out var previous) && previous.SourceId != sample.SourceId)
+                        {
+                            sample.HasDrive = false;
+                            sample.Diagnostic = "电机连接了多个变频电源，请断开混接。";
+                        }
+                        snapshot.MotorDrives[motor.DeviceId] = sample;
+                    }
                 }
             }
             return snapshot;

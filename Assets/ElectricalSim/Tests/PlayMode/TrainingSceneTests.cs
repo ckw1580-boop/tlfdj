@@ -168,6 +168,7 @@ namespace ElectricalSim.Tests
         {
             ConnectG120TestPower();
             var controller = Object.FindObjectOfType<SimulationController>();
+            controller.SetMode(SimulationMode.Drag);
             var inverter = controller.InverterPanel;
             Assert.That(inverter, Is.Not.Null);
             Assert.That(inverter.TrySetParameter("SP", 600f), Is.True);
@@ -185,23 +186,24 @@ namespace ElectricalSim.Tests
             var runButton = buttons["btn_i"].GetComponent<InverterMomentaryButton>();
             Assert.That(runButton, Is.Not.Null);
             runButton.OnPointerDown(null);
+            controller.AdvanceSimulation(.02f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.GreaterThan(0f));
-            Assert.That(inverter.ActualSpeedRpm, Is.LessThanOrEqualTo(600f));
+            Assert.That(inverter.OutputSpeedRpm, Is.GreaterThan(0f));
+            Assert.That(inverter.OutputSpeedRpm, Is.LessThanOrEqualTo(600f));
 
             inverter.SetControlOptions(true, true);
             Assert.That(inverter.IsJogMode, Is.True);
             Assert.That(inverter.IsReverse, Is.True);
             runButton.OnPointerDown(null);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.LessThan(600f));
+            Assert.That(inverter.OutputSpeedRpm, Is.LessThan(600f));
             runButton.OnPointerUp(null);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.LessThan(600f));
+            Assert.That(inverter.OutputSpeedRpm, Is.LessThan(600f));
 
             buttons["btn_o"].onClick.Invoke();
             for (var index = 0; index < 5; index++) yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.LessThan(600f));
+            Assert.That(inverter.OutputSpeedRpm, Is.LessThan(600f));
 
             inverter.ResetFactorySettings();
             Assert.That(inverter.GetParameterText("P1003"), Is.EqualTo("300"));
@@ -259,8 +261,9 @@ namespace ElectricalSim.Tests
             setInput(0, true);
             setInput(1, true);
             setInput(4, true);
+            controller.AdvanceSimulation(.04f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(600f).Within(2f));
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(600f).Within(2f));
 
             setInput(0, false);
             setInput(1, false);
@@ -269,14 +272,20 @@ namespace ElectricalSim.Tests
             controller.InverterControls.Inputs[0].Simulated = true;
             controller.InverterControls.Inputs[0].SimulatedValue = 5f;
             setInput(0, true);
+            controller.AdvanceSimulation(.04f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(500f).Within(2f));
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(500f).Within(2f));
+            var crossedZero = false;
+            System.Action<float> observeReversal = speed => { if (Mathf.Abs(speed) < 0.01f) crossedZero = true; };
+            inverter.OutputSpeedChanged += observeReversal;
             setInput(1, false);
             setInput(1, true);
+            controller.AdvanceSimulation(.04f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f), "Reversal finishes deceleration before accelerating in reverse");
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(-500f).Within(2f));
+            inverter.OutputSpeedChanged -= observeReversal;
+            Assert.That(crossedZero, Is.True, "Substep reversal passes through zero even when the render frame skips that instant");
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(-500f).Within(2f));
 
             inverter.SetFault(true, 123);
             Assert.That(inverter.HasFault, Is.True);
@@ -292,17 +301,19 @@ namespace ElectricalSim.Tests
             setInput(5, false);
             inverter.SetMotorizedPotentiometer(350f);
             setInput(0, true);
+            controller.AdvanceSimulation(.04f);
             yield return null;
             yield return null;
             Assert.That(inverter.IsLocalControl, Is.True);
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(350f).Within(2f));
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(350f).Within(2f));
         }
 
         [UnityTest]
         public IEnumerator G120ProfibusMacroUsesControlWordTelegramAndStatusWord()
         {
             ConnectG120TestPower();
-            var inverter = Object.FindObjectOfType<SimulationController>().InverterPanel;
+            var controller = Object.FindObjectOfType<SimulationController>();
+            var inverter = controller.InverterPanel;
             inverter.TrySetParameter("P0010", 1f);
             inverter.TrySetParameter("P1120", 0.01f);
             inverter.TrySetParameter("P1121", 0.01f);
@@ -312,19 +323,26 @@ namespace ElectricalSim.Tests
             Assert.That(inverter.TelegramType, Is.EqualTo(352));
 
             inverter.SetProfibusCommand(0x047F, 600f);
+            controller.AdvanceSimulation(.02f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(600f).Within(2f));
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(600f).Within(2f));
             Assert.That((inverter.FieldbusStatusWord & (1 << 2)), Is.Not.Zero, "Status word must report operation enabled");
             Assert.That((inverter.FieldbusStatusWord & (1 << 9)), Is.Not.Zero, "Status word must report PZD control");
 
+            var crossedZero = false;
+            System.Action<float> observeReversal = speed => { if (Mathf.Abs(speed) < .01f) crossedZero = true; };
+            inverter.OutputSpeedChanged += observeReversal;
             inverter.SetProfibusCommand(0x0C7F, 400f);
+            controller.AdvanceSimulation(.04f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f), "Profibus direction changes also pass through zero");
+            inverter.OutputSpeedChanged -= observeReversal;
+            Assert.That(crossedZero, Is.True, "Profibus reversal must pass through zero within the simulation substeps");
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(-400f).Within(2f));
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(-400f).Within(2f));
             inverter.SetProfibusCommand(0x047E, 400f);
+            controller.AdvanceSimulation(.02f);
             yield return null;
-            Assert.That(inverter.ActualSpeedRpm, Is.EqualTo(0f).Within(2f));
+            Assert.That(inverter.OutputSpeedRpm, Is.EqualTo(0f).Within(2f));
         }
 
         [UnityTest]
@@ -2950,6 +2968,8 @@ namespace ElectricalSim.Tests
             var controller = Object.FindObjectOfType<SimulationController>();
             controller.PanelPower.StartForAssessment();
             foreach (var phase in new[] { "L1", "L2", "L3" }) controller.Graph.AddWire("POWER." + phase, "G120." + phase, Color.red);
+            controller.SetMode(SimulationMode.Simulate);
+            controller.AdvanceSimulation(0);
         }
 
         private static void AssertNamedBoardPort(

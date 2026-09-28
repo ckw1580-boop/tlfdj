@@ -60,7 +60,7 @@ namespace ElectricalSim.Tests
             controller.Graph.AddWire("DuanZiPai_3.G120_T09", "DuanZiPai_3.G120_DI4", Color.red);
             controller.InverterPanel.TrySetParameter("P1120", .01f); controller.SetMode(SimulationMode.Simulate);
             controller.AdvanceSimulation(.1f); yield return null;
-            Assert.That(controller.InverterPanel.Macro, Is.EqualTo(1)); Assert.That(controller.InverterPanel.ActualSpeedRpm, Is.EqualTo(300).Within(.1));
+            Assert.That(controller.InverterPanel.Macro, Is.EqualTo(1)); Assert.That(controller.InverterPanel.OutputSpeedRpm, Is.EqualTo(300).Within(.1));
             var count = controller.Graph.Wires.Count; controller.SelectInverter(true); yield return null;
             Assert.That(controller.InverterProperties.IsVisible, Is.True);
             Assert.That(controller.InverterProperties.DisplayedText, Does.Contain("正转启动").And.Contain("旧模拟量端子").And.Contain("69"));

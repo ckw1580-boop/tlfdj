@@ -1,3 +1,5 @@
+using System;
+using System.Globalization;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -10,6 +12,9 @@ namespace ElectricalSim
         private Text title, details;
         private ScrollRect scroll;
         private Button tripButton, resetButton;
+        private Button applyConfiguration;
+        private InputField[] configurationInputs;
+        private Text configurationStatus;
         public string DisplayedText => details != null ? details.text : string.Empty;
 
         public void Initialize(SimulationController source, Canvas canvas, Font font)
@@ -90,10 +95,24 @@ namespace ElectricalSim
             hint.rectTransform.pivot = Vector2.zero;
             hint.rectTransform.anchoredPosition = new Vector2(16, 8);
             hint.rectTransform.sizeDelta = new Vector2(512, 24);
-            hint.text = "滚动查看全部端子 · 仿真模式可模拟脱扣与复位";
+            hint.text = "教学热曲线 · 仿真可模拟脱扣，冷却后才能复位";
             tripButton = ActionButton("Trip", "模拟脱扣", 16, font, () => controller.SetThermalRelayTripped(view, true));
             resetButton = ActionButton("Reset", "复位", 138, font, () => controller.SetThermalRelayTripped(view, false));
-            scrollTransform.offsetMin = new Vector2(16, 78);
+            var settings = new GameObject("Thermal settings", typeof(RectTransform)).GetComponent<RectTransform>();
+            settings.SetParent(transform, false); settings.anchorMin = settings.anchorMax = settings.pivot = Vector2.zero;
+            settings.anchoredPosition = new Vector2(16, 78); settings.sizeDelta = new Vector2(512, 204);
+            configurationInputs = new InputField[3];
+            var labels = new[] { "整定电流（A）", "热时间常数（秒）", "允许复位热状态（%）" };
+            var names = new[] { "SettingCurrent", "TimeConstantSeconds", "ResetThresholdPercent" };
+            for (var i = 0; i < 3; i++)
+            {
+                var label = Label(settings, names[i] + "Label", font, 15); label.text = labels[i]; Place(label.rectTransform, 0, i * 39, 300, 32);
+                configurationInputs[i] = MotorConfigurationEditor.Input(settings, font, names[i], 320, i * 39, 174);
+            }
+            applyConfiguration = MotorConfigurationEditor.Button(settings, font, "应用保护配置", 0, 120, 170, ApplyConfiguration);
+            configurationStatus = Label(settings, "ConfigurationStatus", font, 14); configurationStatus.color = new Color(1, .7f, .3f);
+            Place(configurationStatus.rectTransform, 0, 160, 498, 42);
+            scrollTransform.offsetMin = new Vector2(16, 292);
             gameObject.SetActive(false);
         }
 
@@ -104,6 +123,10 @@ namespace ElectricalSim
             if (view == null) return;
             transform.SetAsLastSibling();
             title.text = view.Definition.Id + (view.IsRear ? " · 背部热继电器属性" : " · 热继电器属性");
+            var config = view.Runtime.ThermalConfiguration;
+            var values = new[] { config.SettingCurrent, config.TimeConstantSeconds, config.ResetThreshold * 100 };
+            for (var i = 0; i < values.Length; i++) configurationInputs[i].text = values[i].ToString("G", CultureInfo.InvariantCulture);
+            configurationStatus.text = "";
             Refresh();
             Canvas.ForceUpdateCanvases();
             scroll.StopMovement();
@@ -128,9 +151,27 @@ namespace ElectricalSim
         {
             if (view == null) return;
             tripButton.interactable = controller.Mode == SimulationMode.Simulate && !view.Runtime.IsTripped;
-            resetButton.interactable = controller.Mode == SimulationMode.Simulate && view.Runtime.IsTripped;
+            resetButton.interactable = controller.Mode == SimulationMode.Simulate && view.Runtime.IsTripped && view.Runtime.ThermalState.CanReset;
+            var editable = controller.Mode != SimulationMode.Simulate && !controller.IsFileOperationActive;
+            foreach (var input in configurationInputs) input.interactable = editable;
+            applyConfiguration.interactable = editable;
             var text = controller.DescribeThermalRelay(view);
             if (details.text != text) details.text = text;
+        }
+
+        private void ApplyConfiguration()
+        {
+            try
+            {
+                var values = new float[3];
+                for (var i = 0; i < values.Length; i++)
+                    if (!float.TryParse(configurationInputs[i].text, NumberStyles.Float, CultureInfo.InvariantCulture, out values[i]) || float.IsNaN(values[i]) || float.IsInfinity(values[i]))
+                        throw new ArgumentException("请输入有效数字。");
+                controller.ConfigureThermalRelay(view, new ThermalRelayConfiguration
+                { SettingCurrent = values[0], TimeConstantSeconds = values[1], ResetThreshold = values[2] / 100 });
+                configurationStatus.text = "已应用教学保护参数。";
+            }
+            catch (Exception exception) { configurationStatus.text = exception.Message; }
         }
 
         private static Text Label(Transform parent, string name, Font font, int size)

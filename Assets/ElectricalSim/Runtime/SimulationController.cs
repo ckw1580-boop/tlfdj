@@ -219,6 +219,8 @@ namespace ElectricalSim
                 SetStatus(lastSnapshot.Errors[0], true);
             else if (!lastSnapshot.IsConverged)
                 SetStatus("电路未收敛：请检查触点反馈或振荡连接。", true);
+            else if (Mode == SimulationMode.Simulate && lastSnapshot.Diagnostics.Count > 0)
+                SetStatus(lastSnapshot.Diagnostics[0], true);
         }
 
         public void SetMode(SimulationMode mode)
@@ -261,6 +263,7 @@ namespace ElectricalSim
             foreach (var device in devices.Values)
             {
                 if (device.Kind == ElectricalDeviceKind.Motor) device.ResetMotorSpeed();
+                if (device.Kind == ElectricalDeviceKind.ThermalRelay) device.ResetThermalState();
                 if (device.Kind == ElectricalDeviceKind.Breaker)
                     device.SetControl(!IsMainBreaker(device) || AreCabinetBreakersClosed);
                 else if (device.Kind == ElectricalDeviceKind.Fuse) device.SetControl(true);

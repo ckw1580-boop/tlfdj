@@ -54,12 +54,12 @@ namespace ElectricalSim.Tests
         }
         [Test] public void MacroOneUsesWiredCommonsDirectionsSummedSpeedsAndResetEdge()
         {
-            On(0); On(4); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.Zero);
-            Commons(); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(300));
-            On(5); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(700));
+            On(0); On(4); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.Zero);
+            Commons(); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(300));
+            On(5); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(700));
             var forward = graph.Wires.Single(w => w.EndPort == "G120.T05"); graph.RemoveWire(forward.Id); On(1);
-            graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.Zero); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(-700));
-            panel.SetFault(true, 123); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.Zero);
+            graph.Solve(.02f); Assert.That(panel.OutputSpeedRpm, Is.Zero); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(-700));
+            panel.SetFault(true, 123); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.Zero);
             On(2); graph.Solve(.1f); Assert.That(panel.HasFault, Is.False);
         }
         [Test] public void CommonsUseEvenAndOddGroupsAndNeverImplicitGround()
@@ -74,7 +74,7 @@ namespace ElectricalSim.Tests
             mains = false; Commons(); On(0); On(4);
             Wire("DC.DC_POSITIVE", "G120.T31"); Wire("DC.DC_NEGATIVE", "G120.T32");
             var s = graph.Solve(.1f);
-            Assert.That(Control.Powered, Is.True); Assert.That(panel.ActualSpeedRpm, Is.Zero);
+            Assert.That(Control.Powered, Is.True); Assert.That(panel.OutputSpeedRpm, Is.Zero);
             Assert.That(panel.OperationEnabled, Is.False);
             Assert.That(panel.FieldbusStatusWord & 7, Is.Zero, "Control power alone cannot report drive readiness or enable.");
             Assert.That(s.GetDcVoltage("G120.T01", "G120.T02"), Is.EqualTo(10));
@@ -157,39 +157,42 @@ namespace ElectricalSim.Tests
         }
         [Test] public void AnalogWiringUsesBothLeadsAndSimulationIsExplicitAndExclusive()
         {
-            Macro(12); Commons(); On(0); Link(1, 3); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.Zero);
-            Link(2, 4); graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(1000));
+            Macro(12); Commons(); On(0); Link(1, 3); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.Zero);
+            Link(2, 4); graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(1000));
             Control.Inputs[0].Simulated = true; Control.Inputs[0].SimulatedValue = 5;
-            graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(500));
-            Control.Inputs[0].Simulated = false; graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(1000));
+            graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(500));
+            Control.Inputs[0].Simulated = false; graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(1000));
         }
         [Test] public void AiOneSupportsNegativeVoltageAndMacroSwitchRestoresAiZero()
         {
             Macro(12); Commons(); On(0); graph.Solve(0); Control.SelectedAnalogInput = 1;
             Control.Inputs[1].Simulated = true; Control.Inputs[1].SimulatedValue = -5;
-            graph.Solve(.1f); Assert.That(panel.ActualSpeedRpm, Is.EqualTo(-500));
+            graph.Solve(.1f); Assert.That(panel.OutputSpeedRpm, Is.EqualTo(-500));
             Macro(17); graph.Solve(0); Assert.That(Control.SelectedAnalogInput, Is.Zero);
         }
         [Test] public void AoCurrentFeedsMatchingAiWithCalibrationAndExposesOpenAndReversedLoops()
         {
-            Macro(12); Commons(); On(0); Control.SetInputType(0, 2); Control.SimulatedMotorCurrent = 1.55f;
+            Macro(12); Commons(); On(0); Control.SetInputType(0, 2); Control.UseSimulatedMotorCurrent = true; Control.SimulatedMotorCurrent = 1.55f;
             graph.Solve(0); Assert.That(Control.Outputs[1].Reading.State, Is.EqualTo(ControlSignalState.Floating));
             var a = Link(26, 3); var b = Link(27, 4); graph.Solve(.1f);
             Assert.That(Control.Inputs[0].Reading.Value, Is.EqualTo(10).Within(.001));
-            Assert.That(panel.ActualSpeedRpm, Is.EqualTo(500).Within(.1)); Assert.That(Control.Outputs[1].Effective, Is.EqualTo(10).Within(.001));
+            Assert.That(panel.OutputSpeedRpm, Is.EqualTo(500).Within(.1)); Assert.That(Control.Outputs[1].Effective, Is.EqualTo(10).Within(.001));
             graph.RemoveWire(a.Id); graph.RemoveWire(b.Id); Link(26, 4); Link(27, 3); graph.Solve(.1f);
-            Assert.That(Control.Inputs[0].Reading.State, Is.EqualTo(ControlSignalState.Reversed)); Assert.That(panel.ActualSpeedRpm, Is.Zero);
+            Assert.That(Control.Inputs[0].Reading.State, Is.EqualTo(ControlSignalState.Reversed)); Assert.That(panel.OutputSpeedRpm, Is.Zero);
         }
         [Test] public void AnalogUnitMismatchAndMultipleSourcesAreRejected()
         {
             Link(26, 3); Link(27, 4); graph.Solve(0);
             Assert.That(Control.Inputs[0].Reading.State, Is.EqualTo(ControlSignalState.TypeMismatch));
+            graph.RegisterDevice(ElectricalDeviceRuntime.CreateMotor("M1"));
+            Wire("G120.U2", "M1.U"); Wire("G120.V2", "M1.V"); Wire("G120.W2", "M1.W");
+            Wire("M1.U2", "M1.V2"); Wire("M1.V2", "M1.W2");
             Link(12, 3); Link(13, 4); Control.SetInputType(0, 2);
             Assert.That(graph.Solve(0).Errors, Is.Not.Empty);
         }
         [Test] public void ParallelCurrentInputsShareTheSourceCurrentAndRestoreWhenOneIsDisconnected()
         {
-            Control.SetInputType(0, 2); Control.SetInputType(1, 2); Control.SimulatedMotorCurrent = 1.55f;
+            Control.SetInputType(0, 2); Control.SetInputType(1, 2); Control.UseSimulatedMotorCurrent = true; Control.SimulatedMotorCurrent = 1.55f;
             Link(26, 3); Link(27, 4); var secondPositive = Link(26, 10); Link(27, 11);
             var snapshot = graph.Solve(0);
             Assert.That(Control.Outputs[1].Setpoint, Is.EqualTo(10).Within(.001));
@@ -205,14 +208,14 @@ namespace ElectricalSim.Tests
         [TestCase(G120AnalogOutputMode.Current4To20, 12)]
         public void OutputModesScaleSimulatedCurrent(G120AnalogOutputMode mode, double expected)
         {
-            Control.Outputs[1].Mode = mode; Control.SimulatedMotorCurrent = 2; Control.Outputs[1].FullScale = 4;
+            Control.Outputs[1].Mode = mode; Control.UseSimulatedMotorCurrent = true; Control.SimulatedMotorCurrent = 2; Control.Outputs[1].FullScale = 4;
             graph.Solve(0); Assert.That(Control.Outputs[1].Setpoint, Is.EqualTo(expected).Within(.001));
         }
         [TestCase(G120PtcState.Overheated)] [TestCase(G120PtcState.Open)] [TestCase(G120PtcState.Shorted)]
         public void PtcRequiresRecoveryAndANewResetEdge(G120PtcState state)
         {
             Commons(); On(0); On(4); Control.PtcEnabled = true; Control.PtcState = state;
-            graph.Solve(.1f); Assert.That(panel.HasFault, Is.True); Assert.That(panel.ActualSpeedRpm, Is.Zero);
+            graph.Solve(.1f); Assert.That(panel.HasFault, Is.True); Assert.That(panel.OutputSpeedRpm, Is.Zero);
             Assert.That(panel.FaultNumber, Is.EqualTo(state == G120PtcState.Overheated ? 7011 : 7016));
             Assert.That(panel.AlarmNumber, Is.EqualTo(state == G120PtcState.Overheated ? 7910 : 7015));
             var reset = On(2); graph.Solve(.1f); Assert.That(panel.HasFault, Is.True);
@@ -241,20 +244,20 @@ namespace ElectricalSim.Tests
         {
             Macro(19); panel.SetAnalogInputVolts(5);
             panel.SetDigitalInputs(new[] { false, true, false, false, false, false }); panel.Advance(.1f);
-            Assert.That(panel.ActualSpeedRpm, Is.Zero);
+            Assert.That(panel.OutputSpeedRpm, Is.Zero);
             panel.SetDigitalInputs(new[] { true, true, false, false, false, false }); panel.Advance(.1f);
-            Assert.That(panel.ActualSpeedRpm, Is.Zero, "held start is not a new pulse");
+            Assert.That(panel.OutputSpeedRpm, Is.Zero, "held start is not a new pulse");
             panel.SetDigitalInputs(new[] { true, false, false, false, false, false });
             panel.SetDigitalInputs(new[] { true, true, false, false, false, false }); panel.Advance(.1f);
-            Assert.That(panel.ActualSpeedRpm, Is.EqualTo(500));
+            Assert.That(panel.OutputSpeedRpm, Is.EqualTo(500));
         }
         [Test] public void ZeroTimeSolveNeverAdvancesRampsOrMopAndFactoryResetClearsInjection()
         {
             Macro(9); Commons(); On(0); On(1); panel.TrySetParameter("P1120", 10);
-            graph.Solve(.1f); var speed = panel.ActualSpeedRpm; var mop = panel.MotorizedPotentiometerRpm;
+            graph.Solve(.1f); var speed = panel.OutputSpeedRpm; var mop = panel.MotorizedPotentiometerRpm;
             for (var i = 0; i < 5; i++) graph.Solve(0);
-            Assert.That(panel.ActualSpeedRpm, Is.EqualTo(speed)); Assert.That(panel.MotorizedPotentiometerRpm, Is.EqualTo(mop));
-            Control.Inputs[0].Simulated = true; Control.SimulatedMotorCurrent = 5; Control.PtcEnabled = true;
+            Assert.That(panel.OutputSpeedRpm, Is.EqualTo(speed)); Assert.That(panel.MotorizedPotentiometerRpm, Is.EqualTo(mop));
+            Control.Inputs[0].Simulated = true; Control.UseSimulatedMotorCurrent = true; Control.SimulatedMotorCurrent = 5; Control.PtcEnabled = true;
             panel.ResetFactorySettings(); Assert.That(panel.Macro, Is.EqualTo(1)); Assert.That(Control.Inputs[0].Simulated, Is.False);
             Assert.That(Control.PtcEnabled, Is.False); Assert.That(Control.SimulatedMotorCurrent, Is.Zero);
         }

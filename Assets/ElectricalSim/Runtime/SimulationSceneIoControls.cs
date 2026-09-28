@@ -50,6 +50,11 @@ namespace ElectricalSim
                 throw new InvalidOperationException("搅拌机对应电机缺失：" + SceneIoCatalog.MixerMotorId);
             AddSceneIoView(mixer, SceneIoCatalog.MixerName, font);
             AddSceneIoView(RequireSceneIoModel(environment, MotorBindingDefinition.Find(SceneIoCatalog.MixerMotorId).ModelPath), SceneIoCatalog.MixerName, font);
+            // Pump and mixer housings already share their associated process view;
+            // register remaining motors with the same property and picking entry point.
+            foreach (var motor in MotorBindingDefinition.All)
+                if (!SceneIoCatalog.Pumps.Any(p => p.MotorId == motor.Id) && motor.Id != SceneIoCatalog.MixerMotorId)
+                    AddSceneIoView(RequireSceneIoModel(environment, motor.ModelPath), motor.Id, font);
             // Only the shaft/paddle mesh rotates; the motor housing and tank stay fixed.
             var paddles = RequireSceneIoModel(mixer, "mesh/JiaoBanJi");
             var mixerAxis = new GameObject("MixerRotationAxis").transform;
@@ -72,6 +77,7 @@ namespace ElectricalSim
             SceneIoProperties = new GameObject("Scene IO Properties", typeof(RectTransform)).AddComponent<SceneIoPropertiesPresenter>();
             SceneIoProperties.Initialize(this, canvas, font);
             savedLiquidConfiguration = LiquidConfigurationSignature();
+            savedMotorConfigurations = MotorConfigurationSignature();
         }
 
         private static Transform RequireSceneIoModel(Transform environment, string path)
@@ -128,10 +134,12 @@ namespace ElectricalSim
                 liquidStepAccumulator = 0;
                 if (IsFileOperationActive) Liquid.Pause();
                 else { Liquid.AdvanceIdle(Math.Max(0, elapsedSeconds)); liquidView?.Refresh(); }
+                // Electrical controls (including the BOP in Drag mode) keep their existing
+                // live clock; only file operations suspend it. Liquid requires Simulate mode.
                 return graph.Solve(IsFileOperationActive ? 0 : elapsedSeconds);
             }
             liquidStepAccumulator += Math.Max(0, elapsedSeconds);
-            var snapshot = lastSnapshot;
+            SimulationSnapshot snapshot = null;
             while (liquidStepAccumulator + 1e-9 >= 0.02)
             {
                 snapshot = graph.Solve(0.02f);
@@ -142,10 +150,18 @@ namespace ElectricalSim
                 liquidStepAccumulator -= 0.02;
             }
             liquidView?.Refresh();
+            // Topology and control inputs must refresh even when no simulation tick is due.
             return snapshot ?? graph.Solve(0);
         }
 
         public string DescribeSceneIo(string id)
+        {
+            var motorId = MotorIdForSceneIo(id);
+            var prefix = motorId == null ? "" : DescribeMotor(motorId) + "\n\n";
+            return prefix + DescribeSceneIoAssociation(id);
+        }
+
+        private string DescribeSceneIoAssociation(string id)
         {
             if (Liquid == null) return "";
             if (id == "TANK")

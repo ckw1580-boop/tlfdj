@@ -59,6 +59,7 @@ namespace ElectricalSim
             if (thermalRelaySchematicTexture == null) throw new InvalidOperationException("热继电器原理图资源缺失");
             ThermalRelayProperties = new GameObject("Thermal Relay Properties", typeof(RectTransform)).AddComponent<ThermalRelayPropertiesPresenter>();
             ThermalRelayProperties.Initialize(this, canvas, font);
+            savedThermalConfigurations = ThermalConfigurationSignature();
             Debug.Log("[ThermalRelayValidation] 3 个独立热继电器、30/30 连接点绑定通过（正面 20，背部 10）。");
         }
         public void SelectThermalRelay(ThermalRelayView view)
@@ -76,6 +77,13 @@ namespace ElectricalSim
             if (Mode != SimulationMode.Simulate || view == null || !thermalRelayViews.Contains(view)) return;
             view.Runtime.SetControl(tripped);
         }
+        public void ConfigureThermalRelay(ThermalRelayView view, ThermalRelayConfiguration configuration)
+        {
+            if (Mode == SimulationMode.Simulate || IsFileOperationActive)
+                throw new InvalidOperationException("请退出仿真后修改热继电器配置。");
+            if (view == null || !thermalRelayViews.Contains(view)) throw new ArgumentException("热继电器不存在。");
+            view.Runtime.ConfigureThermalRelay(configuration);
+        }
         public void ShowThermalRelaySchematic(ThermalRelayView view)
         {
             if (Mode != SimulationMode.Wiring || view == null || !thermalRelayViews.Contains(view)) return;
@@ -87,14 +95,23 @@ namespace ElectricalSim
         {
             if (view == null) return string.Empty;
             var trip = view.Runtime.IsTripped;
+            var config = view.Runtime.ThermalConfiguration;
+            var state = view.Runtime.ThermalState;
             var rows = new List<string> { view.Definition.Id + " · 热继电器", "位置：柜体" + (view.IsRear ? "背部" : "正面"),
                 "对应运行时编号：" + view.Runtime.DeviceId, "状态：" + (trip ? "已脱扣" : "正常／已复位"),
-                "三只独立动作 · 无线圈", "整定电流／脱扣延时：未配置", "", "实时通断" };
+                "三只独立动作 · 无线圈 · 教学热积累模型",
+                $"整定电流：{config.SettingCurrent:G} A · 热时间常数：{config.TimeConstantSeconds:G} 秒",
+                "三相支路电流：" + string.Join("／", state.Currents.Select(i => float.IsNaN(i) ? "未知" : i.ToString("F2"))) + " A",
+                $"热状态：{state.Heat * 100:F1}% · 达到100%自动脱扣",
+                $"复位条件：冷却至 {config.ResetThreshold * 100:G}% 以下 · " + (state.CanReset ? "允许复位" : "尚需冷却"),
+                "脱扣原因：" + (string.IsNullOrEmpty(state.TripReason) ? "无" : state.TripReason),
+                "电流诊断：" + (string.IsNullOrEmpty(state.Diagnostic) ? "无" : state.Diagnostic), "", "实时通断" };
             foreach (var pair in ThermalRelayDefinition.Heaters)
                 rows.Add(ThermalRelayDefinition.TerminalLabel(pair.A) + "–" + ThermalRelayDefinition.TerminalLabel(pair.B) + " 热元件：导通");
             rows.Add("95–96 常闭：" + (trip ? "断开" : "闭合"));
             rows.Add("97–98 常开：" + (trip ? "闭合" : "断开"));
-            rows.Add("脱扣通过 95–96 切断接触器控制回路。");
+            rows.Add("脱扣仅切换辅助触点；95–96 须接入接触器控制回路才能停机。");
+            rows.Add("整定和热曲线均为教学值，不代表工程保护等级。");
             rows.Add(""); rows.Add("实际端子绑定");
             foreach (var terminal in ThermalRelayDefinition.Ports)
             {

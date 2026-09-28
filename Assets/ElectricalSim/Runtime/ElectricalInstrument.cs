@@ -25,7 +25,7 @@ namespace ElectricalSim
             {
                 if (snapshot.HasExternalSupply(redPort) || snapshot.HasExternalSupply(blackPort))
                     return new MultimeterReading(mode, MultimeterReadingState.Energized);
-                return snapshot.SameNet(redPort, blackPort)
+                return snapshot.GetResistance(redPort, blackPort) <= 50
                     ? new MultimeterReading(mode, MultimeterReadingState.Valid, 1)
                     : new MultimeterReading(mode, MultimeterReadingState.OpenCircuit, 0);
             }
@@ -52,9 +52,9 @@ namespace ElectricalSim
             if (measurement == MeasurementKind.DcVoltage) return snapshot.GetDcVoltage(portA, portB);
             if (measurement == MeasurementKind.AcVoltage) return snapshot.GetAcVoltage(portA, portB);
             if (measurement == MeasurementKind.Continuity)
-                return snapshot.SameNet(portA, portB) ? 1d : 0d;
+                return snapshot.GetResistance(portA, portB) <= 50 ? 1d : 0d;
             if (measurement == MeasurementKind.Resistance)
-                return snapshot.SameNet(portA, portB) ? 0.2d : double.PositiveInfinity;
+                return snapshot.HasExternalSupply(portA) || snapshot.HasExternalSupply(portB) ? double.NaN : snapshot.GetResistance(portA, portB);
 
             var a = snapshot.GetPotential(portA);
             var b = snapshot.GetPotential(portB);

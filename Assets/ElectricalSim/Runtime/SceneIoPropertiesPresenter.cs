@@ -14,6 +14,8 @@ namespace ElectricalSim
         private InputField[] inputs;
         private Button apply, reset;
         private ScrollRect scroll;
+        private MotorConfigurationEditor motorEditor;
+        public MotorConfigurationEditor MotorEditor => motorEditor;
         public string DisplayedText => details != null ? details.text : "";
         public void Initialize(SimulationController source, Canvas canvas, Font font)
         {
@@ -53,11 +55,14 @@ namespace ElectricalSim
             error = Label(settings, font, 14); error.color = new Color(1, 0.7f, 0.3f); Place(error.rectTransform, 0, 238, 476, 66);
             scroll = scrollObj.GetComponent<ScrollRect>(); scroll.viewport = (RectTransform)viewport.transform; scroll.content = content;
             scroll.horizontal = false; scroll.scrollSensitivity = 30; scroll.movementType = ScrollRect.MovementType.Clamped;
+            motorEditor = new GameObject("Motor settings", typeof(RectTransform)).AddComponent<MotorConfigurationEditor>();
+            motorEditor.transform.SetParent(content, false); motorEditor.Initialize(controller, font);
             gameObject.SetActive(false);
         }
         public void Show(SceneIoView selected)
         {
             view = selected; gameObject.SetActive(view != null);
+            motorEditor.Show(view == null ? null : controller.MotorIdForSceneIo(view.Id));
             if (view == null) return;
             transform.SetAsLastSibling(); error.text = "";
             var config = controller.Liquid.Configuration;
@@ -75,7 +80,10 @@ namespace ElectricalSim
             details.rectTransform.sizeDelta = new Vector2(482, height);
             var tank = view.Id == "TANK"; settings.gameObject.SetActive(tank);
             Place(settings, 10, height + 12, 482, 312);
-            content.sizeDelta = new Vector2(0, height + (tank ? 340 : 20));
+            var motor = controller.MotorIdForSceneIo(view.Id) != null;
+            Place((RectTransform)motorEditor.transform, 10, height + 12, 482, motorEditor.Height);
+            motorEditor.Refresh();
+            content.sizeDelta = new Vector2(0, height + (tank ? 340 : motor ? motorEditor.Height + 28 : 20));
             var editable = controller.Mode != SimulationMode.Simulate && !controller.IsFileOperationActive;
             foreach (var input in inputs) input.interactable = editable;
             apply.interactable = reset.interactable = editable;

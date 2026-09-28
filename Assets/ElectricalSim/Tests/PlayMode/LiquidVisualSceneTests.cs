@@ -27,6 +27,7 @@ namespace ElectricalSim.Tests
         private void PowerMotor(string id)
         {
             for (var i = 0; i < 3; i++) Wire("POWER.L" + (i + 1), id + "." + new[] { "U", "V", "W" }[i]);
+            ManualCircuitFixture.CompleteMotor(controller.Graph, id);
         }
         private void PowerValve(int i)
         {

@@ -12,7 +12,7 @@ namespace ElectricalSim.Tests
         {
             var graph = new CircuitGraph();
             graph.RegisterDevice(ElectricalDeviceRuntime.CreatePowerSource());
-            foreach (var binding in MotorBindingDefinition.All) graph.RegisterDevice(ElectricalDeviceRuntime.CreateMotor(binding.Id));
+            foreach (var binding in MotorBindingDefinition.All) { var motor = ElectricalDeviceRuntime.CreateMotor(binding.Id); motor.SetMotorLoad(1); graph.RegisterDevice(motor); }
             var speed = 600f;
             if (inverter)
             {
@@ -25,15 +25,18 @@ namespace ElectricalSim.Tests
             {
                 foreach (var wire in graph.Wires.Where(w => w.EndPort.StartsWith(id + ".")).ToArray()) graph.RemoveWire(wire.Id);
                 for (var i = 0; i < 3; i++) graph.AddWire(sources[i], id + "." + ports[reverse && i < 2 ? 1 - i : i], Color.red);
-                var snapshot = graph.Solve();
+                if (id != "M_DOUBLE") { graph.AddWire(id + ".U", id + ".W2", Color.red); graph.AddWire(id + ".V", id + ".U2", Color.red); graph.AddWire(id + ".W", id + ".V2", Color.red); }
+                var snapshot = graph.Solve(2);
                 foreach (var binding in MotorBindingDefinition.All)
                 {
-                    Assert.That(snapshot.GetMotorSpeedRpm(binding.Id), Is.EqualTo(binding.Id == id ? (reverse ? -1 : 1) * (inverter ? 600 : 1450) : 0));
+                    Assert.That(snapshot.GetMotorSpeedRpm(binding.Id), Is.EqualTo(binding.Id == id ? (reverse ? -1 : 1) * (inverter ? 600 : 1450) : 0).Within(2));
                     Assert.That(snapshot.GetMotorDirection(binding.Id), Is.EqualTo(binding.Id == id ? (reverse ? MotorDirection.Reverse : MotorDirection.Forward) : MotorDirection.Stopped));
                 }
             }
             graph.RemoveWire(graph.Wires.First(w => w.EndPort == id + ".W").Id);
-            Assert.That(graph.Solve(3).GetMotorSpeedRpm(id), Is.Zero);
+            Assert.That(graph.Solve(.02f).GetMotorState(id).Connection.PhaseLoss, Is.True);
+            ((ElectricalDeviceRuntime)graph.Devices[id]).ResetMotorSpeed();
+            Assert.That(graph.Solve(1).GetMotorSpeedRpm(id), Is.Zero, "Missing phase prevents self-start, but may not stop an already rotating rotor.");
         }
 
         [TestCase("KB")] [TestCase("KMB")]
@@ -43,10 +46,10 @@ namespace ElectricalSim.Tests
             graph.RegisterDevice(ElectricalDeviceRuntime.CreatePowerSource());
             foreach (var binding in MotorBindingDefinition.All)
             {
-                graph.RegisterDevice(ElectricalDeviceRuntime.CreateMotor(binding.Id));
+                { var motor = ElectricalDeviceRuntime.CreateMotor(binding.Id); motor.SetMotorLoad(1); graph.RegisterDevice(motor); }
                 for (var i = 0; i < 3; i++) graph.AddWire("POWER.L" + (i + 1), binding.Id + "." + new[] { "U", "V", "W" }[i], Color.red);
             }
-            graph.Solve();
+            foreach (var id in new[] { "M1", "M2", "M3" }) { graph.AddWire(id + ".U", id + ".W2", Color.red); graph.AddWire(id + ".V", id + ".U2", Color.red); graph.AddWire(id + ".W", id + ".V2", Color.red); } graph.Solve(2);
             var brake = ElectricalDeviceRuntime.CreateContactor(brakeId);
             graph.RegisterDevice(brake);
             graph.AddWire("POWER.L1", brakeId + ".A1", Color.red);
@@ -55,7 +58,7 @@ namespace ElectricalSim.Tests
             Assert.That(snapshot.GetMotorSpeedRpm("M1"), Is.Zero);
             foreach (var id in new[] { "M2", "M3", "M_DOUBLE" })
             {
-                Assert.That(snapshot.GetMotorSpeedRpm(id), Is.EqualTo(1450));
+                Assert.That(snapshot.GetMotorSpeedRpm(id), Is.EqualTo(1450).Within(2));
                 Assert.That(snapshot.GetMotorDirection(id), Is.EqualTo(MotorDirection.Forward));
             }
         }

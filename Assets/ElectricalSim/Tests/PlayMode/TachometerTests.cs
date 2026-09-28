@@ -172,14 +172,17 @@ namespace ElectricalSim.Tests
             Assert.That(motor.ActualSpeedRpm, Is.EqualTo(600).Within(2));
             Assert.That(meter.View.DisplayText, Is.EqualTo("600"));
             Assert.That(((ElectricalDeviceRuntime)controller.Graph.Devices["M2"]).ActualSpeedRpm, Is.Zero);
-            inverter.SetControlOptions(false, true);
             var observedZero = false;
+            System.Action<float> observeRamp = speed => { if (Mathf.Abs(speed) < 0.01f) observedZero = true; };
+            inverter.OutputSpeedChanged += observeRamp;
+            inverter.SetControlOptions(false, true);
             var deadline = Time.realtimeSinceStartup + 2f;
             while (Time.realtimeSinceStartup < deadline)
             {
                 yield return null;
-                if (Mathf.Abs(inverter.ActualSpeedRpm) < 0.01f) observedZero = true;
+                if (Mathf.Abs(inverter.OutputSpeedRpm) < 0.01f) observedZero = true;
             }
+            inverter.OutputSpeedChanged -= observeRamp;
             Assert.That(observedZero, Is.True);
             Assert.That(motor.ActualSpeedRpm, Is.EqualTo(-600).Within(2));
             Assert.That(meter.View.DisplayText, Is.EqualTo("600"));
@@ -238,6 +241,7 @@ namespace ElectricalSim.Tests
             controller.PanelPower.StartForAssessment();
             foreach (var phase in new[] { "L1", "L2", "L3" }) controller.Graph.AddWire("POWER." + phase, "G120." + phase, Color.red);
             foreach (var phase in new[] { "U", "V", "W" }) controller.Graph.AddWire("G120." + phase + "2", motorId + "." + phase, Color.red);
+            ManualCircuitFixture.CompleteMotor(controller.Graph, motorId);
         }
         private static void Capture(Camera camera, string name)
         {

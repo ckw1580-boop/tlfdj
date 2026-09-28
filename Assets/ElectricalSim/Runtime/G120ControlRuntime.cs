@@ -34,6 +34,7 @@ namespace ElectricalSim
         private int ptcAlarmNumber;
         private bool do1ForwardSupply;
         private bool ptcResetBlocked;
+        private readonly List<string> motorParameterDiagnostics = new List<string>();
         public bool Powered { get; private set; }
         public bool MainSupply { get; private set; }
         public bool PtcEnabled { get; set; }
@@ -42,6 +43,11 @@ namespace ElectricalSim
         public bool PtcFaultActive { get; private set; }
         public int SelectedAnalogInput { get; set; }
         public float SimulatedMotorCurrent { get; set; }
+        public bool UseSimulatedMotorCurrent { get; set; }
+        public float ComputedMotorCurrent { get; private set; }
+        public float EffectiveMotorCurrent => UseSimulatedMotorCurrent ? Mathf.Max(0, SimulatedMotorCurrent) : ComputedMotorCurrent;
+        public string MotorFeedbackStatus => panel.MotorFeedbackSummary;
+        public IReadOnlyList<string> MotorParameterDiagnostics => motorParameterDiagnostics;
         public bool HasControlFault { get; private set; }
         public IReadOnlyList<bool> DigitalInputs => digital;
         public IReadOnlyList<bool> DigitalOutputs => outputs;
@@ -78,6 +84,7 @@ namespace ElectricalSim
         }
         public IEnumerable<ControlSignal> GetSignals(SimulationSnapshot topology)
         {
+            RefreshMotorFeedback(topology);
             var phases = new[] { "L1", "L2", "L3" }.Select(p => topology.GetPotential("G120." + p)).ToArray();
             MainSupply = phases.All(p => p == ElectricalPotential.PhaseL1 || p == ElectricalPotential.PhaseL2 || p == ElectricalPotential.PhaseL3) && phases.Distinct().Count() == 3;
             // The topology here has only external legacy supply potentials. Never let our
@@ -91,8 +98,9 @@ namespace ElectricalSim
             for (var i = 0; i < 2; i++)
             {
                 var output = Outputs[i];
+                if (i == 0 && !panel.HasSingleMotorFeedback) { output.Setpoint = 0; continue; }
                 var scale = output.FullScale > 0 ? output.FullScale : Parameter("P305", 3.1f);
-                var feedback = i == 0 ? Mathf.Abs(panel.ActualSpeedRpm) : Mathf.Max(0, SimulatedMotorCurrent);
+                var feedback = i == 0 ? Mathf.Abs(panel.ActualSpeedRpm) : EffectiveMotorCurrent;
                 var normalized = Mathf.Clamp01(feedback / Mathf.Max(0.001f, scale));
                 output.Setpoint = output.Mode == G120AnalogOutputMode.Voltage10 ? normalized * 10 :
                     output.Mode == G120AnalogOutputMode.Current4To20 ? 4 + normalized * 16 : normalized * 20;
@@ -182,13 +190,14 @@ namespace ElectricalSim
         public void RefreshReadings(SimulationSnapshot snapshot)
         {
             LastSnapshot = snapshot;
+            RefreshMotorFeedback(snapshot);
             for (var i = 0; i < 2; i++)
             {
                 var output = Outputs[i]; var positive = Terminal(i == 0 ? 12 : 26); var negative = Terminal(i == 0 ? 13 : 27);
                 var receiver = Enumerable.Range(0, 2).Where(j => !Inputs[j].Simulated &&
                     (snapshot.SameNet(positive, Terminal(j == 0 ? 3 : 10)) && snapshot.SameNet(negative, Terminal(j == 0 ? 4 : 11)) ||
                      snapshot.SameNet(positive, Terminal(j == 0 ? 4 : 11)) && snapshot.SameNet(negative, Terminal(j == 0 ? 3 : 10)))).ToArray();
-                var state = !Powered ? ControlSignalState.Floating : snapshot.HasSignalConflict(positive) || snapshot.HasSignalConflict(negative) ? ControlSignalState.Conflict :
+                var state = !Powered || i == 0 && !panel.HasSingleMotorFeedback ? ControlSignalState.Floating : snapshot.HasSignalConflict(positive) || snapshot.HasSignalConflict(negative) ? ControlSignalState.Conflict :
                     snapshot.SameNet(positive, negative) ? ControlSignalState.ShortCircuit :
                     receiver.Any(j => InputUnit(j) != output.Unit) ? ControlSignalState.TypeMismatch :
                     receiver.Any(j => snapshot.SameNet(positive, Terminal(j == 0 ? 4 : 11))) ? ControlSignalState.Reversed :
@@ -198,11 +207,49 @@ namespace ElectricalSim
                 output.Reading = new ControlSignalReading(state, output.Effective);
             }
         }
+        private void RefreshMotorFeedback(SimulationSnapshot snapshot)
+        {
+            var speeds = new List<KeyValuePair<string, float>>();
+            ComputedMotorCurrent = 0;
+            motorParameterDiagnostics.Clear();
+            var configurations = snapshot.MotorConfigurations;
+            var motorPorts = new[] { "U", "V", "W", "U2", "V2", "W2" };
+            var drivePorts = new[] { "G120.U2", "G120.V2", "G120.W2" };
+            foreach (var pair in snapshot.MotorStates)
+            {
+                if (!motorPorts.Any(port => drivePorts.Any(output => snapshot.SameNet(pair.Key + "." + port, output)))) continue;
+                speeds.Add(new KeyValuePair<string, float>(pair.Key, pair.Value.SpeedRpm));
+                ComputedMotorCurrent += Mathf.Max(0, pair.Value.CurrentAmps);
+                if (configurations.TryGetValue(pair.Key, out var configuration))
+                {
+                    var high = pair.Value.Connection.IsHighSpeed;
+                    var star = pair.Value.Connection.Kind == MotorConnectionKind.Star;
+                    var mismatches = new List<string>();
+                    CompareParameter("P304", star ? configuration.RatedVoltageStar : configuration.RatedVoltageDelta, mismatches);
+                    CompareParameter("P305", high ? configuration.HighRatedCurrentAmps : configuration.RatedCurrentAmps / (star ? Mathf.Sqrt(3) : 1), mismatches);
+                    CompareParameter("P307", high ? configuration.HighRatedPowerKw : configuration.RatedPowerKw, mismatches);
+                    CompareParameter("P310", configuration.RatedFrequencyHz, mismatches);
+                    CompareParameter("P311", high ? configuration.HighRatedSpeedRpm : configuration.RatedSpeedRpm, mismatches);
+                    if (mismatches.Count > 0)
+                    {
+                        var diagnostic = "G120 / " + pair.Key + " 铭牌参数不匹配：" + string.Join("、", mismatches) + "。请核对参数；电机配置未自动修改。";
+                        motorParameterDiagnostics.Add(diagnostic);
+                        snapshot.AddDiagnostic(diagnostic);
+                    }
+                }
+            }
+            panel.SetMotorFeedback(speeds);
+        }
+        private void CompareParameter(string key, float expected, List<string> mismatches)
+        {
+            if (Mathf.Abs(Parameter(key) - expected) > Mathf.Max(0.01f, expected * .01f))
+                mismatches.Add(key + "=" + Parameter(key).ToString("G4") + "，电机 " + expected.ToString("G4"));
+        }
         public void Reset()
         {
             ptcAlarmNumber = 0; PtcEnabled = false; PtcState = G120PtcState.Normal; PtcFaultActive = HasControlFault = false;
             ptcResetBlocked = do1ForwardSupply = false;
-            SelectedAnalogInput = 0; SimulatedMotorCurrent = 0; lastMacro = panel.Macro;
+            SelectedAnalogInput = 0; SimulatedMotorCurrent = 0; ComputedMotorCurrent = 0; UseSimulatedMotorCurrent = false; lastMacro = panel.Macro;
             Array.Clear(digital, 0, digital.Length); Array.Clear(outputs, 0, outputs.Length);
             for (var i = 0; i < 2; i++)
             { Inputs[i].Simulated = false; Inputs[i].SimulatedValue = Inputs[i].Percent = 0; Outputs[i].Mode = G120AnalogOutputMode.Current20; Outputs[i].FullScale = i == 0 ? 1500 : 0; }
