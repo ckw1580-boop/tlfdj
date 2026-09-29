@@ -7,8 +7,9 @@ namespace ElectricalSim
         private int schematicInputResumeFrame = -1;
         public SchematicGalleryPresenter SchematicGallery { get; private set; }
         public bool IsSchematicViewerOpen => SchematicGallery != null && SchematicGallery.IsViewerOpen;
-        public bool IsInteractionBlocked => IsFileOperationActive || IsSchematicViewerOpen ||
-            Time.frameCount <= fileInputResumeFrame || Time.frameCount <= schematicInputResumeFrame;
+        public bool IsInteractionBlocked => IsFileOperationActive || IsSchematicViewerOpen || IsHomePageOpen ||
+            Time.frameCount <= fileInputResumeFrame || Time.frameCount <= schematicInputResumeFrame ||
+            Time.frameCount <= homeInputResumeFrame;
 
         public void RegisterSchematicGallery(SchematicGalleryPresenter gallery)
         {

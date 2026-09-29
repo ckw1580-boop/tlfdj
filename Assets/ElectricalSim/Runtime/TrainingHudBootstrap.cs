@@ -72,6 +72,9 @@ namespace ElectricalSim
 
         private void BindUi(HudReferences ui)
         {
+            var homePage = ui.Canvas.gameObject.AddComponent<HomePagePresenter>();
+            homePage.Initialize(ui.Canvas, uiFont);
+            controller.RegisterHomePage(homePage);
             instrumentTools = new GameObject("InstrumentTools", typeof(RectTransform));
             instrumentTools.transform.SetParent(ui.Canvas.transform, false);
             var instrumentToolsRect = instrumentTools.GetComponent<RectTransform>();
@@ -123,7 +126,7 @@ namespace ElectricalSim
             var toolbar = InstantiateUi("ExperimentToolbar", ui.Canvas.transform);
             if (navigation != null)
             {
-                BindNamedButton(navigation, "homeBtn", ToggleTaskPanel);
+                BindNamedButton(navigation, "homeBtn", controller.HomePage.Open);
                 BindNamedButton(navigation, "scheduleBtn", ToggleTaskPanel);
                 BindNamedButton(navigation, "saveBtn", controller.SaveCc3d);
                 BindNamedButton(navigation, "resetBtn", controller.ResetTraining);

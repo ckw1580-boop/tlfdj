@@ -302,6 +302,7 @@ namespace ElectricalSim
 
         private void OnDestroy()
         {
+            if (HomePage != null) HomePage.VisibilityChanged -= OnHomeVisibilityChanged;
             if (SchematicGallery != null) SchematicGallery.ViewerVisibilityChanged -= OnSchematicViewerVisibility;
             StopPlcConnections();
             if (wireMaterial != null && wireMaterial.name == "Cabinet Surface Wire") Destroy(wireMaterial);

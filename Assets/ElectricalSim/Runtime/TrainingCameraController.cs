@@ -29,6 +29,13 @@ namespace ElectricalSim
         public bool InputBlocked { get; set; }
         public bool InstrumentInputBlocked { get; set; }
         public bool SchematicInputBlocked { get; private set; }
+        public bool HomeInputBlocked { get; private set; }
+        private int homeInputResumeFrame = -1;
+        public void SetHomeInputBlocked(bool blocked)
+        {
+            HomeInputBlocked = blocked;
+            if (!blocked) homeInputResumeFrame = Time.frameCount;
+        }
         private int schematicInputResumeFrame = -1;
         public void SetSchematicInputBlocked(bool blocked)
         {
@@ -51,7 +58,8 @@ namespace ElectricalSim
         {
             if (EventSystem.current != null && EventSystem.current.currentSelectedGameObject != null &&
                 EventSystem.current.currentSelectedGameObject.GetComponent<UnityEngine.UI.InputField>() != null) return;
-            if (InputBlocked || InstrumentInputBlocked || SchematicInputBlocked || Time.frameCount <= schematicInputResumeFrame) return;
+            if (InputBlocked || InstrumentInputBlocked || SchematicInputBlocked || HomeInputBlocked ||
+                Time.frameCount <= schematicInputResumeFrame || Time.frameCount <= homeInputResumeFrame) return;
             var speed = MoveSpeed * Time.unscaledDeltaTime;
             var horizontal = (Input.GetKey(KeyCode.D) ? 1f : 0f) - (Input.GetKey(KeyCode.A) ? 1f : 0f);
             var forward = (Input.GetKey(KeyCode.W) ? 1f : 0f) - (Input.GetKey(KeyCode.S) ? 1f : 0f);
