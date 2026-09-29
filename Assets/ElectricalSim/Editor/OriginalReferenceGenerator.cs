@@ -19,7 +19,7 @@ namespace ElectricalSim.Editor
         {
             Directory.CreateDirectory("Assets/ElectricalSim/Generated");
             var registry = AssetDatabase.LoadAssetAtPath<OriginalVisualRegistry>(RegistryPath);
-            if (registry == null) throw new InvalidOperationException("OriginalVisualRegistry is missing. Import original assets first.");
+            if (registry == null) throw new InvalidOperationException("OriginalVisualRegistry is missing. Restore the current project resources; see Docs/project-recovery.md.");
             GeneratePorts(registry);
             GenerateUi(registry);
             AssetDatabase.SaveAssets();

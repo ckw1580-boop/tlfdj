@@ -69,6 +69,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\Tools\Build-CompleteProjec
 
 ## 项目内保护
 
+2026-09-29 起，项目已移除原始素材包、旧素材导入器及未使用的旧版资源。恢复应使用当前版本的完整源码或恢复包；不要用旧程序资源覆盖当前 `Assets/OriginalContent`。现有场景安装、参考数据生成及构建流程只使用项目内保留的资源，不要求原始素材包。历史恢复 ZIP 保留原样，其中可能包含清理前的旧资源。
+
 - 打开 Unity 后自动检查资源，失败时提示恢复办法并将完整问题列表写入 `Build/Reports/resource-integrity.txt`。
 - 点击 Play 前检查实际文件和当前场景的原始资源引用；失败时取消 Play。
 - 自定义构建菜单及标准 Unity 构建回调均执行资源检查。

@@ -48,5 +48,5 @@ crashlytics-build.properties
 Thumbs.db
 Desktop.ini
 
-# User-provided original asset staging area (imported copies belong under Assets/OriginalContent)
+# Retired original software package: keep any manually restored copy out of the project history.
 /OriginalAssetsSource/

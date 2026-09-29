@@ -6,7 +6,13 @@
 
 首次下载请先阅读[下载与恢复](#下载与恢复)，确认模型、贴图和字体已经下载完整，再打开 Unity。详细故障处理见[项目恢复说明](Docs/project-recovery.md)。
 
-电机接线与运行操作见[电机使用说明](Docs/电机使用说明.md)，包含普通电机Y/Δ、双速Δ/YY、G120、负载／堵转、热保护及旧工程排查步骤。
+电机接线与运行操作见[三相异步电机：接线与使用](#三相异步电机接线与使用)，模型范围和验证结果见[电机模型验收](Docs/motor-model-verification.md)。
+
+## 阅读导航
+
+- 首次使用：[下载与恢复](#下载与恢复) → [启动与构建](#启动与构建) → [操作说明](#操作说明)。
+- 功能说明：[电气仿真](#电气仿真)、[仪表与排故](#仪表与排故)、[PLC 联调](Docs/PLC联调说明.md)、[G120 控制端子](Docs/G120控制端子.md)。
+- 保存与维护：[本地数据](#本地数据)、[项目资源维护](#项目资源维护)、[测试与验收](#测试与验收)。
 
 ## 当前能力
 
@@ -56,9 +62,12 @@
 Assets/
 ├─ ElectricalSim/
 │  ├─ Runtime/          # 电气图、器件、交互、相机、原理图 UI 与存档
-│  ├─ Editor/           # 原资源导入、安装、Windows 构建与校验工具
+│  ├─ Editor/           # 场景安装、参考数据生成、资源审计与 Windows 构建
+│  ├─ Generated/        # 生成的材质、原始参考数据与 UI 布局配置
+│  ├─ Resources/        # 原理图、仪表模型等运行时资源
 │  └─ Tests/            # EditMode 与 PlayMode 测试
-├─ OriginalContent/     # 原程序恢复的模型、Prefab、材质、贴图、UI 和场景资源
+├─ OriginalContent/     # 清理后保留的模型、Prefab、材质、贴图、字体及 UI
+├─ Plugins/             # S7.Net PLC 通信库等插件
 ├─ Scenes/
 │  └─ ElectricalTraining.unity
 └─ StreamingAssets/     # 端子映射与兼容数据
@@ -79,16 +88,26 @@ Docs/                   # 项目恢复、PLC 联调及验收说明
 
 `Build/` 是本地输出目录，不作为完整构建产物提交到仓库。源码下载不保证包含该目录中的 ZIP、截图或测试报告。
 
-## 原始素材接入
+## 项目资源维护
 
-仓库内已有完整的 `Assets/OriginalContent/` 时，通过资源检查后即可打开项目，无需重新导入。只有需要从原素材重建资源时才执行以下步骤；它们不能替代 Git LFS 下载：
+`Assets/OriginalContent/` 保存当前运行与编辑器工具实际依赖的模型、材质、贴图、字体和 UI。资源检查通过后即可打开项目；原始素材包及旧版导入菜单已移除。
 
-1. 将包含完整 `.meta` 文件的原 `Assets` 子集放到项目根目录 `OriginalAssetsSource/`。
-2. 在 Unity 菜单执行 `Electrical Sim > Import Original Assets`。
-3. 导入器将资源整理到 `Assets/OriginalContent/`，并创建或更新 `OriginalVisualRegistry.asset`。
-4. 自动识别失败的 Prefab 可在注册表中按 `DeviceId` 或 `TypeId` 指定。
+资源缺失时，请使用包含真实 Git LFS 文件的当前版本源码或完整恢复包恢复，不再从旧程序重新导入。保留资源的 `.meta` 文件和 GUID；`OriginalVisualRegistry.asset` 继续负责设备及当前 UI 的引用，场景安装、参考数据生成和 Windows 构建工具继续可用。
 
-不要删除原资源的 `.meta` 文件；Prefab、材质、贴图和端口 Transform 依赖原 GUID 关系。
+旧版资源清理范围、依赖判定及验证结果见 [清理记录](Docs/legacy-resource-cleanup-2026-09-29.md)。
+
+2026-09-29 清理移除了未使用的旧登录、更新、考试和竞赛资源、`OriginalAssetsSource/` 原始素材包、旧导入器及 `SampleScene`。删除文件逻辑大小合计约 **1.93 GiB**；此数值不代表 Git 历史或 LFS 缓存缩减。当前实训功能依赖的共享资源及 `.meta` 保留。
+
+资源维护入口：
+
+| 入口 | 用途 |
+| --- | --- |
+| `Electrical Sim > Validate Project Resources` | 检查资源完整性与注册表引用 |
+| `Electrical Sim > Install Training Scene` | 重新创建并保存启动场景、绑定现有资源；已有场景正常时无需执行 |
+| `Electrical Sim > Generate Original Reference Manifests` | 从保留资源生成参考数据与 UI 布局 |
+| `ElectricalSim.Editor.LegacyResourceAudit.WriteReport` | Unity 命令行 `-executeMethod` 只读依赖审计；默认写入 `Build/Reports/legacy-cleanup/audit.json`，可用 `-legacyAuditReport` 指定路径，不执行删除 |
+
+旧 `Build/Windows/` 和历史恢复 ZIP 不会因资源清理自动更新。需要交付当前版本时，应重新构建或生成完整恢复包。
 
 ## 下载与恢复
 
@@ -282,7 +301,7 @@ FR 上端子区按原模型从左到右分为两组，每组 5 点，中间留�
 
 ### 三相异步电机：接线与使用
 
-完整操作步骤见[电机使用说明](Docs/电机使用说明.md)，模型范围和回归结果见[电机模型验收](Docs/motor-model-verification.md)。
+本节列出常用接线及操作，模型范围和回归结果见[电机模型验收](Docs/motor-model-verification.md)。
 
 | 电机／接法 | 三相供电端 | 必须实际连接的桥接线 |
 | --- | --- | --- |
@@ -375,7 +394,7 @@ FR 上端子区按原模型从左到右分为两组，每组 5 点，中间留�
 
 三只共绑定 30 个连接点：正面每只的 `DuanZiPai_3` 对应 1L1、3L2、5L3、95、97，`DuanZiPai_4` 对应 2T1、4T2、6T3、96、98；背部使用原有 10 个本体连接点。背部 T1/T2/T3 保留电线与跳线入口，其他端子仍仅用于电线。连接点位置、名称、悬停文字及 `.cc3d` 端点格式不变。旧文件仍可加载，但过去依赖三只误合并而省略的连线需要按实际回路补接；正面 FR1 与 FR2 分别独立运行，背部 FR3 保留运行时编号 `FR` 用于排故接线。
 
-视角、仿真模式左键点击本体，右侧可滚动属性面板显示编号、位置、支路电流、热状态、脱扣原因、复位条件、五组回路实时通断和实际端子绑定；背部在排故模式也可查看，仪表端子优先。属性与 KA、KM、PLC、按钮及导线面板互斥。非仿真模式可编辑保护配置；仿真模式可使用“模拟脱扣”和“复位”，热状态降至阈值后才允许复位。三只独立脱扣与复位；配置写入`.cc3d`可选字段，瞬时热量和脱扣状态不保存，载入工程或重置训练会清除。接线与保护练习见[电机使用说明](Docs/电机使用说明.md)。
+视角、仿真模式左键点击本体，右侧可滚动属性面板显示编号、位置、支路电流、热状态、脱扣原因、复位条件、五组回路实时通断和实际端子绑定；背部在排故模式也可查看，仪表端子优先。属性与 KA、KM、PLC、按钮及导线面板互斥。非仿真模式可编辑保护配置；仿真模式可使用“模拟脱扣”和“复位”，热状态降至阈值后才允许复位。三只独立脱扣与复位；配置写入`.cc3d`可选字段，瞬时热量和脱扣状态不保存，载入工程或重置训练会清除。接线与保护配置见[三相异步电机：接线与使用](#三相异步电机接线与使用)。
 
 接线模式左键点击三只任一本体，与 KA/KM 共用左侧 280×240 浮窗（左 16、上 140），标题 14、关闭文字 12、白底图纸区域 264×196。透明 PNG 按参考图程序重绘，只保留黑色 FR 字样、全部端子编号、辅助触点及三路热元件符号。重复点击保持显示，切换器件更新同一窗口；关闭按钮或离开接线模式隐藏，点击空白和端子不隐藏。查看、切换和关闭图纸保留接线起点及全部路径点，端子与节点拖动优先，窗口只拦截自身区域事件。
 
@@ -447,7 +466,7 @@ G120 输入 `L1/L2/L3` 需要三相供电，输出 `U2/V2/W2` 经端子排、导
 
 点击“关闭”或按 Esc 返回；关闭的同一帧不会把按键或鼠标传给场景。大图查看期间保留接线起点、路径点、当前模式与仿真运行，场景不接受鼠标或模式快捷键操作。截图功能继续可用。
 
-六张 PNG 原样保存于 `Assets/ElectricalSim/Resources/Schematics/`，由 `SchematicCatalog.asset` 按顺序引用，采用无压缩、关闭 mipmap 的 Sprite 导入设置。旧任务图及本地考试专用资源已删除，导入原始素材不会恢复它们。KA/KM/FR 器件原理图仍由左上浮窗显示。
+六张 PNG 原样保存于 `Assets/ElectricalSim/Resources/Schematics/`，由 `SchematicCatalog.asset` 按顺序引用，采用无压缩、关闭 mipmap 的 Sprite 导入设置。旧任务图及本地考试专用资源已删除。KA/KM/FR 器件原理图仍由左上浮窗显示。
 
 三种分辨率下的展开、放大截图及测试结果见[图册验证记录](Docs/schematic-gallery-verification.md)。
 
@@ -548,7 +567,30 @@ Assets/ElectricalSim/Tests/PlayMode/
 
 测试和构建日志输出到 `Build/Reports/`。端子位置验收目标为世界坐标误差不超过 0.5 mm、1920×1080 下吸附中心屏幕误差不超过 2 px。
 
-### ZIP 恢复修复验收（2026-09-14）
+### 运行测试
+
+完成资源导入后，在 Unity 的 **Window > General > Test Runner** 中分别选择 **EditMode** 和 **PlayMode**，执行 **Run All**。显式性能基准需要单独选择运行；PlayMode 场景测试包含画面与交互验证，应使用可用的图形环境。
+
+当前测试还覆盖电机铭牌与热保护配置、真实 PLC 映射、G120 控制、混合罐液位、场景 I/O，以及清理后 UI 注册表和编辑器生成工具依赖资源的完整性。
+
+### 资源清理后验收（2026-09-29）
+
+以下为已有清理验收报告的结果，不表示每次修改 README 都重新运行了 Unity 测试。
+
+| 检查 | 结果 |
+| --- | --- |
+| 文件资源完整性 | 通过，无检查问题 |
+| 完整 EditMode | 352 通过、0 失败、1 跳过 |
+| 完整 PlayMode | 172 通过、0 失败、1 跳过 |
+| Windows x64 构建 | 成功；验证程序为 `Build/Windows-LegacyCleanup/ElectricalTraining.exe` |
+| Windows 图形模式离线启动 | 实训场景初始化完成，未记录异常或着色器错误 |
+| 最终资源依赖审计 | 保留 914 项，未使用旧资源候选 0 项，新增引用告警 0 项 |
+
+两套测试的跳过项均为显式性能基准。依赖审计仍有 6 条既有告警：转速表编辑器源 Prefab 的 1 个旧 GUID 无法解析，以及实训室液体模型的 5 个空材质槽；与清理前一致。
+
+详细范围与验证说明见[旧版资源清理记录](Docs/legacy-resource-cleanup-2026-09-29.md)。原始测试 XML、资源报告、构建日志和截图位于本地 `Build/Reports/legacy-cleanup/`，不会随普通源码下载自动提供。
+
+### 历史 ZIP 恢复修复验收（2026-09-14）
 
 | 检查 | 结果 |
 | --- | --- |
@@ -560,7 +602,7 @@ Assets/ElectricalSim/Tests/PlayMode/
 | 最终代码编译与构建前资源检查 | 通过；本轮没有重新构建 Windows EXE |
 | GitHub LFS 下载元数据 | 1540 个独立对象、1917 个文件引用均返回可下载状态 |
 
-上述数量是本次验收快照，后续增删文件会变化。GitHub 检查验证的是服务端下载元数据，没有重新下载全部对象；在线 ZIP 整包下载因网速过慢停止，不能视为在线 ZIP 整包验收通过。本地完整包已完成独立的文件与场景验收。
+上述数量仅为 2026-09-14 的历史验收快照，不是资源清理后的当前文件或 LFS 对象数量。GitHub 检查验证的是当时服务端下载元数据，没有重新下载全部对象；在线 ZIP 整包下载因网速过慢停止，不能视为在线 ZIP 整包验收通过。当时的本地完整包已完成独立的文件与场景验收。
 
 本地记录位于 `Build/Reports/`，包括 `resource-tests.xml`、`restored-scene-tests.xml`、`restored-visual-tests.xml`、`resource-build-validation.log`、`restored-project-integrity.json`、`remote-lfs-availability.json` 和 `restored-project-overview.png`。这些记录不会随普通源码下载自动提供。
 
