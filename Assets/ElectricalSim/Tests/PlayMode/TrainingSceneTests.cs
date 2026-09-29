@@ -30,6 +30,22 @@ namespace ElectricalSim.Tests
         }
 
         [UnityTest]
+        public IEnumerator RemovedManualControlsStayHiddenInRunningHud()
+        {
+            var hud = GameObject.Find("Simulation HUD");
+            Assert.That(hud, Is.Not.Null);
+            var controls = hud.GetComponentsInChildren<Transform>(true);
+            foreach (var name in new[] { "btn_help", "split_help" })
+            {
+                var control = controls.Single(t => t.name == name);
+                Assert.That(control.gameObject.activeInHierarchy, Is.False);
+            }
+            Assert.That(controls.Single(t => t.name == "btn_submit").gameObject.activeInHierarchy, Is.True,
+                "Opening saved wiring must remain available.");
+            yield return null;
+        }
+
+        [UnityTest]
         public IEnumerator SelectedWirePropertiesShowActualColorAndPhysicalTerminalNames()
         {
             var controller = Object.FindObjectOfType<SimulationController>();
@@ -2376,6 +2392,13 @@ namespace ElectricalSim.Tests
                     Mathf.RoundToInt(texture.height * 0.921f));
                 Assert.That(removedLogoPixel.a, Is.LessThan(0.01f),
                     "The legacy upper-left logo must remain removed.");
+                var modelLabelPixels = texture.GetPixels(
+                    Mathf.RoundToInt(texture.width * (420f / 1024f)),
+                    Mathf.RoundToInt(texture.height * (949f / 1024f)),
+                    Mathf.RoundToInt(texture.width * (285f / 1024f)),
+                    Mathf.RoundToInt(texture.height * (55f / 1024f)));
+                Assert.That(modelLabelPixels.All(pixel => pixel.a < 0.01f), Is.True,
+                    "The legacy model label above the training title must remain removed.");
                 Assert.That(firstDianCornerPixel.a, Is.GreaterThan(0.05f),
                     "The removal mask must not clip the first 电 glyph shared by the front and back faces.");
             }
@@ -2411,6 +2434,7 @@ namespace ElectricalSim.Tests
             {
                 if (back) camera.SetFaultView(); else camera.SetWiringView();
                 yield return null;
+                SaveRearWireFrame(back ? "branding-back.png" : "branding-front.png", 1920, 1080);
                 var planes = GeometryUtility.CalculateFrustumPlanes(Camera.main);
                 Assert.That(cabinets.Any(r => GeometryUtility.TestPlanesAABB(planes, r.bounds)), Is.True,
                     "The cabinet must remain in frame from both training views.");

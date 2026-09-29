@@ -77,7 +77,7 @@ namespace ElectricalSim.Editor
         private static void ConfigurePlayerSettings()
         {
             PlayerSettings.productName = "电气控制系统仿真软件";
-            PlayerSettings.companyName = "同立方";
+            PlayerSettings.companyName = "WCK";
             PlayerSettings.defaultScreenWidth = 1920;
             PlayerSettings.defaultScreenHeight = 1080;
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;

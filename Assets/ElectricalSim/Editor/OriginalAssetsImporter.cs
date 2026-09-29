@@ -56,8 +56,7 @@ namespace ElectricalSim.Editor
             { "Save", "App/Src/UI/NewUI/UISaveTip.prefab" },
             { "Recorder", "App/Src/UI/Recorder.prefab" },
             { "RecordControl", "App/Src/UI/RecordCotrol.prefab" },
-            { "Audio", "App/Src/UI/UIExperimentAudioSet.prefab" },
-            { "Help", "App/Src/UI/UIPDFViewer.prefab" }
+            { "Audio", "App/Src/UI/UIExperimentAudioSet.prefab" }
         };
 
         [MenuItem("Electrical Sim/Import Original Assets")]
@@ -84,7 +83,7 @@ namespace ElectricalSim.Editor
             var guidIndex = BuildGuidIndex(sourceRoot);
             var selected = ResolveDependencyClosure(sourceRoot, guidIndex, BuildSeedPaths(sourceRoot));
             selectedCount = CopySelectedAssets(sourceRoot, selected);
-            CopyOfflineData(sourceRoot);
+            CopyOfflineData(sourceRoot, Path.GetFullPath("Assets/StreamingAssets/OfflineData"));
             AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
 
             Directory.CreateDirectory(GeneratedVisualDirectory);
@@ -216,19 +215,18 @@ namespace ElectricalSim.Editor
             return copied;
         }
 
-        private static void CopyOfflineData(string sourceRoot)
+        private static void CopyOfflineData(string sourceRoot, string destination)
         {
             var source = Full(sourceRoot, "StreamingAssets");
             if (!Directory.Exists(source)) return;
-            var destination = Path.GetFullPath("Assets/StreamingAssets/OfflineData");
-            foreach (var relative in new[] { "project", "Instructions" })
+            foreach (var relative in new[] { "project" })
             {
                 var folder = Path.Combine(source, relative);
                 if (!Directory.Exists(folder)) continue;
                 foreach (var file in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
                 {
                     var extension = Path.GetExtension(file).ToLowerInvariant();
-                    if (extension != ".json" && extension != ".cc3d" && extension != ".pdf") continue;
+                    if (extension != ".json" && extension != ".cc3d") continue;
                     var target = Path.Combine(destination, relative, file.Substring(folder.Length).TrimStart(Path.DirectorySeparatorChar));
                     Directory.CreateDirectory(Path.GetDirectoryName(target));
                     File.Copy(file, target, true);
@@ -305,9 +303,28 @@ namespace ElectricalSim.Editor
             instance.name = source.name;
             foreach (var transform in instance.GetComponentsInChildren<Transform>(true))
                 GameObjectUtility.RemoveMonoBehavioursWithMissingScript(transform.gameObject);
+            SanitizePersonalProjectUi(instance, id);
             var prefab = PrefabUtility.SaveAsPrefabAsset(instance, destination);
             UnityEngine.Object.DestroyImmediate(instance);
             return prefab;
+        }
+
+        private static void SanitizePersonalProjectUi(GameObject instance, string id)
+        {
+            foreach (var transform in instance.GetComponentsInChildren<Transform>(true))
+            {
+                if (id == "ElementProperties")
+                {
+                    if (transform.name == "txt_company")
+                    {
+                        var text = transform.GetComponent<UnityEngine.UI.Text>();
+                        if (text != null) text.text = string.Empty;
+                    }
+                    if (transform.name == "company") transform.gameObject.SetActive(false);
+                }
+                if (id == "ExperimentToolbar" && (transform.name == "btn_help" || transform.name == "split_help"))
+                    transform.gameObject.SetActive(false);
+            }
         }
 
         private static GameObject BuildEnvironmentPrefab()

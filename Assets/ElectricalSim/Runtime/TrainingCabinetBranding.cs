@@ -125,7 +125,7 @@ namespace ElectricalSim
                     };
                     cleaned.ReadPixels(new Rect(0f, 0f, source.width, source.height), 0, 0, false);
 
-                    // The original 同立方/CUBE SPACE mark occupies only the upper-left
+                    // The legacy company mark occupies only the upper-left
                     // portion of bq_0.png. Unity pixel coordinates start at the bottom.
                     var clearX = Mathf.RoundToInt(source.width * 0.015f);
                     var clearY = Mathf.RoundToInt(source.height * 0.915f);
@@ -140,6 +140,24 @@ namespace ElectricalSim
                         clearWidth,
                         clearHeight,
                         Enumerable.Repeat(Color.clear, clearWidth * clearHeight).ToArray());
+                    // Legacy model and panel-brand labels, in bottom-left pixel
+                    // coordinates on the 1024 x 1024 reference atlas. Keep device text.
+                    foreach (var region in new[]
+                    {
+                        new RectInt(420, 949, 285, 55),
+                        new RectInt(182, 849, 54, 12),
+                        new RectInt(621, 849, 39, 12)
+                    })
+                    {
+                        var width = Mathf.RoundToInt(source.width * (region.width / 1024f));
+                        var height = Mathf.RoundToInt(source.height * (region.height / 1024f));
+                        cleaned.SetPixels(
+                            Mathf.RoundToInt(source.width * (region.x / 1024f)),
+                            Mathf.RoundToInt(source.height * (region.y / 1024f)),
+                            width,
+                            height,
+                            Enumerable.Repeat(Color.clear, width * height).ToArray());
+                    }
                     cleaned.Apply(false, false);
                     material.mainTexture = cleaned;
                 }

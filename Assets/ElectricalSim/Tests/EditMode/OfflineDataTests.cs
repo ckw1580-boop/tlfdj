@@ -36,7 +36,6 @@ namespace ElectricalSim.Tests
                 var store = new LocalSessionStore(root);
                 Assert.That(Directory.Exists(store.ProjectsDirectory), Is.True);
                 Assert.That(Directory.Exists(store.CapturesDirectory), Is.True);
-                Assert.That(Directory.Exists(store.RecordingsDirectory), Is.True);
                 Assert.That(Directory.Exists(Path.Combine(root, "成绩")), Is.False);
             }
             finally

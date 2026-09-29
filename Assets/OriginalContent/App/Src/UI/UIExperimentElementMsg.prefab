@@ -290,7 +290,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &1705390221481576
 GameObject:
   serializedVersion: 6
@@ -618,7 +618,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!1 &1875609422105747
 GameObject:
   serializedVersion: 6
@@ -3021,7 +3021,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: 深圳市通利方科技有限公司
+  m_Text: 
 --- !u!224 &224649986673806370
 RectTransform:
   m_ObjectHideFlags: 0

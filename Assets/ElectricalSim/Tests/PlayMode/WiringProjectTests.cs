@@ -241,6 +241,43 @@ namespace ElectricalSim.Tests
             Assert.That(Object.FindObjectsOfType<ElectricalWireView>().Count(v => v.Connection.Id == wire.Id), Is.EqualTo(1));
         }
 
+        [Test]
+        public void PersonalProjectDirectoryAndExplicitPreviousLocationRemainUsable()
+        {
+            Assert.That(Application.companyName, Is.EqualTo("WCK"));
+            var projectDirectory = Path.Combine(Application.persistentDataPath, "Projects");
+            var savedPath = Path.Combine(projectDirectory, "branding-test-" + Guid.NewGuid().ToString("N") + ".cc3d");
+            var wireId = AddWire().Id;
+            var dialogs = new FakeDialogs { SavePath = savedPath };
+            controller.FileDialogs = dialogs;
+            try
+            {
+                controller.SaveCc3d();
+                Assert.That(dialogs.Directory, Is.EqualTo(projectDirectory));
+                Assert.That(File.Exists(savedPath), Is.True, controller.LastFileError);
+                dialogs.OpenPath = savedPath;
+                controller.OpenCc3d();
+                Assert.That(dialogs.OpenCount, Is.EqualTo(1));
+                Assert.That(controller.Graph.Wires.Single().Id, Is.EqualTo(wireId));
+
+                // An existing file chosen outside the new default directory stays in place.
+                var previousPath = PathFor("previous-location");
+                File.Copy(savedPath, previousPath);
+                var previousBytes = File.ReadAllBytes(previousPath);
+                dialogs.OpenPath = previousPath;
+                controller.OpenCc3d();
+                Assert.That(dialogs.OpenCount, Is.EqualTo(2));
+                Assert.That(controller.Graph.Wires.Single().Id, Is.EqualTo(wireId));
+                Assert.That(File.ReadAllBytes(previousPath), Is.EqualTo(previousBytes));
+                Assert.That(File.Exists(savedPath), Is.True);
+                Debug.Log("Verified project directory: " + projectDirectory);
+            }
+            finally
+            {
+                if (File.Exists(savedPath)) File.Delete(savedPath);
+            }
+        }
+
         private sealed class FakeDialogs : IWiringFileDialogs
         {
             public string OpenPath = "";

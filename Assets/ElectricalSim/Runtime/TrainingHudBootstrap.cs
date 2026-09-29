@@ -31,7 +31,7 @@ namespace ElectricalSim
             canvasObject.AddComponent<GraphicRaycaster>();
 
             var top = Panel("TopBar", canvas.transform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -88f), Vector2.zero, darkBlue);
-            var title = Label("Title", top.transform, "同立方 · 电气控制系统仿真软件  |  核心离线版", 26, TextAnchor.MiddleLeft, Color.white);
+            var title = Label("Title", top.transform, "电气控制系统仿真软件 | Unity 个人项目", 26, TextAnchor.MiddleLeft, Color.white);
             SetRect(title.rectTransform, new Vector2(0f, 0f), new Vector2(0.34f, 1f), new Vector2(30f, 0f), new Vector2(-10f, 0f));
 
             var mode = Label("Mode", top.transform, "当前模式：视角", 22, TextAnchor.MiddleCenter, cyan);
@@ -152,9 +152,13 @@ namespace ElectricalSim
                 // Imported object names do not match their icons: btn_submit
                 // carries the original "打开" folder sprite; btn_resume is reset.
                 BindNamedButton(toolbar, "btn_submit", controller.OpenCc3d);
-                BindNamedButton(toolbar, "btn_localSave", controller.SaveCc3d);
-                BindNamedButton(toolbar, "btn_saveAnswer", controller.SaveCc3d);
-                BindNamedButton(toolbar, "btn_record", captureRecorder.ToggleRecording);
+                // Keep the C/A toolbar icons in place without save actions.
+                // Saving is available through the navigation's saveBtn.
+                SetNamedButtonActive(toolbar, "btn_record", false);
+                SetNamedButtonActive(toolbar, "btn_help", false);
+                var helpSeparator = toolbar.GetComponentsInChildren<Transform>(true)
+                    .FirstOrDefault(item => item.name == "split_help");
+                if (helpSeparator != null) helpSeparator.gameObject.SetActive(false);
                 BindNamedButton(toolbar, "btn_audio", () => AudioListener.pause = !AudioListener.pause);
             }
 

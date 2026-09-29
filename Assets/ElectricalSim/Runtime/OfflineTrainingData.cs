@@ -76,7 +76,6 @@ namespace ElectricalSim
 
         public string ProjectsDirectory => Ensure("存档");
         public string CapturesDirectory => Ensure("截图");
-        public string RecordingsDirectory => Ensure("录像");
         private string Ensure(string name)
         {
             var path = Path.Combine(RootDirectory, name);

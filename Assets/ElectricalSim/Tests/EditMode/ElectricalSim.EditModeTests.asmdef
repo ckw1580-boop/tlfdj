@@ -1,7 +1,7 @@
 {
   "name": "ElectricalSim.EditModeTests",
   "rootNamespace": "ElectricalSim.Tests",
-  "references": ["ElectricalSim.Runtime"],
+  "references": ["ElectricalSim.Runtime", "ElectricalSim.Editor"],
   "includePlatforms": ["Editor"],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
