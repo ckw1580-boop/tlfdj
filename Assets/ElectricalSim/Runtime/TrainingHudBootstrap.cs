@@ -75,6 +75,9 @@ namespace ElectricalSim
             var homePage = ui.Canvas.gameObject.AddComponent<HomePagePresenter>();
             homePage.Initialize(ui.Canvas, uiFont);
             controller.RegisterHomePage(homePage);
+            var resetConfirmation = ui.Canvas.gameObject.AddComponent<ResetConfirmationPresenter>();
+            resetConfirmation.Initialize(ui.Canvas, uiFont);
+            controller.RegisterResetConfirmation(resetConfirmation);
             instrumentTools = new GameObject("InstrumentTools", typeof(RectTransform));
             instrumentTools.transform.SetParent(ui.Canvas.transform, false);
             var instrumentToolsRect = instrumentTools.GetComponent<RectTransform>();
@@ -102,7 +105,7 @@ namespace ElectricalSim
             SetRect(open.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1500f, 14f), new Vector2(1592f, 74f));
             var save = Button("Save", ui.Top.transform, "保存接线", controller.SaveCc3d);
             SetRect(save.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1600f, 14f), new Vector2(1692f, 74f));
-            var reset = Button("Reset", ui.Top.transform, "重置", controller.ResetTraining);
+            var reset = Button("Reset", ui.Top.transform, "重置", controller.RequestResetTraining);
             SetRect(reset.GetComponent<RectTransform>(), Vector2.zero, Vector2.zero, new Vector2(1700f, 14f), new Vector2(1792f, 74f));
 
             var instruments = new[] { InstrumentKind.Multimeter, InstrumentKind.VoltageProbe, InstrumentKind.Oscilloscope, InstrumentKind.Tachometer };
@@ -129,7 +132,7 @@ namespace ElectricalSim
                 BindNamedButton(navigation, "homeBtn", controller.HomePage.Open);
                 BindNamedButton(navigation, "scheduleBtn", ToggleTaskPanel);
                 BindNamedButton(navigation, "saveBtn", controller.SaveCc3d);
-                BindNamedButton(navigation, "resetBtn", controller.ResetTraining);
+                BindNamedButton(navigation, "resetBtn", controller.RequestResetTraining);
                 SetNamedButtonActive(navigation, "saveBtn", true);
                 SetNamedButtonActive(navigation, "submitBtn", false);
                 SetNamedButtonActive(navigation, "downloadBtn", false);
@@ -150,7 +153,7 @@ namespace ElectricalSim
                 BindNamedButton(toolbar, "btn_drag", () => controller.SetMode(SimulationMode.Drag));
                 BindNamedButton(toolbar, "btn_line", () => controller.SetMode(SimulationMode.Wiring));
                 BindNamedButton(toolbar, "btn_sim", () => controller.SetMode(SimulationMode.Simulate));
-                BindNamedButton(toolbar, "btn_resume", controller.ResetTraining);
+                BindNamedButton(toolbar, "btn_resume", controller.RequestResetTraining);
                 BindNamedButton(toolbar, "btn_snapshot", captureRecorder.CaptureScreenshot);
                 // Imported object names do not match their icons: btn_submit
                 // carries the original "打开" folder sprite; btn_resume is reset.

@@ -312,6 +312,7 @@ namespace ElectricalSim
 
         private void OnDestroy()
         {
+            if (ResetConfirmation != null) ResetConfirmation.VisibilityChanged -= OnResetConfirmationVisibilityChanged;
             if (HomePage != null) HomePage.VisibilityChanged -= OnHomeVisibilityChanged;
             if (SchematicGallery != null) SchematicGallery.ViewerVisibilityChanged -= OnSchematicViewerVisibility;
             StopPlcConnections();

@@ -20,6 +20,7 @@ namespace ElectricalSim
         private readonly List<ElectricalDeviceView> deviceViews = new List<ElectricalDeviceView>();
         private readonly List<GameObject> cabinetWireDuctCoverGroups = new List<GameObject>();
         private Font uiFont;
+        private Material wallAuthorMaterial;
         private SimulationController controller;
         private Transform originalEnvironment;
         private Dictionary<string, List<Transform>> originalTerminals;
@@ -256,6 +257,8 @@ namespace ElectricalSim
 
         private void OnDestroy()
         {
+            Font.textureRebuilt -= RefreshWallAuthorFontTexture;
+            if (wallAuthorMaterial != null) Destroy(wallAuthorMaterial);
             if (controller != null)
                 controller.ModeChanged -= SetCabinetWireDuctCoversForMode;
         }
@@ -699,17 +702,17 @@ namespace ElectricalSim
             // The original scene creates its Floor root from a removed runtime script. Rebuild the
             // same open-front training room from the measured Experiment renderer bounds.
             CreateCube("Original Floor", new Vector3(-0.067f, -0.055f, -2.62f), new Vector3(5.62f, 0.11f, 5.35f), new Color(0.08f, 0.58f, 0.49f));
-            CreateCube("Original Back Wall", new Vector3(-0.067f, 1.55f, -5.31f), new Vector3(5.62f, 3.2f, 0.10f), new Color(0.35f, 0.35f, 0.35f));
-            CreateCube("Original Left Wall", new Vector3(-2.90f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f));
-            CreateCube("Original Right Wall", new Vector3(2.77f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f));
+            CreateWallWithAuthor("Original Back Wall", new Vector3(-0.067f, 1.55f, -5.31f), new Vector3(5.62f, 3.2f, 0.10f), new Color(0.35f, 0.35f, 0.35f), Vector3.back);
+            CreateWallWithAuthor("Original Left Wall", new Vector3(-2.90f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f), Vector3.left);
+            CreateWallWithAuthor("Original Right Wall", new Vector3(2.77f, 1.55f, -2.62f), new Vector3(0.10f, 3.2f, 5.35f), new Color(0.74f, 0.77f, 0.78f), Vector3.right);
         }
 
         private void CreatePlaceholderEnvironment()
         {
             CreateCube("Floor", new Vector3(0f, -0.08f, 1f), new Vector3(10f, 0.16f, 10f), new Color(0.05f, 0.43f, 0.37f));
-            CreateCube("BackWall", new Vector3(0f, 2.4f, 4.5f), new Vector3(10f, 4.8f, 0.2f), new Color(0.72f, 0.76f, 0.78f));
-            CreateCube("LeftWall", new Vector3(-5f, 2.4f, 0f), new Vector3(0.2f, 4.8f, 9f), new Color(0.67f, 0.71f, 0.74f));
-            CreateCube("RightWall", new Vector3(5f, 2.4f, 0f), new Vector3(0.2f, 4.8f, 9f), new Color(0.67f, 0.71f, 0.74f));
+            CreateWallWithAuthor("BackWall", new Vector3(0f, 2.4f, 4.5f), new Vector3(10f, 4.8f, 0.2f), new Color(0.72f, 0.76f, 0.78f), Vector3.forward);
+            CreateWallWithAuthor("LeftWall", new Vector3(-5f, 2.4f, 0f), new Vector3(0.2f, 4.8f, 9f), new Color(0.67f, 0.71f, 0.74f), Vector3.left);
+            CreateWallWithAuthor("RightWall", new Vector3(5f, 2.4f, 0f), new Vector3(0.2f, 4.8f, 9f), new Color(0.67f, 0.71f, 0.74f), Vector3.right);
 
             if (originalVisuals != null && originalVisuals.CabinetPrefab != null)
             {
@@ -1792,6 +1795,57 @@ namespace ElectricalSim
             renderer.material = new Material(source);
             renderer.material.color = color;
             return gameObject;
+        }
+
+        private void CreateWallWithAuthor(string name, Vector3 position, Vector3 size, Color color, Vector3 outward)
+        {
+            var wall = CreateCube(name, position, size, color);
+            var bounds = wall.GetComponent<Renderer>().bounds;
+            var surfaceCenter = bounds.center + Vector3.Scale(outward, bounds.extents);
+            // Both room floors end at y = 0; the original walls extend below them.
+            surfaceCenter.y = Mathf.Max(0f, bounds.min.y) + 0.06f;
+
+            if (wallAuthorMaterial == null)
+            {
+                wallAuthorMaterial = new Material(Resources.Load<Shader>("WallAuthorText"))
+                {
+                    name = "Wall Author Font",
+                    mainTexture = uiFont.material.mainTexture
+                };
+                Font.textureRebuilt += RefreshWallAuthorFontTexture;
+            }
+
+            var label = new GameObject("Wall Author Label");
+            label.transform.position = surfaceCenter;
+            // TextMesh's readable face points along local -Z.
+            label.transform.rotation = Quaternion.LookRotation(-outward, Vector3.up);
+            var text = label.AddComponent<TextMesh>();
+            text.font = uiFont;
+            text.fontSize = 64;
+            text.characterSize = 0.00625f;
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.color = new Color(0.65f, 0.65f, 0.65f, 1f);
+            text.text = "作者：汪成康";
+
+            var renderer = label.GetComponent<MeshRenderer>();
+            renderer.sharedMaterial = wallAuthorMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            // Fit the actual Chinese glyphs to 4 cm, keeping their aspect ratio.
+            if (renderer.bounds.size.y > 0f)
+                label.transform.localScale *= 0.04f / renderer.bounds.size.y;
+            var centerCorrection = surfaceCenter - renderer.bounds.center;
+            label.transform.position += Vector3.ProjectOnPlane(centerCorrection, outward);
+            // Preserve world size when parenting to the non-uniformly scaled wall.
+            label.transform.SetParent(wall.transform, true);
+            RefreshWallAuthorFontTexture(uiFont);
+        }
+
+        private void RefreshWallAuthorFontTexture(Font rebuiltFont)
+        {
+            if (rebuiltFont == uiFont && wallAuthorMaterial != null)
+                wallAuthorMaterial.mainTexture = uiFont.material.mainTexture;
         }
 
         private void CreateWorldLabel(string text, Vector3 position, float size, Color color)
