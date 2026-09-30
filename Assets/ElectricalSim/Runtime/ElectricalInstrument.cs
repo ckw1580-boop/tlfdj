@@ -11,6 +11,36 @@ namespace ElectricalSim
 
         public InstrumentKind Kind { get; }
 
+        public VoltageProbeReading MeasureVoltageProbe(VoltageProbeMode mode, string port, SimulationSnapshot snapshot)
+        {
+            VoltageProbeReading Result(VoltageProbeState state, double value = double.NaN) => new VoltageProbeReading(mode, state, value);
+            if (string.IsNullOrEmpty(port)) return Result(VoltageProbeState.MissingContact);
+            if (snapshot == null) return Result(VoltageProbeState.Unavailable);
+            if (!snapshot.ContainsPort(port)) return Result(VoltageProbeState.MissingContact);
+            var reference = mode == VoltageProbeMode.AC ? VoltageProbeReading.AcReference : VoltageProbeReading.DcReference;
+            var potential = snapshot.GetPotential(port);
+            if (potential == ElectricalPotential.Conflict || snapshot.HasSignalConflict(port) ||
+                snapshot.GetPotential(reference) == ElectricalPotential.Conflict || snapshot.HasSignalConflict(reference))
+                return Result(VoltageProbeState.Conflict);
+            if (!snapshot.IsConverged) return Result(VoltageProbeState.Unavailable);
+            if (snapshot.IsVoltageUnsupported(port) || snapshot.IsVoltageUnsupported(reference)) return Result(VoltageProbeState.Unsupported);
+            if (mode == VoltageProbeMode.AC && (IsDc(potential) || snapshot.HasControlSignal(port)) ||
+                mode == VoltageProbeMode.DC && (IsPhase(potential) || potential == ElectricalPotential.Neutral))
+                return Result(VoltageProbeState.ModeMismatch);
+            if (!snapshot.ContainsPort(reference) || snapshot.GetPotential(reference) !=
+                (mode == VoltageProbeMode.AC ? ElectricalPotential.Neutral : ElectricalPotential.DcNegative))
+                return Result(VoltageProbeState.UndefinedReference);
+            if (snapshot.SameNet(port, reference)) return Result(VoltageProbeState.Valid, 0);
+            if (mode == VoltageProbeMode.AC)
+                return IsPhase(potential) || potential == ElectricalPotential.Neutral
+                    ? Result(VoltageProbeState.Valid, snapshot.GetAcVoltage(port, reference))
+                    : Result(VoltageProbeState.UndefinedReference);
+            if (snapshot.TryGetSignalVoltage(port, reference, out var volts))
+                return double.IsNaN(volts) || double.IsInfinity(volts) ? Result(VoltageProbeState.Conflict) : Result(VoltageProbeState.Valid, volts);
+            if (IsDc(potential)) return Result(VoltageProbeState.Valid, snapshot.GetDcVoltage(port, reference));
+            return Result(VoltageProbeState.UndefinedReference);
+        }
+
         // Red is the positive input; black is COM. This API leaves legacy instruments unchanged.
         public MultimeterReading Measure(MultimeterMode mode, string redPort, string blackPort, SimulationSnapshot snapshot)
         {

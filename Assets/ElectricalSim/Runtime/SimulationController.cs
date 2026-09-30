@@ -39,13 +39,20 @@ namespace ElectricalSim
         private SimulationSnapshot lastSnapshot;
         private InstrumentKind instrumentKind = InstrumentKind.Multimeter;
         public MultimeterController Multimeter { get; private set; }
+        public VoltageProbeController VoltageProbe { get; private set; }
+        public void RegisterVoltageProbe(VoltageProbeController probe)
+        {
+            VoltageProbe = probe;
+            VoltageProbe?.SetFaultMode(Mode == SimulationMode.Fault);
+        }
         public void RegisterMultimeter(MultimeterController meter)
         {
             Multimeter = meter;
             Multimeter?.SetFaultMode(Mode == SimulationMode.Fault);
         }
         public bool CanOperateFaultControls => Mode == SimulationMode.Fault && !IsInteractionBlocked &&
-            instrumentKind != InstrumentKind.Tachometer && (Multimeter == null || !Multimeter.IsSelected || !Multimeter.IsBusy);
+            instrumentKind != InstrumentKind.Tachometer && (Multimeter == null || !Multimeter.IsSelected || !Multimeter.IsBusy) &&
+            (VoltageProbe == null || !VoltageProbe.IsBusy);
         public TachometerController Tachometer { get; private set; }
         public void RegisterTachometer(TachometerController tachometer)
         {
@@ -204,7 +211,7 @@ namespace ElectricalSim
                 UpdateWiringDraft();
                 HandleSceneInput();
             }
-            else Multimeter?.SuspendPointer();
+            else { Multimeter?.SuspendPointer(); VoltageProbe?.SuspendPointer(); }
             PreparePlcOutputs();
             var wasOverflowing = Liquid != null && Liquid.IsOverflowing;
             lastSnapshot = AdvanceSimulation(Time.deltaTime);
@@ -235,6 +242,7 @@ namespace ElectricalSim
             Mode = mode;
             if (Tachometer != null) Tachometer.SetFaultMode(mode == SimulationMode.Fault);
             Multimeter?.SetFaultMode(mode == SimulationMode.Fault);
+            VoltageProbe?.SetFaultMode(mode == SimulationMode.Fault);
             if (mode != SimulationMode.Drag) setInverterPanelVisible?.Invoke(false);
             foreach (var breaker in cabinetBreakers)
                 if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
@@ -280,12 +288,14 @@ namespace ElectricalSim
             foreach (var port in meterPorts) port.SetHighlighted(false);
             if (Tachometer != null) Tachometer.Deselect();
             Multimeter?.Deselect();
+            VoltageProbe?.Deselect();
             instrumentKind = kind;
             meterPorts.Clear();
-            instrumentText.text = $"{InstrumentName(kind)}：请选择两个端子";
+            instrumentText.text = kind == InstrumentKind.VoltageProbe ? "数字验电笔：请接触一个端子" : $"{InstrumentName(kind)}：请选择两个端子";
             SetMode(SimulationMode.Fault);
             if (kind == InstrumentKind.Tachometer && Tachometer != null) Tachometer.Select();
             if (kind == InstrumentKind.Multimeter) Multimeter?.Select(Camera.main);
+            if (kind == InstrumentKind.VoltageProbe) VoltageProbe?.Select(Camera.main);
             ApplyPortAnchors();
         }
 
@@ -352,7 +362,8 @@ namespace ElectricalSim
             var effectivePreset = trainingCamera.IsViewingFaultSide
                 ? TrainingViewPreset.FaultBack
                 : TrainingViewPreset.WiringFront;
-            var measuring = Mode == SimulationMode.Fault && Multimeter != null && Multimeter.IsSelected;
+            var measuring = Mode == SimulationMode.Fault && (Multimeter != null && Multimeter.IsSelected ||
+                VoltageProbe != null && VoltageProbe.IsSelected);
             foreach (var port in portViews.Values)
                 port.ApplyOriginalAnchor(effectivePreset, measuring ? port.JumperOnly : jumper);
             foreach (var wire in wireViews) wire.Refresh();
@@ -446,6 +457,7 @@ namespace ElectricalSim
 
         private void HandleSceneInput()
         {
+            if (Mode == SimulationMode.Fault && VoltageProbe != null && VoltageProbe.IsSelected && VoltageProbe.HandleInput(Camera.main)) return;
             if (Mode == SimulationMode.Fault && Multimeter != null && Multimeter.IsSelected && Multimeter.HandleInput(Camera.main)) return;
             if (TrySelectPlcFromPointer()) return;
             if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer)
@@ -554,7 +566,7 @@ namespace ElectricalSim
 
             if (Mode == SimulationMode.Fault && port != null)
             {
-                if (Multimeter == null || !Multimeter.IsSelected) HandleMeterPort(port);
+                if ((Multimeter == null || !Multimeter.IsSelected) && instrumentKind != InstrumentKind.VoltageProbe) HandleMeterPort(port);
             }
             else if ((Mode == SimulationMode.Simulate || CanOperateFaultControls) && deviceView != null) HandleDeviceControl(deviceView.Runtime);
         }
@@ -975,6 +987,14 @@ namespace ElectricalSim
 
         private void UpdateInstrumentReadout()
         {
+            // Refresh the instrument even when the legacy readout is absent or collapsed.
+            if (instrumentKind == InstrumentKind.VoltageProbe)
+            {
+                VoltageProbe?.Refresh(lastSnapshot);
+                if (instrumentText != null) instrumentText.text = VoltageProbe != null && VoltageProbe.IsSelected
+                    ? VoltageProbe.DescribeReading() : "数字验电笔：请选择工具并接触一个端子";
+                return;
+            }
             if (instrumentText == null) return;
             if (instrumentKind == InstrumentKind.Multimeter && Multimeter != null && Multimeter.IsSelected)
             {

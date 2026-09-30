@@ -157,6 +157,7 @@ namespace ElectricalSim
             BindOriginalUi(ui);
             CreateTachometer();
             CreateMultimeter(ui);
+            CreateVoltageProbe(ui);
             if (originalEnvironment != null) Invoke(nameof(RefreshCabinetBranding), 0.1f);
             Debug.Log("[OfflineBootstrap] Build complete.");
         }
