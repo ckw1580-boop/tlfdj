@@ -1611,8 +1611,9 @@ namespace ElectricalSim.Tests
                 var start = pair[1] == "M2" ? motor : board;
                 var end = start == motor ? board : motor;
                 begin.Invoke(controller, new object[] { start });
-                // Reproduce a blank-space click before choosing the motor terminal.
-                var surfacePoint = start.CurrentAnchorPosition + Vector3.down * 0.2f;
+                // A blank cabinet click outside the motor no-snap region must
+                // still be accepted, then ignored when completing a soft jumper.
+                var surfacePoint = board.CurrentAnchorPosition + Vector3.up * 0.05f;
                 var routeSurface = Object.FindObjectOfType<ElectricalWireDraftView>().transform.forward;
                 typeof(SimulationController).GetMethod("HandleWiringClick", flags).Invoke(controller,
                     new object[] { null, new Ray(surfacePoint + routeSurface, -routeSurface) });

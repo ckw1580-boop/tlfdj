@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -23,6 +24,166 @@ namespace ElectricalSim.Tests
             yield return null;
             controller = Object.FindObjectOfType<SimulationController>();
             motors = Object.FindObjectsOfType<ElectricalDeviceView>().Where(v => v.Runtime.Kind == ElectricalDeviceKind.Motor).ToArray();
+        }
+
+        [UnityTest]
+        public IEnumerator MotorNoSnapRegionsRejectBlankClicksAndKeepTerminalConnections()
+        {
+            controller.SetMode(SimulationMode.Wiring);
+            controller.SetWireStyle(Color.red, 0.01f, "JumperLine");
+            controller.enabled = false;
+            var camera = Camera.main;
+            var navigation = Object.FindObjectOfType<TrainingCameraController>();
+            navigation.enabled = false;
+            camera.nearClipPlane = 0.01f;
+            var environment = GameObject.Find("OriginalLabEnvironment").transform;
+            Assert.That(((List<WireNoSnapRegion>)ControllerField("wireNoSnapRegions")).Count, Is.EqualTo(4));
+            foreach (var binding in MotorBindingDefinition.All)
+            {
+                if (binding.Id == "M3") navigation.SetFaultView();
+                else navigation.SetWiringView();
+                var surface = (WireSurfacePlane)ControllerField(binding.Id == "M3" ? "faultWireSurface" : "frontWireSurface");
+                SetControllerField("wireSurface", surface);
+                var motor = motors.Single(m => m.Runtime.DeviceId == binding.Id);
+                var model = environment.Find(binding.ModelPath);
+                var body = new WireBodyGeometry(model);
+                Assert.That(body.TryGetBounds(surface, out var bounds), Is.True);
+                var blank = surface.Project(surface.Rotation * bounds.center);
+                camera.transform.position = blank + surface.Normal * 2f;
+                camera.transform.LookAt(blank);
+                Physics.SyncTransforms();
+                var screen = (Vector2)camera.WorldToScreenPoint(blank);
+                var ray = camera.ScreenPointToRay(screen);
+                Assert.That(surface.Raycast(ray, out _), Is.True, binding.Id + " control: cabinet plane is hittable");
+                Assert.That(Physics.Raycast(ray, out var hit, 100f) && hit.collider.GetComponent<ElectricalPortView>() != null,
+                    Is.False, binding.Id + " blank point must not hit a terminal");
+                InvokeController("BeginWireRoute", motor.Ports[0]);
+                var draft = (ElectricalWireDraftView)ControllerField("wireDraftView");
+                Assert.That(draft.GetComponent<LineRenderer>().enabled, Is.False, binding.Id + " starts without cabinet preview");
+                InvokeController("RefreshWiringDraft", camera, screen);
+                Assert.That(draft.GetComponent<LineRenderer>().enabled, Is.False);
+                CaptureMotor(binding.Id, "motor-no-snap-" + binding.Id + "-blank", binding.Id == "M1");
+                InvokeController("HandleWiringClick", null, ray);
+                Assert.That(((List<Vector3>)ControllerField("pendingWirePoints")), Is.Empty);
+                Assert.That(controller.IsRoutingWire, Is.True, "Rejected click must preserve selected start terminal");
+
+                // Leave the motor footprint: this remains an ordinary editable cabinet point.
+                var free = FindFreeCabinetPoint(surface, bounds);
+                camera.transform.position = free + surface.Normal * 2f;
+                camera.transform.LookAt(free);
+                Physics.SyncTransforms();
+                screen = camera.WorldToScreenPoint(free);
+                InvokeController("RefreshWiringDraft", camera, screen);
+                Assert.That(draft.GetComponent<LineRenderer>().enabled, Is.True, binding.Id + " preview must recover outside region");
+
+                // Aim straight at a real terminal: terminal priority bypasses the region.
+                var end = motor.Ports[1];
+                camera.transform.position = end.CurrentAnchorPosition + end.MotorOutward * 0.25f;
+                camera.transform.LookAt(end.CurrentAnchorPosition, -model.right);
+                Physics.SyncTransforms();
+                screen = camera.WorldToScreenPoint(end.CurrentAnchorPosition);
+                ray = camera.ScreenPointToRay(screen);
+                Assert.That(Physics.Raycast(ray, out hit, 100f), Is.True);
+                Assert.That(hit.collider.GetComponent<ElectricalPortView>(), Is.SameAs(end));
+                InvokeController("RefreshWiringDraft", camera, screen);
+                Assert.That(draft.GetComponent<LineRenderer>().enabled, Is.True);
+                Assert.That(draft.RenderPath.RouteKind, Is.EqualTo(WireRouteKind.MotorTerminalBridge));
+                var preview = draft.RenderPath.Points.ToArray();
+                InvokeController("HandleWiringPointerDown", camera, screen);
+                Assert.That(controller.IsRoutingWire, Is.False);
+                var wire = controller.Graph.Wires.Last();
+                var view = Object.FindObjectsOfType<ElectricalWireView>().Single(v => v.Connection.Id == wire.Id);
+                Assert.That(wire.Points, Is.Empty);
+                Assert.That(view.RenderedPoints, Is.EqualTo(preview));
+                Assert.That(view.RenderPath.RouteKind, Is.EqualTo(WireRouteKind.MotorTerminalBridge));
+            }
+            controller.UndoWiring();
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(3));
+            controller.RedoWiring();
+            Assert.That(controller.Graph.Wires.Count, Is.EqualTo(4));
+            yield return null;
+            CaptureMotor("M1", "motor-no-snap-front-overview", true);
+        }
+
+        [UnityTest]
+        public IEnumerator MotorNoSnapBlocksInsertDragAndDirectBendsWithoutRecordingHistory()
+        {
+            controller.SetMode(SimulationMode.Wiring);
+            controller.enabled = false;
+            var navigation = Object.FindObjectOfType<TrainingCameraController>();
+            navigation.SetWiringView();
+            navigation.enabled = false;
+            var surface = (WireSurfacePlane)ControllerField("frontWireSurface");
+            var model = GameObject.Find("OriginalLabEnvironment").transform.Find(MotorBindingDefinition.Find("M1").ModelPath);
+            Assert.That(new WireBodyGeometry(model).TryGetBounds(surface, out var bounds), Is.True);
+            var blank = surface.Project(surface.Rotation * bounds.center);
+            var free = FindFreeCabinetPoint(surface, bounds);
+            var motor = motors.Single(m => m.Runtime.DeviceId == "M1");
+            InvokeController("BeginWireRoute", motor.Ports[0]);
+            InvokeController("CompleteWireRoute", motor.Ports[1]);
+            var wire = controller.Graph.Wires.Last();
+            var view = Object.FindObjectsOfType<ElectricalWireView>().Single(v => v.Connection.Id == wire.Id);
+            var history = (WireHistory)ControllerField("wireHistory");
+            var undoCount = history.UndoCount;
+            var redoCount = history.RedoCount;
+            Assert.That(controller.AddBendPointToLastWire(blank), Is.False);
+            Assert.That(wire.Points, Is.Empty);
+
+            // An ordinary legacy wire crossing the forbidden cabinet area can
+            // still be selected, but double-click must not insert a new bend.
+            wire.LineType = "ElectricalWire";
+            wire.FaultSide = false;
+            var right = surface.Rotation * Vector3.right;
+            view.Rebind(wire, port => blank + right * (port == wire.StartPort ? -0.1f : 0.1f), surface);
+            view.Refresh();
+            var camera = Camera.main;
+            camera.transform.position = blank + surface.Normal * 2f;
+            camera.transform.LookAt(blank);
+            Physics.SyncTransforms();
+            var screen = (Vector2)camera.WorldToScreenPoint(blank);
+            InvokeController("ClearWireSelection");
+            InvokeController("HandleWiringPointerDown", camera, screen);
+            Assert.That(controller.SelectedWire, Is.SameAs(wire));
+            InvokeController("HandleWiringPointerDown", camera, screen);
+            Assert.That(wire.Points, Is.Empty);
+
+            wire.Points.Add(free);
+            view.Refresh();
+            SetControllerField("selectedWirePointIndex", 0);
+            InvokeController("MoveSelectedWirePoint", camera.ScreenPointToRay(screen));
+            Assert.That(wire.Points[0], Is.EqualTo(free));
+            Assert.That((bool)ControllerField("wirePointDragChanged"), Is.False);
+            Assert.That(history.UndoCount, Is.EqualTo(undoCount));
+            Assert.That(history.RedoCount, Is.EqualTo(redoCount));
+
+            camera.transform.position = free + surface.Normal * 2f;
+            camera.transform.LookAt(free);
+            var allowed = free + (surface.Rotation * Vector3.up) * 0.01f;
+            InvokeController("MoveSelectedWirePoint", camera.ScreenPointToRay(camera.WorldToScreenPoint(allowed)));
+            Assert.That(Vector3.Distance(wire.Points[0], allowed), Is.LessThan(0.0001f));
+            Assert.That(history.UndoCount, Is.EqualTo(undoCount + 1));
+            yield return null;
+        }
+
+        private object ControllerField(string name) => typeof(SimulationController).GetField(name, Private).GetValue(controller);
+        private void SetControllerField(string name, object value) => typeof(SimulationController).GetField(name, Private).SetValue(controller, value);
+        private object InvokeController(string name, params object[] args) => typeof(SimulationController).GetMethod(name, Private).Invoke(controller, args);
+
+        private Vector3 FindFreeCabinetPoint(WireSurfacePlane surface, Bounds motorBounds)
+        {
+            var regions = (List<WireNoSnapRegion>)ControllerField("wireNoSnapRegions");
+            foreach (var distance in new[] { 0.03f, 0.06f, 0.1f, 0.2f })
+                foreach (var direction in new[] { Vector3.right, Vector3.left, Vector3.up })
+                {
+                    var candidate = surface.Rotation * (motorBounds.center + Vector3.Scale(direction, motorBounds.extents) + direction * distance);
+                    candidate = surface.Project(candidate);
+                    var ray = new Ray(candidate + surface.Normal * 2f, -surface.Normal);
+                    if (!surface.Raycast(ray, out _) || regions.Any(region => region.BlocksRay(ray, candidate, surface))) continue;
+                    if (Physics.Raycast(ray, out var hit, 100f) && hit.collider.GetComponent<ElectricalPortView>() != null) continue;
+                    return candidate;
+                }
+            Assert.Fail("Expected an editable cabinet point near the motor, outside its own region");
+            return default;
         }
 
         [UnityTest]

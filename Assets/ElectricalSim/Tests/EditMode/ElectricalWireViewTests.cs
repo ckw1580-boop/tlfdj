@@ -8,6 +8,70 @@ namespace ElectricalSim.Tests
     {
         [TestCase(0f)]
         [TestCase(31f)]
+        public void MotorNoSnapRegionIncludesPaddingAndTracksMovedRotatedModel(float angle)
+        {
+            var motor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            var helper = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                var rotation = Quaternion.Euler(0f, angle, 0f);
+                var origin = new Vector3(2f, 1f, -3f);
+                var surface = new WireSurfacePlane(origin, rotation * Vector3.forward, 0f);
+                motor.transform.SetPositionAndRotation(origin + rotation * new Vector3(0f, 0f, 0.3f), rotation);
+                motor.transform.localScale = new Vector3(0.2f, 0.2f, 0.2f);
+                helper.name = "picker";
+                helper.transform.SetParent(motor.transform, false);
+                helper.transform.localScale = Vector3.one * 100f;
+                var region = new WireNoSnapRegion(motor.transform);
+                Vector3 Point(float x) => origin + rotation * new Vector3(x, 0f, 0f);
+                Assert.That(region.ContainsProjection(Point(0.119f), surface), Is.True, "2 cm margin is forbidden");
+                Assert.That(region.ContainsProjection(Point(0.121f), surface), Is.False, "Helper mesh must not enlarge the region");
+                Assert.That(region.ContainsProjection(Point(-0.119f), surface), Is.True);
+                Assert.That(region.ContainsProjection(Point(-0.121f), surface), Is.False);
+                motor.transform.position += rotation * Vector3.right * 0.5f;
+                Assert.That(region.ContainsProjection(Point(0f), surface), Is.False, "Old model position must be released");
+                Assert.That(region.ContainsProjection(Point(0.5f), surface), Is.True, "Region must follow the model");
+            }
+            finally
+            {
+                Object.DestroyImmediate(motor);
+            }
+        }
+
+        [TestCase(0f)]
+        [TestCase(31f)]
+        public void MotorNoSnapRayBlocksObliqueBodyHitsButNotOppositeCabinetFace(float angle)
+        {
+            var motor = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            try
+            {
+                var rotation = Quaternion.Euler(0f, angle, 0f);
+                var origin = new Vector3(2f, 1f, -3f);
+                var surface = new WireSurfacePlane(origin, rotation * Vector3.forward, 0f);
+                motor.transform.SetPositionAndRotation(origin + rotation * new Vector3(0f, 0f, 0.3f), rotation);
+                motor.transform.localScale = Vector3.one * 0.2f;
+                var region = new WireNoSnapRegion(motor.transform);
+                var target = origin + rotation * new Vector3(0.3f, 0f, 0f);
+                var eye = origin + rotation * new Vector3(-0.3f, 0f, 0.6f);
+                var ray = new Ray(eye, target - eye);
+                Assert.That(surface.Raycast(ray, out var point), Is.True);
+                Assert.That(region.ContainsProjection(point, surface), Is.False);
+                Assert.That(region.BlocksRay(ray, point, surface), Is.True, "Oblique ray crosses the motor before reaching the cabinet");
+                var clearRay = new Ray(target + surface.Normal, -surface.Normal);
+                Assert.That(region.BlocksRay(clearRay, target, surface), Is.False);
+                var opposite = new WireSurfacePlane(origin, -surface.Normal, 0f);
+                Assert.That(region.ContainsProjection(origin, opposite), Is.False);
+                Assert.That(region.BlocksRay(new Ray(origin - surface.Normal, surface.Normal), origin, opposite), Is.False,
+                    "Motor behind the active cabinet face must not block it");
+            }
+            finally
+            {
+                Object.DestroyImmediate(motor);
+            }
+        }
+
+        [TestCase(0f)]
+        [TestCase(31f)]
         public void ShellPanelUsesFaceBehindDeviceInsteadOfWholeCabinetBounds(float angle)
         {
             var cube = GameObject.CreatePrimitive(PrimitiveType.Cube);

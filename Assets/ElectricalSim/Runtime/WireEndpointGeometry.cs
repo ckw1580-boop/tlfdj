@@ -61,6 +61,45 @@ namespace ElectricalSim
         }
     }
 
+    // Reject cabinet editing behind a motor as well as rays passing through its
+    // body. Keep this separate from render projection so old wires are untouched.
+    public sealed class WireNoSnapRegion
+    {
+        public const float Padding = 0.02f;
+        private readonly WireBodyGeometry body;
+
+        public WireNoSnapRegion(Transform modelRoot) => body = new WireBodyGeometry(modelRoot);
+
+        private bool TryGetBounds(WireSurfacePlane surface, out Bounds bounds)
+        {
+            if (!body.TryGetBounds(surface, out bounds)) return false;
+            bounds.Expand(Padding * 2f);
+            return true;
+        }
+
+        public bool ContainsProjection(Vector3 point, WireSurfacePlane surface)
+        {
+            if (!TryGetBounds(surface, out var bounds)) return false;
+            var inverse = Quaternion.Inverse(surface.Rotation);
+            var local = inverse * point;
+            // A motor entirely behind this cabinet face must not block editing
+            // on the opposite side of the cabinet.
+            return bounds.max.z >= (inverse * surface.Origin).z &&
+                   local.x >= bounds.min.x && local.x <= bounds.max.x &&
+                   local.y >= bounds.min.y && local.y <= bounds.max.y;
+        }
+
+        public bool BlocksRay(Ray ray, Vector3 surfacePoint, WireSurfacePlane surface)
+        {
+            if (ContainsProjection(surfacePoint, surface)) return true;
+            if (!TryGetBounds(surface, out var bounds)) return false;
+            var inverse = Quaternion.Inverse(surface.Rotation);
+            var localRay = new Ray(inverse * ray.origin, inverse * ray.direction.normalized);
+            return bounds.IntersectRay(localRay, out var distance) &&
+                   distance <= Vector3.Distance(ray.origin, surfacePoint) + 0.0001f;
+        }
+    }
+
     public readonly struct WireEndpointGeometry
     {
         public WireEndpointGeometry(Vector3 position, WireBodyGeometry body = null, string motorId = null, Vector3 motorOutward = default)

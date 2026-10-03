@@ -19,6 +19,7 @@ namespace ElectricalSim
         private readonly List<CabinetBreakerInteractable> cabinetBreakers = new List<CabinetBreakerInteractable>();
         private ElectricalPortView selectedPort;
         private readonly List<Vector3> pendingWirePoints = new List<Vector3>();
+        private readonly List<WireNoSnapRegion> wireNoSnapRegions = new List<WireNoSnapRegion>();
         private ElectricalWireDraftView wireDraftView;
         private Vector3 wireDraftCursor;
         private ElectricalWireView selectedWire;
@@ -147,6 +148,13 @@ namespace ElectricalSim
             SetMode(SimulationMode.View);
             ApplyPortAnchors();
             SetStatus("系统就绪。可查看原理图并自由接线、仿真或排故。", false);
+        }
+
+        public void RegisterWireNoSnapBodies(IEnumerable<Transform> modelRoots)
+        {
+            wireNoSnapRegions.Clear();
+            foreach (var root in modelRoots)
+                if (root != null) wireNoSnapRegions.Add(new WireNoSnapRegion(root));
         }
 
         public void RegisterCabinetBreakers(IEnumerable<CabinetBreakerInteractable> breakers)
@@ -421,10 +429,12 @@ namespace ElectricalSim
         public bool AddBendPointToLastWire(Vector3 worldPosition)
         {
             if (graph.Wires.Count == 0) return false;
-            PushWireHistory();
             var wire = graph.Wires[graph.Wires.Count - 1];
             var surface = wire.FaultSide.HasValue ? (wire.FaultSide.Value ? faultWireSurface : frontWireSurface) : wireSurface;
-            wire.Points.Add(surface.Project(worldPosition));
+            var point = surface.Project(worldPosition);
+            if (!CanPlaceWirePoint(point, surface)) return false;
+            PushWireHistory();
+            wire.Points.Add(point);
             RefreshWireViews();
             return true;
         }
@@ -598,24 +608,28 @@ namespace ElectricalSim
                 }
 
                 if (pointerOverUi || selectedWire == null || selectedWirePointIndex < 0) return;
-                if (!selectedWire.Surface.Raycast(camera.ScreenPointToRay(Input.mousePosition), out var point)) return;
-                point = selectedWire.Surface.Project(point);
-                var current = selectedWire.Connection.Points[selectedWirePointIndex];
-                if (Vector3.Distance(current, point) < 0.0001f) return;
-                if (!wirePointDragChanged)
-                {
-                    PushWireHistory();
-                    wirePointDragChanged = true;
-                }
-                selectedWire.Connection.Points[selectedWirePointIndex] = point;
-                selectedWire.Refresh();
-                selectedWire.SetSelected(true, selectedWirePointIndex);
+                MoveSelectedWirePoint(camera.ScreenPointToRay(Input.mousePosition));
                 return;
             }
 
             if (pointerOverUi || !Input.GetMouseButtonDown(0)) return;
 
             HandleWiringPointerDown(camera, Input.mousePosition);
+        }
+
+        private void MoveSelectedWirePoint(Ray ray)
+        {
+            if (!TryProjectEditableWirePoint(ray, selectedWire.Surface, out var point)) return;
+            var current = selectedWire.Connection.Points[selectedWirePointIndex];
+            if (Vector3.Distance(current, point) < 0.0001f) return;
+            if (!wirePointDragChanged)
+            {
+                PushWireHistory();
+                wirePointDragChanged = true;
+            }
+            selectedWire.Connection.Points[selectedWirePointIndex] = point;
+            selectedWire.Refresh();
+            selectedWire.SetSelected(true, selectedWirePointIndex);
         }
 
         private void HandleWiringPointerDown(Camera camera, Vector2 screenPosition)
@@ -687,7 +701,9 @@ namespace ElectricalSim
                               Time.unscaledTime - lastWireClickTime <= DoubleClickSeconds &&
                               Vector2.Distance(lastWireClickPosition, screenPosition) <= DoubleClickDistancePixels;
             SelectWire(hitWire);
-            if (doubleClick && insertionIndex >= 0)
+            if (doubleClick && insertionIndex >= 0 &&
+                CanPlaceWirePoint(hitWire.Surface.Project(surfacePoint), hitWire.Surface) &&
+                !IsWireRayBlocked(ray, surfacePoint, hitWire.Surface))
             {
                 PushWireHistory();
                 hitWire.Connection.Points.Insert(insertionIndex, hitWire.Surface.Project(surfacePoint));
@@ -869,7 +885,8 @@ namespace ElectricalSim
                 wireSurface,
                 () => port.EndpointGeometry(port.CurrentAnchorPosition, trainingCamera.IsViewingFaultSide));
             wireDraftView.Refresh(pendingWirePoints, wireDraftCursor);
-            SetStatus($"起点：{port.QualifiedPort}。左键空白处添加路径点，点击另一个端子完成。", false);
+            wireDraftView.SetVisible(CanPlaceWirePoint(wireDraftCursor, wireSurface));
+            SetStatus($"起点：{port.QualifiedPort}。左键空白处添加路径点（电机区域除外），点击另一个端子完成。", false);
         }
 
         private void CompleteWireRoute(ElectricalPortView port)
@@ -909,7 +926,12 @@ namespace ElectricalSim
                 wireDraftView.SetVisible(false);
                 return;
             }
-            var ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            RefreshWiringDraft(Camera.main, Input.mousePosition);
+        }
+
+        private void RefreshWiringDraft(Camera camera, Vector2 screenPosition)
+        {
+            var ray = camera.ScreenPointToRay(screenPosition);
             var port = Physics.Raycast(ray, out var hit, 100f)
                 ? hit.collider.GetComponent<ElectricalPortView>()
                 : null;
@@ -927,9 +949,34 @@ namespace ElectricalSim
 
         private bool TryProjectWirePoint(Ray ray, out Vector3 point)
         {
-            if (selectedPort != null) return wireSurface.Raycast(ray, out point);
+            if (selectedPort != null) return TryProjectEditableWirePoint(ray, wireSurface, out point);
             point = Vector3.zero;
             return false;
+        }
+
+        private bool CanPlaceWirePoint(Vector3 point, WireSurfacePlane surface)
+        {
+            foreach (var region in wireNoSnapRegions)
+                if (region.ContainsProjection(point, surface)) return false;
+            return true;
+        }
+
+        private bool IsWireRayBlocked(Ray ray, Vector3 point, WireSurfacePlane surface)
+        {
+            foreach (var region in wireNoSnapRegions)
+                if (region.BlocksRay(ray, point, surface)) return true;
+            return false;
+        }
+
+        private bool TryProjectEditableWirePoint(Ray ray, WireSurfacePlane surface, out Vector3 point)
+        {
+            if (!surface.Raycast(ray, out point) || IsWireRayBlocked(ray, point, surface))
+            {
+                point = Vector3.zero;
+                return false;
+            }
+            point = surface.Project(point);
+            return true;
         }
 
         private void DestroyWireDraft()

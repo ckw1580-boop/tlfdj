@@ -134,6 +134,9 @@ namespace ElectricalSim
                     profile);
             }
             controller.Initialize(deviceViews, cameraController, wireRoot, ui.Mode, ui.Status, ui.Instrument, wireMaterial, frontWireSurface, faultWireSurface, ui.PortHover);
+            controller.RegisterWireNoSnapBodies(originalEnvironment != null
+                ? MotorBindingDefinition.All.Select(binding => originalEnvironment.Find(binding.ModelPath))
+                : deviceViews.Where(view => view.Runtime.Kind == ElectricalDeviceKind.Motor).Select(view => view.transform));
             controller.RegisterSchematicGallery(ui.Gallery);
             controller.RegisterPanel(panelViews, panelPower);
             controller.RegisterPlcs(originalEnvironment, uiFont, ui.Status.canvas);
