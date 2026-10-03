@@ -23,7 +23,7 @@ namespace ElectricalSim
         {
             if (!visible) schematicInputResumeFrame = Time.frameCount;
             if (trainingCamera != null) trainingCamera.SetSchematicInputBlocked(visible);
-            if (visible) portHover?.Hide();
+            if (visible) { portHover?.Hide(); if (Oscilloscope != null) { Oscilloscope.InteractionBlocked = true; Oscilloscope.SuspendPointer(); } }
         }
     }
 }

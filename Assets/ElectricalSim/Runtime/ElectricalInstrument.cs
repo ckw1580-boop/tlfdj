@@ -23,6 +23,8 @@ namespace ElectricalSim
                 snapshot.GetPotential(reference) == ElectricalPotential.Conflict || snapshot.HasSignalConflict(reference))
                 return Result(VoltageProbeState.Conflict);
             if (!snapshot.IsConverged) return Result(VoltageProbeState.Unavailable);
+            if (snapshot.TryReadInverterVoltage(port, reference, out var inverterProbe))
+                return Result(inverterProbe.State == OscilloscopeSignalState.Conflict ? VoltageProbeState.Conflict : VoltageProbeState.UndefinedReference);
             if (snapshot.IsVoltageUnsupported(port) || snapshot.IsVoltageUnsupported(reference)) return Result(VoltageProbeState.Unsupported);
             if (mode == VoltageProbeMode.AC && (IsDc(potential) || snapshot.HasControlSignal(port)) ||
                 mode == VoltageProbeMode.DC && (IsPhase(potential) || potential == ElectricalPotential.Neutral))
@@ -53,12 +55,19 @@ namespace ElectricalSim
                 return new MultimeterReading(mode, MultimeterReadingState.Conflict);
             if (mode == MultimeterMode.Continuity)
             {
+                if (snapshot.TryReadInverterVoltage(redPort, blackPort, out var fault) && fault.State == OscilloscopeSignalState.Conflict)
+                    return new MultimeterReading(mode, MultimeterReadingState.Conflict);
                 if (snapshot.HasExternalSupply(redPort) || snapshot.HasExternalSupply(blackPort))
                     return new MultimeterReading(mode, MultimeterReadingState.Energized);
                 return snapshot.GetResistance(redPort, blackPort) <= 50
                     ? new MultimeterReading(mode, MultimeterReadingState.Valid, 1)
                     : new MultimeterReading(mode, MultimeterReadingState.OpenCircuit, 0);
             }
+            if (snapshot.TryReadInverterVoltage(redPort, blackPort, out var inverter))
+                return new MultimeterReading(mode, inverter.Valid ? MultimeterReadingState.Valid :
+                    inverter.State == OscilloscopeSignalState.Conflict ? MultimeterReadingState.Conflict :
+                    inverter.State == OscilloscopeSignalState.Unavailable ? MultimeterReadingState.Unavailable : MultimeterReadingState.UndefinedReference,
+                    inverter.Valid ? (mode == MultimeterMode.AcVoltage ? inverter.AcRms : inverter.Dc) : double.NaN, true);
             if (snapshot.IsVoltageUnsupported(redPort) || snapshot.IsVoltageUnsupported(blackPort))
                 return new MultimeterReading(mode, MultimeterReadingState.Unsupported);
             if (snapshot.TryGetSignalVoltage(redPort, blackPort, out var signalVoltage))

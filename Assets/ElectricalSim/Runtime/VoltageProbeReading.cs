@@ -23,7 +23,7 @@ namespace ElectricalSim
             State == VoltageProbeState.UndefinedReference ? "测点悬空或参考不明确" :
             State == VoltageProbeState.ModeMismatch ? "档位不匹配，请切换 AC/DC" :
             State == VoltageProbeState.Conflict ? "电势或信号冲突" :
-            State == VoltageProbeState.Unsupported ? "变频输出电压暂不支持" : "无法判断：仿真尚未就绪或未收敛";
+            State == VoltageProbeState.Unsupported ? "电压类型暂不支持" : "无法判断：仿真尚未就绪或未收敛";
 
         public VoltageProbeReading(VoltageProbeMode mode, VoltageProbeState state, double value = double.NaN)
         { Mode = mode; State = state; Value = value; }

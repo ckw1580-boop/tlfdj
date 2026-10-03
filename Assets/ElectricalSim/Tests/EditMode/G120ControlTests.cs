@@ -261,5 +261,19 @@ namespace ElectricalSim.Tests
             panel.ResetFactorySettings(); Assert.That(panel.Macro, Is.EqualTo(1)); Assert.That(Control.Inputs[0].Simulated, Is.False);
             Assert.That(Control.PtcEnabled, Is.False); Assert.That(Control.SimulatedMotorCurrent, Is.Zero);
         }
+        [Test] public void WaveformUsesMotorParametersInputLimitAndRampCommand()
+        {
+            panel.TrySetParameter("P304", 460); panel.TrySetParameter("P310", 60); panel.TrySetParameter("P311", 1200);
+            panel.TrySetParameter("P1082", 2400); panel.TrySetParameter("SP", 600);
+            panel.ToggleHandAuto(); panel.PressRun();
+            var s = graph.Solve(.1f).ReadVoltage("G120.U2", "G120.V2");
+            Assert.That(s.FrequencyHz, Is.EqualTo(30).Within(.001)); Assert.That(s.AcRms, Is.EqualTo(230).Within(.001));
+            panel.TrySetParameter("SP", 1200); s = graph.Solve(.1f).ReadVoltage("G120.U2", "G120.V2");
+            Assert.That(s.FrequencyHz, Is.EqualTo(60).Within(.001)); Assert.That(s.AcRms, Is.EqualTo(380).Within(.001));
+            var phase = s.Inverter.Phase; Assert.That(graph.Solve(0, 32).ReadVoltage("G120.U2", "G120.V2").Inverter.Phase, Is.EqualTo(phase));
+            panel.SetFault(true); Assert.That(graph.Solve(0).ReadVoltage("G120.U2", "G120.V2").AcRms, Is.Zero);
+            panel.SetFault(false); mains = false; Assert.That(graph.Solve(0).ReadVoltage("G120.U2", "G120.V2").AcRms, Is.Zero);
+            panel.ResetFactorySettings(); Assert.That(graph.Solve(0).ReadVoltage("G120.U2", "G120.V2").Inverter.Phase, Is.Zero);
+        }
     }
 }

@@ -38,6 +38,8 @@ namespace ElectricalSim
         private Cc3dDocument loadedDocument;
         private SimulationSnapshot lastSnapshot;
         private InstrumentKind instrumentKind = InstrumentKind.Multimeter;
+        public OscilloscopeController Oscilloscope { get; private set; }
+        public void RegisterOscilloscope(OscilloscopeController instrument) { Oscilloscope = instrument; instrument.SetFaultMode(Mode == SimulationMode.Fault); }
         public MultimeterController Multimeter { get; private set; }
         public VoltageProbeController VoltageProbe { get; private set; }
         public void RegisterVoltageProbe(VoltageProbeController probe)
@@ -52,7 +54,7 @@ namespace ElectricalSim
         }
         public bool CanOperateFaultControls => Mode == SimulationMode.Fault && !IsInteractionBlocked &&
             instrumentKind != InstrumentKind.Tachometer && (Multimeter == null || !Multimeter.IsSelected || !Multimeter.IsBusy) &&
-            (VoltageProbe == null || !VoltageProbe.IsBusy);
+            (VoltageProbe == null || !VoltageProbe.IsBusy) && (Oscilloscope == null || !Oscilloscope.IsBusy);
         public TachometerController Tachometer { get; private set; }
         public void RegisterTachometer(TachometerController tachometer)
         {
@@ -204,6 +206,7 @@ namespace ElectricalSim
         private void Update()
         {
             if (heldPanelButton != null && (!Input.GetMouseButton(0) || IsFileOperationActive)) ReleasePanelButton();
+            if (Oscilloscope != null) Oscilloscope.InteractionBlocked = IsInteractionBlocked;
             if (!IsInteractionBlocked)
             {
                 HandleHotkeys();
@@ -211,7 +214,7 @@ namespace ElectricalSim
                 UpdateWiringDraft();
                 HandleSceneInput();
             }
-            else { Multimeter?.SuspendPointer(); VoltageProbe?.SuspendPointer(); }
+            else { Multimeter?.SuspendPointer(); VoltageProbe?.SuspendPointer(); Oscilloscope?.SuspendPointer(); }
             PreparePlcOutputs();
             var wasOverflowing = Liquid != null && Liquid.IsOverflowing;
             lastSnapshot = AdvanceSimulation(Time.deltaTime);
@@ -243,6 +246,7 @@ namespace ElectricalSim
             if (Tachometer != null) Tachometer.SetFaultMode(mode == SimulationMode.Fault);
             Multimeter?.SetFaultMode(mode == SimulationMode.Fault);
             VoltageProbe?.SetFaultMode(mode == SimulationMode.Fault);
+            Oscilloscope?.SetFaultMode(mode == SimulationMode.Fault);
             if (mode != SimulationMode.Drag) setInverterPanelVisible?.Invoke(false);
             foreach (var breaker in cabinetBreakers)
                 if (breaker != null) breaker.SetHighlighted(mode == SimulationMode.Drag);
@@ -259,6 +263,8 @@ namespace ElectricalSim
 
         public void ResetTraining()
         {
+            foreach (var device in graph.Devices.Values) if (device is InverterDriveRuntime drive) drive.ResetWaveform();
+            Oscilloscope?.ResetSettings();
             inverterPanel?.ResetFactorySettings();
             SelectInverter(false);
             ResetLiquidState();
@@ -289,11 +295,13 @@ namespace ElectricalSim
             if (Tachometer != null) Tachometer.Deselect();
             Multimeter?.Deselect();
             VoltageProbe?.Deselect();
+            Oscilloscope?.Deselect();
             instrumentKind = kind;
             meterPorts.Clear();
             instrumentText.text = kind == InstrumentKind.VoltageProbe ? "数字验电笔：请接触一个端子" : $"{InstrumentName(kind)}：请选择两个端子";
             SetMode(SimulationMode.Fault);
             if (kind == InstrumentKind.Tachometer && Tachometer != null) Tachometer.Select();
+            if (kind == InstrumentKind.Oscilloscope) Oscilloscope?.Select(Camera.main);
             if (kind == InstrumentKind.Multimeter) Multimeter?.Select(Camera.main);
             if (kind == InstrumentKind.VoltageProbe) VoltageProbe?.Select(Camera.main);
             ApplyPortAnchors();
@@ -460,6 +468,7 @@ namespace ElectricalSim
         {
             if (Mode == SimulationMode.Fault && VoltageProbe != null && VoltageProbe.IsSelected && VoltageProbe.HandleInput(Camera.main)) return;
             if (Mode == SimulationMode.Fault && Multimeter != null && Multimeter.IsSelected && Multimeter.HandleInput(Camera.main)) return;
+            if (Mode == SimulationMode.Fault && Oscilloscope != null && Oscilloscope.IsSelected && Oscilloscope.HandleInput(Camera.main)) return;
             if (TrySelectPlcFromPointer()) return;
             if (Mode == SimulationMode.Fault && instrumentKind == InstrumentKind.Tachometer)
             {
@@ -567,7 +576,7 @@ namespace ElectricalSim
 
             if (Mode == SimulationMode.Fault && port != null)
             {
-                if ((Multimeter == null || !Multimeter.IsSelected) && instrumentKind != InstrumentKind.VoltageProbe) HandleMeterPort(port);
+                if ((Multimeter == null || !Multimeter.IsSelected) && instrumentKind != InstrumentKind.VoltageProbe && instrumentKind != InstrumentKind.Oscilloscope) HandleMeterPort(port);
             }
             else if ((Mode == SimulationMode.Simulate || CanOperateFaultControls) && deviceView != null) HandleDeviceControl(deviceView.Runtime);
         }
@@ -988,6 +997,12 @@ namespace ElectricalSim
 
         private void UpdateInstrumentReadout()
         {
+            if (instrumentKind == InstrumentKind.Oscilloscope)
+            {
+                Oscilloscope?.Refresh(lastSnapshot);
+                if (instrumentText != null) instrumentText.text = "双通道差分示波器：请连接各通道正负探头";
+                return;
+            }
             // Refresh the instrument even when the legacy readout is absent or collapsed.
             if (instrumentKind == InstrumentKind.VoltageProbe)
             {
@@ -1023,9 +1038,7 @@ namespace ElectricalSim
             var voltage = instrument.Sample(MeasurementKind.AcVoltage, a, b, lastSnapshot);
             var dcVoltage = instrument.Sample(MeasurementKind.DcVoltage, a, b, lastSnapshot);
             var continuity = instrument.Sample(MeasurementKind.Continuity, a, b, lastSnapshot) > 0.5 ? "导通" : "断开";
-            instrumentText.text = instrumentKind == InstrumentKind.Oscilloscope
-                ? $"示波器：{voltage:0} V / 50 Hz"
-                : $"{InstrumentName(instrumentKind)}：{a} ↔ {b}\n交流 {voltage:0} V · 直流 {dcVoltage:+0;-0;0} V · {continuity}";
+            instrumentText.text = $"{InstrumentName(instrumentKind)}：{a} ↔ {b}\n交流 {voltage:0} V · 直流 {dcVoltage:+0;-0;0} V · {continuity}";
         }
 
         private void RefreshWireViews()

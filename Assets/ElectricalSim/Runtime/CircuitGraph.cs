@@ -95,6 +95,7 @@ namespace ElectricalSim
 
         public double GetDcVoltage(string portA, string portB)
         {
+            if (TryReadInverterVoltage(portA, portB, out var output)) return output.Valid ? output.Dc : double.NaN;
             if (TryGetSignalVoltage(portA, portB, out var signalVoltage)) return signalVoltage;
             var a = GetPotential(portA);
             var b = GetPotential(portB);
@@ -106,6 +107,7 @@ namespace ElectricalSim
 
         public double GetAcVoltage(string portA, string portB)
         {
+            if (TryReadInverterVoltage(portA, portB, out var output)) return output.Valid ? output.AcRms : double.NaN;
             var a = GetPotential(portA); var b = GetPotential(portB);
             if (a == ElectricalPotential.Conflict || b == ElectricalPotential.Conflict) return double.NaN;
             if (a == b) return 0d;
@@ -290,6 +292,7 @@ namespace ElectricalSim
                 }
                 converged &= protectionConverged;
             }
+            foreach (var drive in drives) drive.AdvanceWaveform(deltaTime);
             snapshot = BuildSnapshot();
             snapshot.IsConverged = converged;
             snapshot.IterationCount = iterationCount;
@@ -336,8 +339,16 @@ namespace ElectricalSim
             foreach (var drive in drives)
             {
                 drive.Validate(snapshot, errors);
-                foreach (var output in DriveOutputPorts)
-                    snapshot.MarkUnmodeledVoltageOutput(Port(drive.DeviceId, output), drive.IsActive);
+                snapshot.RegisterInverter(drive);
+            }
+            foreach (var drive in drives)
+            {
+                if (snapshot.InverterHasSharedSource(drive.DeviceId))
+                {
+                    drive.RejectSharedSource();
+                    snapshot.RegisterInverter(drive);
+                    errors.Add(drive.DeviceId + "：多个变频电源混接，输出已停止。");
+                }
                 foreach (var motor in motors)
                 {
                     var sample = drive.SampleMotor(motor.DeviceId, snapshot);

@@ -95,7 +95,7 @@ namespace ElectricalSim.Tests
             Assert.That(Read(VoltageProbeMode.DC, "SIGNAL.P").State, Is.EqualTo(VoltageProbeState.Conflict));
             SetUp();
             graph.RegisterDevice(new InverterDriveRuntime("G120", () => 600, () => false));
-            Assert.That(Read(VoltageProbeMode.AC, "G120.U2").State, Is.EqualTo(VoltageProbeState.Unsupported));
+            Assert.That(Read(VoltageProbeMode.AC, "G120.U2").State, Is.EqualTo(VoltageProbeState.UndefinedReference));
             var snapshot = graph.Solve(0);
             typeof(SimulationSnapshot).GetProperty("IsConverged").GetSetMethod(true).Invoke(snapshot, new object[] { false });
             Assert.That(probe.MeasureVoltageProbe(VoltageProbeMode.AC, "POWER.L1", snapshot).State, Is.EqualTo(VoltageProbeState.Unavailable));

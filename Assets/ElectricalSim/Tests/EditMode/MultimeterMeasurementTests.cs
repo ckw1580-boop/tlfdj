@@ -89,11 +89,11 @@ namespace ElectricalSim.Tests
             graph.RegisterDevice(new InverterDriveRuntime("G120", () => speed, () => false));
             foreach (var phase in new[] { "L1", "L2", "L3" }) graph.AddWire("POWER." + phase, "G120." + phase, Color.red);
             graph.AddWire("G120.U2", "TB.A", Color.red);
-            Assert.That(Read(MultimeterMode.AcVoltage, "TB.B", "G120.V2").State, Is.EqualTo(MultimeterReadingState.Unsupported));
+            Assert.That(Read(MultimeterMode.AcVoltage, "TB.B", "G120.V2").State, Is.EqualTo(MultimeterReadingState.Valid));
             Assert.That(Read(MultimeterMode.Continuity, "TB.A", "TB.B").State, Is.EqualTo(MultimeterReadingState.Energized));
             speed = 0;
             Assert.That(Read(MultimeterMode.Continuity, "TB.A", "TB.B").ShouldBeep, Is.True);
-            Assert.That(Read(MultimeterMode.AcVoltage, "TB.B", "G120.V2").State, Is.EqualTo(MultimeterReadingState.Unsupported));
+            Assert.That(Read(MultimeterMode.AcVoltage, "TB.B", "G120.V2").State, Is.EqualTo(MultimeterReadingState.Valid));
             Assert.That(Read(MultimeterMode.AcVoltage, "G120.L1", "G120.L2").Value, Is.EqualTo(380));
         }
         [Test]

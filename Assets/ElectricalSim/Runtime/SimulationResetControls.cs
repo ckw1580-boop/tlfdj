@@ -31,6 +31,7 @@ namespace ElectricalSim
             ReleasePanelButton();
             Multimeter?.SuspendPointer();
             VoltageProbe?.SuspendPointer();
+            if (Oscilloscope != null) { Oscilloscope.InteractionBlocked = true; Oscilloscope.SuspendPointer(); }
             // End pointer gestures without discarding the unfinished wire route or selection.
             draggedDevice = null;
             draggingWirePoint = false;
